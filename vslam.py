@@ -3,12 +3,17 @@ import numpy as np
 import cv2
 from matplotlib import pyplot as plt
 import time
-#from itertools import compress
-
+import sys
+ 
+print (sys.platform)
 
 # Inputs, images and camera info
-img1 = cv2.imread('/home/vik748/data/lab_timelapse2/G0050894.JPG',1)          # queryImage
-img2 = cv2.imread('/home/vik748/data/lab_timelapse2/G0050899.JPG',1)  
+if sys.platform == 'darwin':
+    img1 = cv2.imread('/Users/vik748/data/lab_timelapse2/G0050894.JPG',1)          # queryImage
+    img2 = cv2.imread('/Users/vik748/data/lab_timelapse2/G0050896.JPG',1)  
+else:    
+    img1 = cv2.imread('/home/vik748/data/lab_timelapse2/G0050894.JPG',1)          # queryImage
+    img2 = cv2.imread('/home/vik748/data/lab_timelapse2/G0050899.JPG',1)  
 
 gr1=cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
 gr2=cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
@@ -77,7 +82,7 @@ print("kp1",kp1[0].pt,dst1[0])
 
 E, mask = cv2.findEssentialMat(dst1, dst2, focal=1.0, pp=(0., 0.), 
                                method=cv2.RANSAC, prob=0.999, threshold=0.001)
-print "Essential matrix used ",np.asscalar(sum(mask)) ," of total ",len(matches),"matches"
+print ("Essential matrix used ",np.asscalar(sum(mask)) ," of total ",len(matches),"matches")
 
 img5 = displayMatches(gr1,kp1,gr2,kp2,mask)
 
@@ -90,9 +95,9 @@ print("recover pose mask:",np.sum(mask!=0))
 plt.imshow(img5),plt.show()
 
 M_r = np.hstack((R, t))
-print "M_r: ", M_r
+print ("M_r: ", M_r)
 M_l = np.hstack((np.eye(3, 3), np.zeros((3, 1))))
-print "M_l: ", M_l
+print ("M_l: ", M_l)
 
 P_l = np.dot(K,  M_l)
 P_r = np.dot(K,  M_r)
