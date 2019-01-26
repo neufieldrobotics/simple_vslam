@@ -2,15 +2,17 @@
 import numpy as np
 import cv2
 from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import time
 import sys
+from vslam_helper import *
  
 print (sys.platform)
 
 # Inputs, images and camera info
 if sys.platform == 'darwin':
     img1 = cv2.imread('/Users/vik748/data/lab_timelapse2/G0050894.JPG',1)          # queryImage
-    img2 = cv2.imread('/Users/vik748/data/lab_timelapse2/G0050896.JPG',1)  
+    img2 = cv2.imread('/Users/vik748/data/lab_timelapse2/G0050899.JPG',1)  
 else:    
     img1 = cv2.imread('/home/vik748/data/lab_timelapse2/G0050894.JPG',1)          # queryImage
     img2 = cv2.imread('/home/vik748/data/lab_timelapse2/G0050899.JPG',1)  
@@ -31,31 +33,6 @@ D = np.float64([-0.276796, 0.113400, -0.000349, -0.000469]);
 
 print(K,D)
 
-def undistortKeyPoints(kps, K, D):
-    '''
-    This function extracts coordinates from keypoint object,
-    undistorts them using K and D and returns undistorted coordinates"
-    '''
-    kp_pts = np.array([o.pt for o in kps])
-    kp_pts_cont = np.ascontiguousarray(kp_pts[:,:2]).reshape((kp_pts.shape[0],1,2))
-    # this version returns normalized points with F=1 and centered at 0,0
-    # cv2.undistortPoints(kp_pts_cont, K, D,  noArray(), K) would return unnormalized output
-    return	cv2.undistortPoints(kp_pts_cont, K, D)
-
-def displayMatches(img_left,kp1,img_right,kp2,mask):
-    '''
-    This function extracts takes a 2 images, set of keypoints and a mask of valid
-    (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
-    '''
-    bool_mask = mask.astype(bool)
-    img_valid = cv2.drawMatches(img_left,kp1,img_right,kp2,matches, None, 
-                                matchColor=(0, 255, 0), 
-                                matchesMask=bool_mask.ravel().tolist(), flags=2)
-    img_all = cv2.drawMatches(img_left,kp1,img_right,kp2,matches, img_valid, 
-                              matchColor=(255, 0, 0), 
-                              matchesMask=np.invert(bool_mask).ravel().tolist(), 
-                              flags=1)
-    return img_all
 
 # Initiate ORB detector
 orb = cv2.ORB_create()
@@ -84,13 +61,13 @@ E, mask = cv2.findEssentialMat(dst1, dst2, focal=1.0, pp=(0., 0.),
                                method=cv2.RANSAC, prob=0.999, threshold=0.001)
 print ("Essential matrix used ",np.asscalar(sum(mask)) ," of total ",len(matches),"matches")
 
-img5 = displayMatches(gr1,kp1,gr2,kp2,mask)
+img5 = displayMatches(gr1,kp1,gr2,kp2,matches,mask)
 
-points, R, t, mask = cv2.recoverPose(E, dst1, dst2,mask=mask)
+points, R, t, mask_recPose = cv2.recoverPose(E, dst1, dst2,mask=mask)
 print("points:",points)
 print("R:",R)
 print("t:",t.transpose())
-print("recover pose mask:",np.sum(mask!=0))
+print("recover pose mask:",np.sum(mask_recPose!=0))
 
 plt.imshow(img5),plt.show()
 
@@ -101,7 +78,24 @@ print ("M_l: ", M_l)
 
 P_l = np.dot(K,  M_l)
 P_r = np.dot(K,  M_r)
-point_4d_hom = cv2.triangulatePoints(P_l, P_r, np.expand_dims(pts_l, axis=1), np.expand_dims(pts_r, axis=1))
-point_4d = point_4d_hom / np.tile(point_4d_hom[-1, :], (4, 1))
-point_3d = point_4d[:3, :].T
+print("dst: ",dst1)
+point_4d_hom = cv2.triangulatePoints(P_l, P_r, 
+                                     dst1[mask_recPose[:,0]==1].T, 
+                                     dst2[mask_recPose[:,0]==1].T).T
+#point_4d = point_4d_hom / np.tile(point_4d_hom[-1, :], (4, 1))
+point_4d = point_4d_hom /  point_4d_hom[:,-1][:,None]
+point_3d = point_4d[:, :3]
+#print(point_3d)
 
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.set_aspect('equal')         # important!
+title = ax.set_title('3D Test')
+graph, = ax.plot(point_3d[:,0], point_3d[:,1], point_3d[:,2], linestyle="", marker="o")
+
+plot_pose3_on_axes(ax,R,t.T, axis_length=1.0)
+plot_pose3_on_axes(ax,np.eye(3),np.zeros(3)[np.newaxis], axis_length=1.0)
+
+set_axes_equal(ax)             # important!
+
+plt.show()
