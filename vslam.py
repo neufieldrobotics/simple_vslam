@@ -14,8 +14,8 @@ if sys.platform == 'darwin':
     img1 = cv2.imread('/Users/vik748/data/lab_timelapse2/G0050894.JPG',1)          # queryImage
     img2 = cv2.imread('/Users/vik748/data/lab_timelapse2/G0050899.JPG',1)  
 else:    
-    img1 = cv2.imread('/home/vik748/data/lab_timelapse2/G0050894.JPG',1)          # queryImage
-    img2 = cv2.imread('/home/vik748/data/lab_timelapse2/G0050899.JPG',1)  
+    img1 = cv2.imread('/home/vik748/data/test_set/GOPR1429.JPG',1)          # queryImage
+    img2 = cv2.imread('/home/vik748/data/test_set/GOPR1430.JPG',1)  
 
 gr1=cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
 gr2=cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
@@ -131,7 +131,7 @@ frames_list = []
 if sys.platform == 'darwin':
     curr_frame = cv2.imread('/Users/vik748/data/lab_timelapse2/G0050900.JPG',1)          # queryImage
 else:    
-    curr_frame = cv2.imread('/home/vik748/data/lab_timelapse2/G0050900.JPG',1)          # queryImage
+    curr_frame = cv2.imread('/home/vik748/data/test_set/GOPR1431.JPG',1)          # queryImage
 
 second_frame = Frames(gr2,orb)
 lm = np.zeros(mask_recPose.shape[0],dtype=int)
