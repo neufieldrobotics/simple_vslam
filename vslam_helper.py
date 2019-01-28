@@ -13,11 +13,12 @@ def undistortKeyPoints(kps, K, D):
     This function extracts coordinates from keypoint object,
     undistorts them using K and D and returns undistorted coordinates"
     '''
-    kp_pts = np.array([o.pt for o in kps])
-    kp_pts_cont = np.ascontiguousarray(kp_pts[:,:2]).reshape((kp_pts.shape[0],1,2))
+    #kp_pts = np.array([o.pt for o in kps])
+    #kp_pts_cont = np.ascontiguousarray(kp_pts[:,:2]).reshape((kp_pts.shape[0],1,2))
     # this version returns normalized points with F=1 and centered at 0,0
     # cv2.undistortPoints(kp_pts_cont, K, D,  noArray(), K) would return unnormalized output
-    return	cv2.undistortPoints(kp_pts_cont, K, D)[:,0,:]
+    return	cv2.undistortPoints(np.expand_dims(kps, axis=1), 
+                               cameraMatrix=K, distCoeffs=D)[:,0,:]
 
 def displayMatches(img_left,kp1,img_right,kp2, matches, mask):
     '''
