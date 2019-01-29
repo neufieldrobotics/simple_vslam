@@ -120,9 +120,28 @@ lm[mask_RP_12.ravel()==1]=np.arange(np.sum(mask_RP_12))
 frame2_to_lm = {mat.trainIdx:lm_id for lm_id,mat in zip(lm, matches12)
                 if lm_id!=0 }
 
-#frame 3 stuff
+# Filter frame 2 to frame 3 matches
+kp2_match_23 = np.array([kp2[mat.queryIdx].pt for mat in matches23])
+kp3_match_23 = np.array([kp3[mat.trainIdx].pt for mat in matches23])
 
-frame3_to_frame2 = {mat.trainIdx:mat.queryIdx for mat in matches23}
+kp2_match_23_ud = undistortKeyPoints(kp2_match_23,K,D)
+kp3_match_23_ud = undistortKeyPoints(kp3_match_23,K,D)
+
+E_23, mask_e_23 = cv2.findEssentialMat(kp2_match_23_ud, kp3_match_23_ud, focal=1.0, pp=(0., 0.), 
+                               method=cv2.RANSAC, prob=0.999, threshold=0.01)
+
+print ("Essential matrix: used ",np.sum(mask_e_23) ," of total ",len(matches23),"matches")
+
+points, R_23, t_23, mask_RP_23 = cv2.recoverPose(E_23, kp2_match_23_ud, kp3_match_23_ud,mask=mask_e_23)
+
+#img23 = displayMatches(gr2,kp2,gr3,kp3,matches23,mask_RP_23)
+#time.sleep(3)
+#plt.imshow(img23),plt.show()
+
+matches23_filt = [matches23[i] for i in range(len(matches23)) if mask_RP_23[i]==1]
+
+#frame 3 stuff
+frame3_to_frame2 = {mat.trainIdx:mat.queryIdx for mat in matches23_filt}
 
 frame3_to_lm = {id:frame2_to_lm.get(frame3_to_frame2[id]) 
                 for id in frame3_to_frame2.keys() 
@@ -136,11 +155,12 @@ lm_kps_3 = np.array([kp3[k].pt for k in frame3_to_lm.keys()])
 
 (success, rvec_23, t_23) = cv2.solvePnP(landmarks_23, lm_kps_3, K, D, flags=cv2.SOLVEPNP_ITERATIVE)
 R_23, jacobian	=	cv2.Rodrigues(rvec_23)
+camera_position = np.matmul((-R_23).T,t_23)    
+
 
 graph, = ax.plot(landmarks_23[:,0], landmarks_23[:,1], landmarks_23[:,2], linestyle="", marker="o", color='r')
 
-plot_pose3_on_axes(ax,R_23,t_23.T, axis_length=5.0)
+plot_pose3_on_axes(ax,R_23,camera_position, axis_length=5.0)
 
 set_axes_equal(ax)             # important!
-
 plt.show()
