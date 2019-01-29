@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import numpy as np
+from numpy.linalg import inv
 import cv2
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -11,9 +12,9 @@ print (sys.platform)
 
 # Inputs, images and camera info
 if sys.platform == 'darwin':
-    img1 = cv2.imread('/Users/vik748/data/lab_timelapse2/G0050894.JPG',1)          # queryImage
-    img2 = cv2.imread('/Users/vik748/data/lab_timelapse2/G0050899.JPG',1)  
-    img3 = cv2.imread('/Users/vik748/data/lab_timelapse2/G0050899.JPG',1)  
+    img1 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1429.JPG',1)          # queryImage
+    img2 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1430.JPG',1)  
+    img3 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1431.JPG',1)  
 else:    
     img1 = cv2.imread('/home/vik748/data/test_set/GOPR1429.JPG',1)          # queryImage
     img2 = cv2.imread('/home/vik748/data/test_set/GOPR1430.JPG',1)  
@@ -21,7 +22,7 @@ else:
 
 gr1=cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
 gr2=cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
-gr3=cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
+gr3=cv2.cvtColor(img3,cv2.COLOR_BGR2GRAY)
 
 fx = 3551.342810
 fy = 3522.689669
@@ -38,7 +39,7 @@ print(K,D)
 
 
 # Initiate ORB detector
-orb = cv2.ORB_create()
+orb = cv2.ORB_create(nfeatures=5000)
 
 # find the keypoints and descriptors with ORB
 kp1, des1 = orb.detectAndCompute(gr1,None)
@@ -96,14 +97,14 @@ fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 ax.set_aspect('equal')         # important!
 title = ax.set_title('3D Test')
-graph, = ax.plot(point_3d[:,0], point_3d[:,1], point_3d[:,2], linestyle="", marker="o")
+graph, = ax.plot(landmarks_12[:,0], landmarks_12[:,1], landmarks_12[:,2], linestyle="", marker="o")
 
-plot_pose3_on_axes(ax,R_12,t_12.T, axis_length=1.0)
-plot_pose3_on_axes(ax,np.eye(3),np.zeros(3)[np.newaxis], axis_length=2.0)
+plot_pose3_on_axes(ax,np.linalg.inv(R_12),-t_12.T, axis_length=1.0)
+plot_pose3_on_axes(ax,np.eye(3),np.zeros(3)[np.newaxis], axis_length=1.0)
 
 set_axes_equal(ax)             # important!
 
-plt.show()
+#plt.show()
 
 '''
 process frame
@@ -113,29 +114,32 @@ k k=1..K
 The associated set of 3D landmarks {X } .i
 '''
 
-lm = np.zeros(mask_recPose.shape[0],dtype=int)
-lm[mask_recPose.ravel()==1]=np.arange(np.sum(mask_recPose))
+lm = np.zeros(mask_RP_12.shape[0],dtype=int)
+lm[mask_RP_12.ravel()==1]=np.arange(np.sum(mask_RP_12))
 
-second_frame.lm_matches = {mat.trainIdx:lm_id for lm_id,mat in zip(lm, matches)
-                           if lm_id!=0 }
+frame2_to_lm = {mat.trainIdx:lm_id for lm_id,mat in zip(lm, matches12)
+                if lm_id!=0 }
 
-curr_frame_gr=cv2.cvtColor(curr_frame,cv2.COLOR_BGR2GRAY)
-frames_list.append(Frames(curr_frame_gr,orb))
-frames_list[0].match_prev_frame(second_frame,bf)
-frames_list[0].lm_matches = {id:second_frame.lm_matches.get(frames_list[0].match_dict[id]) 
-                             for id in frames_list[0].match_dict.keys() 
-                             if second_frame.lm_matches.get(frames_list[0].match_dict[id]) 
-                             is not None}
-print(len(frames_list[0].lm_matches))
-lm3d = np.array([point_3d[frames_list[0].lm_matches[k]] for k in 
-                 frames_list[0].lm_matches.keys()])
-pts2d = np.array([frames_list[0].keypoints[k].pt for k in frames_list[0].lm_matches.keys()])
+#frame 3 stuff
 
-(success, rvec, t) = cv2.solvePnP(lm3d, pts2d, K, D, flags=cv2.SOLVEPNP_ITERATIVE)
-R, jacobian	=	cv2.Rodrigues(rvec)
+frame3_to_frame2 = {mat.trainIdx:mat.queryIdx for mat in matches23}
 
+frame3_to_lm = {id:frame2_to_lm.get(frame3_to_frame2[id]) 
+                for id in frame3_to_frame2.keys() 
+                if frame2_to_lm.get(frame3_to_frame2[id]) is not None}
+print(len(frame3_to_lm))
 
-plot_pose3_on_axes(ax,R,t.T, axis_length=5.0)
+landmarks_23 = np.array([landmarks_12[frame3_to_lm[k]] for k in 
+                        frame3_to_lm.keys()])
+
+lm_kps_3 = np.array([kp3[k].pt for k in frame3_to_lm.keys()])
+
+(success, rvec_23, t_23) = cv2.solvePnP(landmarks_23, lm_kps_3, K, D, flags=cv2.SOLVEPNP_ITERATIVE)
+R_23, jacobian	=	cv2.Rodrigues(rvec_23)
+
+graph, = ax.plot(landmarks_23[:,0], landmarks_23[:,1], landmarks_23[:,2], linestyle="", marker="o", color='r')
+
+plot_pose3_on_axes(ax,R_23,t_23.T, axis_length=5.0)
 
 set_axes_equal(ax)             # important!
 
