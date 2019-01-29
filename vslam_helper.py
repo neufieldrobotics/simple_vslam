@@ -24,6 +24,7 @@ def displayMatches(img_left,kp1,img_right,kp2, matches, mask):
     '''
     This function extracts takes a 2 images, set of keypoints and a mask of valid
     (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
+    The mask should be the same length as matches
     '''
     bool_mask = mask.astype(bool)
     img_valid = cv2.drawMatches(img_left,kp1,img_right,kp2,matches, None, 
