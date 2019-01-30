@@ -20,6 +20,16 @@ else:
     img2 = cv2.imread('/home/vik748/data/test_set/GOPR1430.JPG',1)  
     img3 = cv2.imread('/home/vik748/data/test_set/GOPR1431.JPG',1)  
 
+# Inputs, images and camera info
+if sys.platform == 'darwin':
+    img1 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1429.JPG',1)          # queryImage
+    img2 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1430.JPG',1)  
+    img3 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1431.JPG',1)  
+else:    
+    img1 = cv2.imread('/home/vik748/data/chess_board/GOPR1453.JPG',1)          # queryImage
+    img2 = cv2.imread('/home/vik748/data/chess_board/GOPR1452.JPG',1)  
+    img3 = cv2.imread('/home/vik748/data/chess_board/GOPR1451.JPG',1)  
+
 gr1=cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
 gr2=cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
 gr3=cv2.cvtColor(img3,cv2.COLOR_BGR2GRAY)
@@ -39,7 +49,7 @@ print(K,D)
 
 
 # Initiate ORB detector
-orb = cv2.ORB_create(nfeatures=5000)
+orb = cv2.ORB_create(nfeatures=25000)
 
 # find the keypoints and descriptors with ORB
 kp1, des1 = orb.detectAndCompute(gr1,None)
@@ -77,17 +87,24 @@ print("t:",t_12.transpose())
 img12 = displayMatches(gr1,kp1,gr2,kp2,matches12,mask_RP_12)
 plt.imshow(img12),plt.show()
 
+'''
 Pose_1 = np.dot(K,np.hstack((np.eye(3, 3), np.zeros((3, 1)))))
 print ("Pose_1: ", Pose_1)
 Pose_2 = np.dot(K, np.hstack((R_12, t_12)))
+print ("Pose_2: ", Pose_2)
+'''
+
+Pose_1 = np.hstack((np.eye(3, 3), np.zeros((3, 1))))
+print ("Pose_1: ", Pose_1)
+Pose_2 = np.hstack((R_12, t_12))
 print ("Pose_2: ", Pose_2)
 
 #P_l = np.dot(K,  M_l)
 #P_r = np.dot(K,  M_r)
 #print("dst: ",dst1)
 landmarks_12_hom = cv2.triangulatePoints(Pose_1, Pose_2, 
-                                     kp1_match_12[mask_RP_12[:,0]==1].T, 
-                                     kp2_match_12[mask_RP_12[:,0]==1].T).T
+                                     kp1_match_12_ud[mask_RP_12[:,0]==1].T, 
+                                     kp2_match_12_ud[mask_RP_12[:,0]==1].T).T
 #point_4d = point_4d_hom / np.tile(point_4d_hom[-1, :], (4, 1))
 landmarks_12_hom_norm = landmarks_12_hom /  landmarks_12_hom[:,-1][:,None]
 landmarks_12 = landmarks_12_hom_norm[:, :3]
@@ -104,7 +121,7 @@ plot_pose3_on_axes(ax,np.eye(3),np.zeros(3)[np.newaxis], axis_length=1.0)
 
 set_axes_equal(ax)             # important!
 
-#plt.show()
+plt.show()
 
 '''
 process frame
@@ -160,7 +177,7 @@ camera_position = np.matmul((-R_23).T,t_23)
 
 graph, = ax.plot(landmarks_23[:,0], landmarks_23[:,1], landmarks_23[:,2], linestyle="", marker="o", color='r')
 
-plot_pose3_on_axes(ax,R_23,camera_position, axis_length=5.0)
+plot_pose3_on_axes(ax,R_23.T,camera_position.T, axis_length=5.0)
 
 set_axes_equal(ax)             # important!
 plt.show()
