@@ -20,7 +20,7 @@ def undistortKeyPoints(kps, K, D):
     return	cv2.undistortPoints(np.expand_dims(kps, axis=1), 
                                cameraMatrix=K, distCoeffs=D)[:,0,:]
 
-def displayMatches(img_left,kp1,img_right,kp2, matches, mask):
+def displayMatches(img_left,kp1,img_right,kp2, matches, mask, display_invalid):
     '''
     This function extracts takes a 2 images, set of keypoints and a mask of valid
     (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
@@ -30,10 +30,12 @@ def displayMatches(img_left,kp1,img_right,kp2, matches, mask):
     img_valid = cv2.drawMatches(img_left,kp1,img_right,kp2,matches, None, 
                                 matchColor=(0, 255, 0), 
                                 matchesMask=bool_mask.ravel().tolist(), flags=2)
-    #img_all = cv2.drawMatches(img_left,kp1,img_right,kp2,matches, img_valid, 
-    #                          matchColor=(255, 0, 0), 
-    #                          matchesMask=np.invert(bool_mask).ravel().tolist(), 
-    #                          flags=1)
+    
+    if display_invalid:
+        img_valid = cv2.drawMatches(img_left,kp1,img_right,kp2,matches, img_valid, 
+                                  matchColor=(255, 0, 0), 
+                                  matchesMask=np.invert(bool_mask).ravel().tolist(), 
+                                  flags=1)
     return img_valid
 
 def set_axes_radius(ax, origin, radius):
@@ -79,3 +81,7 @@ def plot_pose3_on_axes(axes, gRp, origin, axis_length=0.1):
     z_axis = origin + gRp[:, 2] * axis_length
     line = np.append(origin, z_axis, axis=0)
     axes.plot(line[:, 0], line[:, 1], line[:, 2], 'b-')
+
+def plot_3d_points(axes, vals, *args, **kwargs):
+    graph, = axes.plot(vals[:,0], vals[:,1], vals[:,2], *args, **kwargs)
+    return

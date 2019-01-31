@@ -7,6 +7,8 @@ from mpl_toolkits.mplot3d import Axes3D
 import time
 import sys
 from vslam_helper import *
+from ssc import *
+
  
 print (sys.platform)
 
@@ -22,13 +24,12 @@ else:
 
 # Inputs, images and camera info
 if sys.platform == 'darwin':
-    img1 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1429.JPG',1)          # queryImage
-    img2 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1430.JPG',1)  
-    img3 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1431.JPG',1)  
-else:    
-    img1 = cv2.imread('/home/vik748/data/chess_board/GOPR1452.JPG',1)          # queryImage
-    img2 = cv2.imread('/home/vik748/data/chess_board/GOPR1453.JPG',1)  
-    img3 = cv2.imread('/home/vik748/data/chess_board/GOPR1451.JPG',1)  
+    path = '/Users/vik748/Google Drive/'
+else:
+    path = '/home/vik748/'
+img1 = cv2.imread(path+'data/chess_board/GOPR1484.JPG',1)          # queryImage
+img2 = cv2.imread(path+'data/chess_board/GOPR1485.JPG',1)  
+img3 = cv2.imread(path+'data/chess_board/GOPR1486.JPG',1)  
 
 gr1=cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
 gr2=cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
@@ -49,12 +50,27 @@ print(K,D)
 
 
 # Initiate ORB detector
-orb = cv2.ORB_create(nfeatures=10000)
+orb = cv2.ORB_create(nfeatures=10000, edgeThreshold=15, patchSize=65, nlevels=32, 
+                     fastThreshold=20, scaleFactor=1.2, WTA_K=2,
+                     scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
+
 
 # find the keypoints and descriptors with ORB
-kp1, des1 = orb.detectAndCompute(gr1,None)
-kp2, des2 = orb.detectAndCompute(gr2,None)
-kp3, des3 = orb.detectAndCompute(gr3,None)
+kp1 = orb.detect(gr1,None)
+kp2 = orb.detect(gr2,None)
+kp3 = orb.detect(gr3,None)
+
+kp1 = sorted(kp1, key = lambda x:x.response, reverse = True)
+kp2 = sorted(kp2, key = lambda x:x.response, reverse = True)
+kp3 = sorted(kp3, key = lambda x:x.response, reverse = True)
+
+kp1 = SSC(kp1, 1000, 0.1, gr1.shape[1], gr1.shape[0])
+kp2 = SSC(kp2, 1000, 0.1, gr1.shape[1], gr1.shape[0])
+kp3 = SSC(kp3, 1000, 0.1, gr1.shape[1], gr1.shape[0])
+
+kp1, des1 = orb.compute(gr1,kp1)
+kp2, des2 = orb.compute(gr2,kp2)
+kp3, des3 = orb.compute(gr3,kp3)
 
 # create BFMatcher object - Brute Force
 bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
@@ -63,8 +79,8 @@ bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 matches12 = bf.match(des1,des2)
 matches23 = bf.match(des2,des3)
 
-matches12 = sorted(matches12, key = lambda x:x.distance)
-matches12 = matches12[0:(int)(len(matches12)*.75)]
+#matches12 = sorted(matches12, key = lambda x:x.distance)
+#matches12 = matches12[:(int)(len(matches12)*.75)]
 
 
 #matches = sorted(matches, key = lambda x:x.distance)
@@ -78,7 +94,7 @@ kp2_match_12_ud = cv2.undistortPoints(np.expand_dims(kp2_match_12,axis=1),K,D)
 #print("kp1",kp1[0].pt,dst1[0])
 
 E_12, mask_e_12 = cv2.findEssentialMat(kp1_match_12_ud, kp2_match_12_ud, focal=1.0, pp=(0., 0.), 
-                               method=cv2.RANSAC, prob=0.999, threshold=0.01)
+                               method=cv2.RANSAC, prob=0.999, threshold=0.001)
 
 print ("Essential matrix: used ",np.sum(mask_e_12) ," of total ",len(matches12),"matches")
 
@@ -88,7 +104,7 @@ print("R:",R_12)
 print("t:",t_12.transpose())
 
 
-img12 = displayMatches(gr1,kp1,gr2,kp2,matches12,mask_RP_12)
+img12 = displayMatches(gr1,kp1,gr2,kp2,matches12,mask_RP_12, False)
 plt.imshow(img12),plt.show()
 
 '''
@@ -115,14 +131,10 @@ print ("Pose_2: ", Pose_2)
 landmarks_12_hom = cv2.triangulatePoints(Pose_1, Pose_2, 
                                      kp1_match_12_ud[mask_RP_12[:,0]==1], 
                                      kp2_match_12_ud[mask_RP_12[:,0]==1]).T
-#point_4d = point_4d_hom / np.tile(point_4d_hom[-1, :], (4, 1))
 landmarks_12_hom_norm = landmarks_12_hom /  landmarks_12_hom[:,-1][:,None]
 landmarks_12 = landmarks_12_hom_norm[:, :3]
 
-corners_12_hom = cv2.triangulatePoints(Pose_1, Pose_2, 
-                                        corners1_ud, 
-                                        corners2_ud).T
-#corners_4d = corners_4d_hom / np.tile(corners_4d_hom[-1, :], (4, 1))
+corners_12_hom = cv2.triangulatePoints(Pose_1, Pose_2, corners1_ud, corners2_ud).T
 corners_12_hom_norm = corners_12_hom /  corners_12_hom[:,-1][:,None]
 corners_12 = corners_12_hom_norm[:, :3]
 #print(point_3d)
@@ -132,17 +144,18 @@ ax = fig.add_subplot(111, projection='3d')
 ax.set_aspect('equal')         # important!
 title = ax.set_title('3D Test')
 ax.set_zlim3d(-5,10)
-graph, = ax.plot(landmarks_12[:,0], landmarks_12[:,1], landmarks_12[:,2], linestyle="", marker="o")
+#graph, = ax.plot(landmarks_12[:,0], landmarks_12[:,1], landmarks_12[:,2], linestyle="", marker="o")
+grapht = plot_3d_points(ax, landmarks_12, linestyle="", marker="o")
 graph, = ax.plot(corners_12[:,0], corners_12[:,1], corners_12[:,2], linestyle="", marker=".",color='g')
 
 plot_pose3_on_axes(ax,np.linalg.inv(R_12),-t_12.T, axis_length=1.0)
 plot_pose3_on_axes(ax,np.eye(3),np.zeros(3)[np.newaxis], axis_length=1.0)
 
-#set_axes_equal(ax)             # important!
+set_axes_equal(ax)             # important!
 
 
 
-plt.show()
+#plt.show()
 
 '''
 process frame
@@ -166,13 +179,13 @@ kp2_match_23_ud = undistortKeyPoints(kp2_match_23,K,D)
 kp3_match_23_ud = undistortKeyPoints(kp3_match_23,K,D)
 
 E_23, mask_e_23 = cv2.findEssentialMat(kp2_match_23_ud, kp3_match_23_ud, focal=1.0, pp=(0., 0.), 
-                               method=cv2.RANSAC, prob=0.999, threshold=0.01)
+                               method=cv2.RANSAC, prob=0.999, threshold=0.001)
 
 print ("Essential matrix: used ",np.sum(mask_e_23) ," of total ",len(matches23),"matches")
 
 points, R_23, t_23, mask_RP_23 = cv2.recoverPose(E_23, kp2_match_23_ud, kp3_match_23_ud,mask=mask_e_23)
 
-#img23 = displayMatches(gr2,kp2,gr3,kp3,matches23,mask_RP_23)
+#img23 = displayMatches(gr2,kp2,gr3,kp3,matches23,mask_RP_23, False)
 #time.sleep(3)
 #plt.imshow(img23),plt.show()
 
