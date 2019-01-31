@@ -26,8 +26,8 @@ if sys.platform == 'darwin':
     img2 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1430.JPG',1)  
     img3 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1431.JPG',1)  
 else:    
-    img1 = cv2.imread('/home/vik748/data/chess_board/GOPR1453.JPG',1)          # queryImage
-    img2 = cv2.imread('/home/vik748/data/chess_board/GOPR1452.JPG',1)  
+    img1 = cv2.imread('/home/vik748/data/chess_board/GOPR1452.JPG',1)          # queryImage
+    img2 = cv2.imread('/home/vik748/data/chess_board/GOPR1453.JPG',1)  
     img3 = cv2.imread('/home/vik748/data/chess_board/GOPR1451.JPG',1)  
 
 gr1=cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
@@ -49,7 +49,7 @@ print(K,D)
 
 
 # Initiate ORB detector
-orb = cv2.ORB_create(nfeatures=25000)
+orb = cv2.ORB_create(nfeatures=10000)
 
 # find the keypoints and descriptors with ORB
 kp1, des1 = orb.detectAndCompute(gr1,None)
@@ -63,13 +63,17 @@ bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 matches12 = bf.match(des1,des2)
 matches23 = bf.match(des2,des3)
 
+matches12 = sorted(matches12, key = lambda x:x.distance)
+matches12 = matches12[0:(int)(len(matches12)*.75)]
+
+
 #matches = sorted(matches, key = lambda x:x.distance)
 
 kp1_match_12 = np.array([kp1[mat.queryIdx].pt for mat in matches12])
 kp2_match_12 = np.array([kp2[mat.trainIdx].pt for mat in matches12])
 
-kp1_match_12_ud = undistortKeyPoints(kp1_match_12,K,D)
-kp2_match_12_ud = undistortKeyPoints(kp2_match_12,K,D)
+kp1_match_12_ud = cv2.undistortPoints(np.expand_dims(kp1_match_12,axis=1),K,D)
+kp2_match_12_ud = cv2.undistortPoints(np.expand_dims(kp2_match_12,axis=1),K,D)
 
 #print("kp1",kp1[0].pt,dst1[0])
 
@@ -94,6 +98,12 @@ Pose_2 = np.dot(K, np.hstack((R_12, t_12)))
 print ("Pose_2: ", Pose_2)
 '''
 
+ret1, corners1 = cv2.findChessboardCorners(gr1, (16,9),None)
+ret2, corners2 = cv2.findChessboardCorners(gr2, (16,9),None)
+
+corners1_ud = cv2.undistortPoints(corners1,K,D)
+corners2_ud = cv2.undistortPoints(corners2,K,D)
+
 Pose_1 = np.hstack((np.eye(3, 3), np.zeros((3, 1))))
 print ("Pose_1: ", Pose_1)
 Pose_2 = np.hstack((R_12, t_12))
@@ -103,23 +113,34 @@ print ("Pose_2: ", Pose_2)
 #P_r = np.dot(K,  M_r)
 #print("dst: ",dst1)
 landmarks_12_hom = cv2.triangulatePoints(Pose_1, Pose_2, 
-                                     kp1_match_12_ud[mask_RP_12[:,0]==1].T, 
-                                     kp2_match_12_ud[mask_RP_12[:,0]==1].T).T
+                                     kp1_match_12_ud[mask_RP_12[:,0]==1], 
+                                     kp2_match_12_ud[mask_RP_12[:,0]==1]).T
 #point_4d = point_4d_hom / np.tile(point_4d_hom[-1, :], (4, 1))
 landmarks_12_hom_norm = landmarks_12_hom /  landmarks_12_hom[:,-1][:,None]
 landmarks_12 = landmarks_12_hom_norm[:, :3]
+
+corners_12_hom = cv2.triangulatePoints(Pose_1, Pose_2, 
+                                        corners1_ud, 
+                                        corners2_ud).T
+#corners_4d = corners_4d_hom / np.tile(corners_4d_hom[-1, :], (4, 1))
+corners_12_hom_norm = corners_12_hom /  corners_12_hom[:,-1][:,None]
+corners_12 = corners_12_hom_norm[:, :3]
 #print(point_3d)
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 ax.set_aspect('equal')         # important!
 title = ax.set_title('3D Test')
+ax.set_zlim3d(-5,10)
 graph, = ax.plot(landmarks_12[:,0], landmarks_12[:,1], landmarks_12[:,2], linestyle="", marker="o")
+graph, = ax.plot(corners_12[:,0], corners_12[:,1], corners_12[:,2], linestyle="", marker=".",color='g')
 
 plot_pose3_on_axes(ax,np.linalg.inv(R_12),-t_12.T, axis_length=1.0)
 plot_pose3_on_axes(ax,np.eye(3),np.zeros(3)[np.newaxis], axis_length=1.0)
 
-set_axes_equal(ax)             # important!
+#set_axes_equal(ax)             # important!
+
+
 
 plt.show()
 

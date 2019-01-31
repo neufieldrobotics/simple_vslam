@@ -30,11 +30,11 @@ def displayMatches(img_left,kp1,img_right,kp2, matches, mask):
     img_valid = cv2.drawMatches(img_left,kp1,img_right,kp2,matches, None, 
                                 matchColor=(0, 255, 0), 
                                 matchesMask=bool_mask.ravel().tolist(), flags=2)
-    img_all = cv2.drawMatches(img_left,kp1,img_right,kp2,matches, img_valid, 
-                              matchColor=(255, 0, 0), 
-                              matchesMask=np.invert(bool_mask).ravel().tolist(), 
-                              flags=1)
-    return img_all
+    #img_all = cv2.drawMatches(img_left,kp1,img_right,kp2,matches, img_valid, 
+    #                          matchColor=(255, 0, 0), 
+    #                          matchesMask=np.invert(bool_mask).ravel().tolist(), 
+    #                          flags=1)
+    return img_valid
 
 def set_axes_radius(ax, origin, radius):
     ax.set_xlim3d([origin[0] - radius, origin[0] + radius])
