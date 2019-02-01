@@ -87,6 +87,6 @@ def plot_3d_points(axes, vals, *args, **kwargs):
     return
 
 def pose_inv(R_in, t_in):
-    t_out = np.matmul((-R_in).T,t_in)
+    t_out = -np.matmul((R_in).T,t_in)
     R_out = R_in.T
     return R_out,t_out
