@@ -85,3 +85,8 @@ def plot_pose3_on_axes(axes, gRp, origin, axis_length=0.1):
 def plot_3d_points(axes, vals, *args, **kwargs):
     graph, = axes.plot(vals[:,0], vals[:,1], vals[:,2], *args, **kwargs)
     return
+
+def pose_inv(R_in, t_in):
+    t_out = np.matmul((-R_in).T,t_in)
+    R_out = R_in.T
+    return R_out,t_out
