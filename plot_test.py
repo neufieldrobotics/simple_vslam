@@ -21,16 +21,15 @@ title = ax.set_title('3D Test')
 
 plot_pose3_on_axes(ax,np.eye(3),np.zeros(3)[np.newaxis], axis_length=0.5)
 
-R = np.array([[ 0.751, -0.075, -0.656],
-              [ 0.023,  0.996, -0.087],
-              [ 0.66 ,  0.05 ,  0.749]])
+#R = np.array([[ 0.751, -0.075, -0.656],
+ #             [ 0.023,  0.996, -0.087],
+ #             [ 0.66 ,  0.05 ,  0.749]])
 
-t = np.array([[0.86 ],[0.134],[0.492]])
+#t = np.array([[0.86 ],[0.134],[0.492]])
 
-R_inv, t_inv = pose_inv(R, t)
+#R_inv, t_inv = pose_inv(R, t)
 
-
-plot_pose3_on_axes(ax,R.T , np.zeros(3)[np.newaxis], axis_length=1.0)
+plot_pose3_on_axes(ax,R2, -t.T, axis_length=1.0)
 
 set_axes_equal(ax)
 

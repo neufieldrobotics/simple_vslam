@@ -17,13 +17,12 @@ from vslam_helper import *
 # Load previously saved data
 # Inputs, images and camera info
 if sys.platform == 'darwin':
-    img1 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1429.JPG',1)          # queryImage
-    img2 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1430.JPG',1)  
-    img3 = cv2.imread('/Users/vik748/Google Drive/data/test_set/GOPR1431.JPG',1)  
-else:    
-    img1 = cv2.imread('/home/vik748/data/chess_board/GOPR1460.JPG',1)          # queryImage
-    img2 = cv2.imread('/home/vik748/data/chess_board/GOPR1461.JPG',1)  
-    img3 = cv2.imread('/home/vik748/data/chess_board/GOPR1462.JPG',1)
+    path = '/Users/vik748/Google Drive/'
+else:
+    path = '/home/vik748/'
+img1 = cv2.imread(path+'data/chess_board/GOPR1488.JPG',1)          # queryImage
+img2 = cv2.imread(path+'data/chess_board/GOPR1490.JPG',1)  
+img3 = cv2.imread(path+'data/chess_board/GOPR1491.JPG',1)
 
 fx = 3551.342810
 fy = 3522.689669
@@ -52,35 +51,43 @@ objp[:,:2] = np.mgrid[0:16,0:9].T.reshape(-1,2)
 
 axis = np.float32([[3,0,0], [0,3,0], [0,0,-3]]).reshape(-1,3)
 
-img_cur = img3
-
-gray = cv2.cvtColor(img_cur,cv2.COLOR_BGR2GRAY)
-ret, corners = cv2.findChessboardCorners(gray, (16,9),None)
-
-
-corners2 = cv2.cornerSubPix(gray,corners,(11,11),(-1,-1),criteria)
-
-# Find the rotation and translation vectors.
-success, rvecs, tvecs, inliers = cv2.solvePnPRansac(objp, corners2, K, D)
-
-# project 3D points to image plane
-imgpts, jac = cv2.projectPoints(axis, rvecs, tvecs, K, D)
-
-imgout = draw(img_cur,corners2,imgpts)
-#plt.imshow(imgout)
-#plt.show()
+imgs = [img1,img2,img3]
+#img_cur = img1
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 ax.set_aspect('equal')         # important!
 title = ax.set_title('3D Test')
-graph, = ax.plot(objp[:,0], objp[:,1], objp[:,2], linestyle="", marker="o")
-R, J	=	cv2.Rodrigues(rvecs)
 
-CP = np.matmul(-R.T,tvecs)
+Rs = []
+ts = []
 
-plot_pose3_on_axes(ax,R.T,CP.T, axis_length=1.0)
-#plot_pose3_on_axes(ax,np.eye(3),np.zeros(3)[np.newaxis], axis_length=1.0)
+for img_cur in imgs:
+    gray = cv2.cvtColor(img_cur,cv2.COLOR_BGR2GRAY)
+    ret, corners = cv2.findChessboardCorners(gray, (16,9),None)
+    
+    
+    corners2 = cv2.cornerSubPix(gray,corners,(11,11),(-1,-1),criteria)
+    
+    # Find the rotation and translation vectors.
+    success, rvecs, tvecs, inliers = cv2.solvePnPRansac(objp, corners2, K, D)
+    
+    # project 3D points to image plane
+    imgpts, jac = cv2.projectPoints(axis, rvecs, tvecs, K, D)
+    
+    imgout = draw(img_cur,corners2,imgpts)
+    #plt.imshow(imgout)
+    #plt.show()
+    
+    graph, = ax.plot(objp[:,0], objp[:,1], objp[:,2], linestyle="", marker="o")
+    R, J	=	cv2.Rodrigues(rvecs)
+    
+    CP = np.matmul(-R.T,tvecs)
+    Rs.append(R.T)
+    ts.append(CP)
+    
+    plot_pose3_on_axes(ax,R.T,CP.T, axis_length=1.0)
+    #plot_pose3_on_axes(ax,np.eye(3),np.zeros(3)[np.newaxis], axis_length=1.0)
 
 set_axes_equal(ax)  
 plt.show()

@@ -90,3 +90,67 @@ def pose_inv(R_in, t_in):
     t_out = -np.matmul((R_in).T,t_in)
     R_out = R_in.T
     return R_out,t_out
+
+def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
+                        max_y=np.inf):
+    """ Compute a bounding_box filter on the given points
+
+    Parameters
+    ----------                        
+    points: (n,2) array
+        The array containing all the points's coordinates. Expected format:
+            array([
+                [x1,y1],
+                ...,
+                [xn,yn]])
+
+    min_i, max_i: float
+        The bounding box limits for each coordinate. If some limits are missing,
+        the default values are -infinite for the min_i and infinite for the max_i.
+
+    Returns
+    -------
+    bb_filter : boolean array
+        The boolean mask indicating wherever a point should be keept or not.
+        The size of the boolean mask will be the same as the number of given points.
+
+    """
+
+    bound_x = np.logical_and(points[:, 0] > min_x, points[:, 0] < max_x)
+    bound_y = np.logical_and(points[:, 1] > min_y, points[:, 1] < max_y)
+
+    bb_filter = np.logical_and(bound_x, bound_y)
+
+    return bb_filter
+
+
+def tiled_features(kp, img, tiley, tilex):
+    feat_per_cell = int(len(kp)/(tilex*tiley))
+    HEIGHT, WIDTH = img.shape
+    assert WIDTH%tiley == 0, "Width is not a multiple of tilex"
+    assert HEIGHT%tilex == 0, "Height is not a multiple of tiley"
+    w_width = int(WIDTH/tiley)
+    w_height = int(HEIGHT/tilex)
+        
+    xx = np.linspace(0,HEIGHT-w_height,tilex,dtype='int')
+    yy = np.linspace(0,WIDTH-w_width,tiley,dtype='int')
+        
+    kps = np.array([])
+    pts = np.array([keypoint.pt for keypoint in kp])
+    kp = np.array(kp)
+    
+    for ix in xx:
+        for iy in yy:
+            inbox_mask = bounding_box(pts, ix,ix+w_height,iy,iy+w_height)
+            inbox = kp[inbox_mask]
+            inbox_sorted = sorted(inbox, key = lambda x:x.response, reverse = True)
+            inbox_sorted_out = inbox_sorted[:feat_per_cell]
+            kps = np.append(kps,inbox_sorted_out)
+    return kps.tolist()
+
+
+def draw_keypoints(vis, keypoints, color = (0, 255, 255)):
+    for kp in keypoints:
+        x, y = kp.pt
+        cv2.circle(vis, (int(x), int(y)), 15, color)
+    return vis
