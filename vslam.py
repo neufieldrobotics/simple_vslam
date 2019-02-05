@@ -48,7 +48,7 @@ gr3=cv2.cvtColor(img3,cv2.COLOR_BGR2GRAY)
 
 # create a mask image filled with zeros, the size of original image
 
-
+'''
 fx = 3551.342810
 fy = 3522.689669
 cx = 2033.513326
@@ -57,8 +57,14 @@ cy = 1455.489194
 K = np.float64([[fx, 0, cx], 
                 [0, fy, cy], 
                 [0, 0, 1]])
-
-D = np.float64([-0.276796, 0.113400, -0.000349, -0.000469]);
+'''    
+K = np.array([[3.50255214e+03, 0.00000000e+00, 2.03244043e+03],
+       [0.00000000e+00, 3.50766569e+03, 1.46643503e+03],
+       [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
+    
+#D = np.float64([-0.276796, 0.113400, -0.000349, -0.000469]);
+D = np.array([[-2.85076025e-01,  1.52582102e-01,  1.88230160e-04,
+         2.70029391e-04, -6.63716833e-02]])
 
 print(K,D)
 
@@ -199,7 +205,7 @@ print ("Pose_2: ", Pose_2)
 #Create 3 x 4 Homogenous Transform
 Pose_1 = np.hstack((np.eye(3, 3), np.zeros((3, 1))))
 print ("Pose_1: ", Pose_1)
-Pose_2 = np.hstack((R_12.T, -t_12))
+Pose_2 = np.hstack((R_12, t_12))
 print ("Pose_2: ", Pose_2)
 
 #P_l = np.dot(K,  M_l)
@@ -254,7 +260,7 @@ plt.show()
 # important!
 #plt.show()
 input("Press [enter] to continue.")
-#raise SystemExit(0)
+raise SystemExit(0)
 '''
 process frame
 where the state of a frame at time t , , contains the following data:

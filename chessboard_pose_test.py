@@ -23,7 +23,7 @@ else:
 img1 = cv2.imread(path+'data/chess_board2/GOPR1496.JPG',1)          # queryImage
 img2 = cv2.imread(path+'data/chess_board2/GOPR1497.JPG',1)  
 img3 = cv2.imread(path+'data/chess_board2/GOPR1498.JPG',1)
-
+'''
 fx = 3551.342810
 fy = 3522.689669
 cx = 2033.513326
@@ -32,8 +32,15 @@ cy = 1455.489194
 K = np.float64([[fx, 0, cx], 
                 [0, fy, cy], 
                 [0, 0, 1]])
+'''    
+K = np.array([[3.50255214e+03, 0.00000000e+00, 2.03244043e+03],
+       [0.00000000e+00, 3.50766569e+03, 1.46643503e+03],
+       [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
+    
+#D = np.float64([-0.276796, 0.113400, -0.000349, -0.000469]);
+D = np.array([[-2.85076025e-01,  1.52582102e-01,  1.88230160e-04,
+         2.70029391e-04, -6.63716833e-02]])
 
-D = np.float64([-0.276796, 0.113400, -0.000349, -0.000469]);
 CHESSBOARD_W = 16
 CHESSBOARD_H = 9
 CHESSBOARD_SIZE = 0.08075
