@@ -33,13 +33,13 @@ K = np.float64([[fx, 0, cx],
                 [0, fy, cy], 
                 [0, 0, 1]])
 '''    
-K = np.array([[3.50255214e+03, 0.00000000e+00, 2.03244043e+03],
-       [0.00000000e+00, 3.50766569e+03, 1.46643503e+03],
-       [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
-    
-#D = np.float64([-0.276796, 0.113400, -0.000349, -0.000469]);
-D = np.array([[-2.85076025e-01,  1.52582102e-01,  1.88230160e-04,
-         2.70029391e-04, -6.63716833e-02]])
+K = np.array([[3.50275628e+03, 0.00000000e+00, 2.01997668e+03],
+              [0.00000000e+00, 3.47709480e+03, 1.44976175e+03],
+              [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
+
+    #D = np.float64([-0.276796, 0.113400, -0.000349, -0.000469]);
+D = np.array([[-2.85711277e-01,  1.61304120e-01,  5.36070359e-05, -1.48554708e-04,
+               -7.71783829e-02]])
 
 CHESSBOARD_W = 16
 CHESSBOARD_H = 9
@@ -83,13 +83,14 @@ axis = np.float32([[3,0,0], [0,3,0], [0,0,-3]]).reshape(-1,3)
 imgs = [img1,img2,img3]
 #img_cur = img1
 
-fig = plt.figure()
+fig = plt.figure(1)
 ax = fig.add_subplot(111, projection='3d')
 ax.set_aspect('equal')         # important!
 title = ax.set_title('3D Test')
 
 Rs = []
 ts = []
+Cs = []
 
 for img_cur in imgs:
     gray = cv2.cvtColor(img_cur,cv2.COLOR_BGR2GRAY)
@@ -97,6 +98,7 @@ for img_cur in imgs:
     
     
     corners2 = cv2.cornerSubPix(gray,corners,(11,11),(-1,-1),criteria)
+    Cs.append(corners2)
     
     # Find the rotation and translation vectors.
     success, rvecs, tvecs, inliers = cv2.solvePnPRansac(objp, corners2, K, D)
@@ -120,14 +122,59 @@ for img_cur in imgs:
     #plot_pose3_on_axes(ax,np.eye(3),np.zeros(3)[np.newaxis], axis_length=1.0)
 
 set_axes_equal(ax)  
-plt.show()
+#plt.show()
+plt.draw()
+plt.pause(0.5)
+input("Press [enter] to continue.")
 
+fig = plt.figure(2)
 T_0_1 = compose_T(Rs[0],ts[0])
 T_0_2 = compose_T(Rs[1],ts[1])
 T_0_3 = compose_T(Rs[2],ts[2])
 
 T_1_0 = T_inv(T_0_1)
 T_1_2 = np.matmul(T_1_0 , T_0_2)
-#k = cv2.waitKey(0) & 0xff
+T_1_3 = np.matmul(T_1_0 , T_0_3)
 
-#cv2.destroyAllWindows()
+Pose_1 = np.hstack((np.eye(3, 3), np.zeros((3, 1))))
+print ("Pose_1: ", Pose_1)
+R_1_2 = T_1_2[:3,:3]
+t_1_2 = T_1_2[:3,[-1]]
+Pose_2 = np.hstack((R_1_2.T,-t_1_2))
+print ("Pose_2: ", Pose_2)
+
+fig = plt.figure(2)
+ax = fig.add_subplot(111, projection='3d')
+plt.get_current_fig_manager().window.setGeometry(992, 430, 928, 1028)
+ax.set_aspect('equal')         # important!
+title = ax.set_title('3D Test')
+
+
+corners1_ud = cv2.undistortPoints(Cs[0],K,D)
+corners2_ud = cv2.undistortPoints(Cs[1],K,D)
+corners3_ud = cv2.undistortPoints(Cs[2],K,D)
+
+corners_12_hom = cv2.triangulatePoints(Pose_1, Pose_2, corners1_ud, corners2_ud).T
+corners_12_hom_norm = corners_12_hom /  corners_12_hom[:,-1][:,None]
+corners_12 = corners_12_hom_norm[:, :3]
+
+graph = plot_3d_points(ax, corners_12, linestyle="", marker=".",color='g')
+plot_pose3_on_axes(ax,Pose_1[:,:3], Pose_1[:,[-1]].T,axis_length=1.0)
+plot_pose3_on_axes(ax,Pose_2[:,:3].T, -Pose_2[:,[-1]].T,axis_length=1.0)
+
+R_1_3 = T_1_3[:3,:3]
+t_1_3 = T_1_3[:3,[-1]]
+Pose_3 = np.hstack((R_1_3.T,-t_1_3))
+print ("Pose_3: ", Pose_3)
+
+
+corners_23_hom = cv2.triangulatePoints(Pose_2, Pose_3, corners2_ud, corners3_ud).T
+corners_23_hom_norm = corners_23_hom /  corners_23_hom[:,-1][:,None]
+corners_23 = corners_23_hom_norm[:, :3]
+graph = plot_3d_points(ax, corners_23, linestyle="", marker=".",color='r')
+plot_pose3_on_axes(ax,Pose_3[:,:3].T, -Pose_3[:,[-1]].T,axis_length=1.0)
+
+
+set_axes_equal(ax)
+plt.show()
+

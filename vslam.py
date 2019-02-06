@@ -172,7 +172,7 @@ kp3_match_23 = np.array([kp3[mat.trainIdx].pt for mat in matches23])
 kp1_match_12_ud = cv2.undistortPoints(np.expand_dims(kp1_match_12,axis=1),K,D)
 kp2_match_12_ud = cv2.undistortPoints(np.expand_dims(kp2_match_12,axis=1),K,D)
 
-#print("kp1",kp1[0].pt,dst1[0])
+#print("kp1",kp1[0].pt,dst1[0]) 
 
 E_12, mask_e_12 = cv2.findEssentialMat(kp1_match_12_ud, kp2_match_12_ud, focal=1.0, pp=(0., 0.), 
                                method=cv2.RANSAC, prob=0.999, threshold=0.0001)
@@ -186,6 +186,7 @@ print("t:",t_12.T)
 
 img12 = displayMatches(gr1,kp1,gr2,kp2,matches12,mask_RP_12, False)
 fig1 = plt.figure(1)
+plt.get_current_fig_manager().window.setGeometry(0, 0, 928, 1028)
 plt.imshow(img12),
 plt.ion()
 #plt.show()
@@ -221,6 +222,7 @@ landmarks_12 = landmarks_12_hom_norm[:, :3]
 
 fig = plt.figure(2)
 ax = fig.add_subplot(111, projection='3d')
+plt.get_current_fig_manager().window.setGeometry(992, 430, 928, 1028)
 ax.set_aspect('equal')         # important!
 title = ax.set_title('3D Test')
 #graph, = ax.plot(landmarks_12[:,0], landmarks_12[:,1], landmarks_12[:,2], linestyle="", marker="o")
@@ -260,7 +262,7 @@ plt.show()
 # important!
 #plt.show()
 input("Press [enter] to continue.")
-raise SystemExit(0)
+#raise SystemExit(0)
 '''
 process frame
 where the state of a frame at time t , , contains the following data:
@@ -270,11 +272,12 @@ The associated set of 3D landmarks {X } .i
 '''
 
 
-lm = np.zeros(mask_RP_12.shape[0],dtype=int)
+lm = -np.ones(mask_RP_12.shape[0],dtype=int)
 lm[mask_RP_12.ravel()==1]=np.arange(np.sum(mask_RP_12))
 
+# Create a dictionary {KP2 index of match : landmark number}
 frame2_to_lm = {mat.trainIdx:lm_id for lm_id,mat in zip(lm, matches12)
-                if lm_id!=0 }
+                if lm_id!=-1 }
 
 # Filter frame 2 to frame 3 matches
 
@@ -301,14 +304,15 @@ input("Press [enter] to continue.")
 #time.sleep(3)
 #plt.imshow(img23),plt.show()
 
-#matches23_filt = [matches23[i] for i in range(len(matches23)) if mask_RP_23[i]==1]
-matches23_filt = matches23
+matches23_filt = [matches23[i] for i in range(len(matches23)) if mask_RP_23[i]==1]
+#matches23_filt = matches23
 #frame 3 stuff
 frame3_to_frame2 = {mat.trainIdx:mat.queryIdx for mat in matches23_filt}
 
 frame3_to_lm = {id:frame2_to_lm.get(frame3_to_frame2[id]) 
                 for id in frame3_to_frame2.keys() 
                 if frame2_to_lm.get(frame3_to_frame2[id]) is not None}
+
 print("Frame3_to_lm: ",len(frame3_to_lm))
 
 landmarks_23 = np.array([landmarks_12[frame3_to_lm[k]] for k in 
@@ -325,9 +329,9 @@ R_23 = R_23_inv.T
 plt.figure(2)
 graph = plot_3d_points(ax, landmarks_23, linestyle="", marker="o", color='r')
 
-plot_pose3_on_axes(ax,R_23, t_23, axis_length=5.0)
+plot_pose3_on_axes(ax,R_23, t_23, axis_length=2.0)
 
-Pose_3 = np.hstack((R_23, t_12))
+Pose_3 = np.hstack((R_23.T, -t_23.T))
 print ("Pose_3: ", Pose_3)
 
 if CHESSBOARD:
@@ -341,3 +345,4 @@ set_axes_equal(ax)             # important!
 plt.draw()
 plt.pause(0.5)
 input("Press [enter] to continue.")
+plt.close(fig='all')
