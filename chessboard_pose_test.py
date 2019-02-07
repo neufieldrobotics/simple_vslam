@@ -20,9 +20,9 @@ if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/'
 else:
     path = '/home/vik748/'
-img1 = cv2.imread(path+'data/chess_board2/GOPR1496.JPG',1)          # queryImage
-img2 = cv2.imread(path+'data/chess_board2/GOPR1497.JPG',1)  
-img3 = cv2.imread(path+'data/chess_board2/GOPR1498.JPG',1)
+img1 = cv2.imread(path+'data/chessboard_triangulation/GOPR1531.JPG',1)          # queryImage
+img2 = cv2.imread(path+'data/chessboard_triangulation/GOPR1532.JPG',1)  
+img3 = cv2.imread(path+'data/chessboard_triangulation/GOPR1533.JPG',1)
 '''
 fx = 3551.342810
 fy = 3522.689669
@@ -136,11 +136,14 @@ T_1_0 = T_inv(T_0_1)
 T_1_2 = np.matmul(T_1_0 , T_0_2)
 T_1_3 = np.matmul(T_1_0 , T_0_3)
 
+T_2_0 = T_inv(T_0_2)
+T_2_3 = np.matmul(T_2_0 , T_0_3)
+
 Pose_1 = np.hstack((np.eye(3, 3), np.zeros((3, 1))))
 print ("Pose_1: ", Pose_1)
 R_1_2 = T_1_2[:3,:3]
 t_1_2 = T_1_2[:3,[-1]]
-Pose_2 = np.hstack((R_1_2.T,-t_1_2))
+Pose_2 = np.hstack(pose_inv(R_1_2,t_1_2))
 print ("Pose_2: ", Pose_2)
 
 fig = plt.figure(2)
@@ -158,23 +161,49 @@ corners_12_hom = cv2.triangulatePoints(Pose_1, Pose_2, corners1_ud, corners2_ud)
 corners_12_hom_norm = corners_12_hom /  corners_12_hom[:,-1][:,None]
 corners_12 = corners_12_hom_norm[:, :3]
 
+#R1, R2, P1, P2, Q, validPixROI1, validPixROI2	=	cv2.stereoRectify(	K, D, K, D, (4000,3000), R_1_2, t_1_2)
+#T_rect = T_inv(compose_T(R1.T,-t_1_2))
+#corners_12_1_hom = np.dot(corners_12_hom_norm,(T_rect))
+#corners_12_1_hom_norm = corners_12_1_hom /  corners_12_1_hom[:,-1][:,None]
+#corners_12_1 = corners_12_1_hom_norm[:, :3]
+
 graph = plot_3d_points(ax, corners_12, linestyle="", marker=".",color='g')
+#graph = plot_3d_points(ax, corners_12_1, linestyle="", marker=".",color='r')
 plot_pose3_on_axes(ax,Pose_1[:,:3], Pose_1[:,[-1]].T,axis_length=1.0)
-plot_pose3_on_axes(ax,Pose_2[:,:3].T, -Pose_2[:,[-1]].T,axis_length=1.0)
+plot_pose3_on_axes(ax,R_1_2, t_1_2.T,axis_length=1.0)
+
 
 R_1_3 = T_1_3[:3,:3]
 t_1_3 = T_1_3[:3,[-1]]
-Pose_3 = np.hstack((R_1_3.T,-t_1_3))
+Pose_3 = np.hstack(pose_inv(R_1_3,t_1_3))
+print ("Pose_3: ", Pose_3)
+corners_13_hom = cv2.triangulatePoints(Pose_1, Pose_3, corners1_ud, corners3_ud).T
+corners_13_hom_norm = corners_13_hom /  corners_13_hom[:,-1][:,None]
+corners_13 = corners_13_hom_norm[:, :3]
+#corners_13_1_hom = np.dot(corners_13_hom_norm,(T_1_1))
+#corners_23_1 = corners_23_1_hom[:, :3]
+
+graph = plot_3d_points(ax, corners_13, linestyle="", marker=".",color='r')
+plot_pose3_on_axes(ax,R_1_3, t_1_3.T,axis_length=1.0)
+
+
+R_2_3 = T_2_3[:3,:3]
+t_2_3 = T_2_3[:3,[-1]]
+Pose_2_3 = np.hstack(pose_inv(R_2_3,t_2_3))
 print ("Pose_3: ", Pose_3)
 
 
-corners_23_hom = cv2.triangulatePoints(Pose_2, Pose_3, corners2_ud, corners3_ud).T
+corners_23_hom = cv2.triangulatePoints(Pose_1, Pose_2_3, corners2_ud, corners3_ud).T
 corners_23_hom_norm = corners_23_hom /  corners_23_hom[:,-1][:,None]
 corners_23 = corners_23_hom_norm[:, :3]
-graph = plot_3d_points(ax, corners_23, linestyle="", marker=".",color='r')
-plot_pose3_on_axes(ax,Pose_3[:,:3].T, -Pose_3[:,[-1]].T,axis_length=1.0)
-
+corners_23_1_hom = corners_23_hom_norm @ T_1_2.T
+#corners_23_1_hom_norm = corners_23_1_hom /  corners_23_1_hom[:,-1][:,None]
+corners_23_1 = corners_23_1_hom[:, :3]
+graph = plot_3d_points(ax, corners_23_1, linestyle="", marker=".",color='c')
 
 set_axes_equal(ax)
 plt.show()
+
+#raise SystemExit(0)
+
 
