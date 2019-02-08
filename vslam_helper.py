@@ -8,6 +8,53 @@ Simple VSLAM Helper File
 import numpy as np
 import cv2
 
+def compose_T(R,t):
+    return np.vstack((np.hstack((R,t)),np.array([0, 0, 0, 1])))
+
+def decompose_T(T_in):
+    return T_in[:3,:3], T_in[:3,[-1]].T
+
+def pose_inv(R_in, t_in):
+    t_out = -np.matmul((R_in).T,t_in)
+    R_out = R_in.T
+    return R_out,t_out
+
+def T_inv(T_in):
+    R_in = T_in[:3,:3]
+    t_in = T_in[:3,[-1]]
+    R_out = R_in.T
+    t_out = -np.matmul(R_out,t_in)
+    return np.vstack((np.hstack((R_out,t_out)),np.array([0, 0, 0, 1])))
+
+def triangulate(T_w_1, T_w_2, pts_1, pts_2 ):
+    '''
+    This function accepts two homogeneous transforms (poses) of 2 cameras in world coordinates,
+    along with corresponding matching points and returns the 3D coordinates in world coordinates
+    '''
+    T_origin = np.eye(4)
+    P_origin = T_origin[:3]
+    # calculate the transform of 1 in 2's frame
+    T_2_w = T_inv(T_w_2)
+    T_2_1 = T_2_w @ T_w_1
+    P_2_1 = T_2_1[:3]
+    print ("P_2_1: ", P_2_1)
+    
+    # Calculate points in 0,0,0 frame
+    pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1, pts_2).T
+    pts_3d_frame1_hom_norm = pts_3d_frame1_hom /  pts_3d_frame1_hom[:,-1][:,None]
+    # Move 3d points to world frame by transforming with T_w_1
+    pts_3d_w_hom = pts_3d_frame1_hom_norm @ T_w_1.T
+    return pts_3d_w_hom[:, :3]
+
+def T_from_PNP(coord_3d, img_pts, K, D):
+    success, rvec_to_obj, tvecs_to_obj, inliers = cv2.solvePnPRansac(coord_3d, img_pts, K, D)
+
+    if success:    
+        R_to_obj, _ = cv2.Rodrigues(rvec_to_obj)
+        return success, compose_T(*pose_inv(R_to_obj, tvecs_to_obj)), inliers
+    else: 
+        return success, None, None
+
 def undistortKeyPoints(kps, K, D):
     '''
     This function extracts coordinates from keypoint object,
@@ -62,13 +109,12 @@ def set_axes_equal(ax):
     radius = 0.5 * np.max(np.abs(limits[:, 1] - limits[:, 0]))
     set_axes_radius(ax, origin, radius)
 
-def plot_pose3_on_axes(axes, gRp, origin, axis_length=0.1):
-    """Plot a 3D pose on given axis 'axes' with given 'axis_length'."""
-    # get rotation and translation (center)
-    #gRp = pose.rotation().matrix()  # rotation from pose to global
-    #t = pose.translation()
-    #origin = np.array([t.x(), t.y(), t.z()])
+def plot_pose3_on_axes(axes, T, axis_length=0.1):
+    """Plot a 3D pose 4x4 homogenous transform  on given axis 'axes' with given 'axis_length'."""
+    plot_pose3RT_on_axes(axes, *decompose_T(T), axis_length)
 
+def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1):
+    """Plot a 3D pose on given axis 'axes' with given 'axis_length'."""
     # draw the camera axes
     x_axis = origin + gRp[:, 0] * axis_length
     line = np.append(origin, x_axis, axis=0)
@@ -84,7 +130,7 @@ def plot_pose3_on_axes(axes, gRp, origin, axis_length=0.1):
 
 def plot_3d_points(axes, vals, *args, **kwargs):
     graph, = axes.plot(vals[:,0], vals[:,1], vals[:,2], *args, **kwargs)
-    return
+    return graph
 
 def pose_inv(R_in, t_in):
     t_out = -np.matmul((R_in).T,t_in)
@@ -154,3 +200,22 @@ def draw_keypoints(vis, keypoints, color = (0, 255, 255)):
         x, y = kp.pt
         cv2.circle(vis, (int(x), int(y)), 15, color)
     return vis
+
+def knn_match_and_filter(matcher, kp1, kp2, des1, des2):
+    matches_knn = matcher.knnMatch(des1,des2, k=2)
+    matches = []
+    kp1_match = []
+    kp2_match = []
+    
+    for i,match in enumerate(matches_knn):
+        if len(match)>1:
+            if match[0].distance < 0.80*match[1].distance:
+                matches.append(match[0])
+                kp1_match.append(kp1[match[0].queryIdx].pt)
+                kp2_match.append(kp2[match[0].trainIdx].pt)
+        elif len(match)==1:
+            matches.append(match[0])
+            kp1_match.append(kp1[match[0].queryIdx].pt)
+            kp2_match.append(kp2[match[0].trainIdx].pt)
+
+    return np.ascontiguousarray(kp1_match), np.ascontiguousarray(kp2_match), matches
