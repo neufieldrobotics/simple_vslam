@@ -7,6 +7,9 @@ Simple VSLAM Helper File
 """
 import numpy as np
 import cv2
+from matplotlib import pyplot as plt
+from scipy import spatial
+
 
 def compose_T(R,t):
     return np.vstack((np.hstack((R,t)),np.array([0, 0, 0, 1])))
@@ -132,11 +135,6 @@ def plot_3d_points(axes, vals, *args, **kwargs):
     graph, = axes.plot(vals[:,0], vals[:,1], vals[:,2], *args, **kwargs)
     return graph
 
-def pose_inv(R_in, t_in):
-    t_out = -np.matmul((R_in).T,t_in)
-    R_out = R_in.T
-    return R_out,t_out
-
 def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
                         max_y=np.inf):
     """ Compute a bounding_box filter on the given points
@@ -219,3 +217,52 @@ def knn_match_and_filter(matcher, kp1, kp2, des1, des2):
             kp2_match.append(kp2[match[0].trainIdx].pt)
 
     return np.ascontiguousarray(kp1_match), np.ascontiguousarray(kp2_match), matches
+
+def move_figure(position="top-right"):
+    '''
+    Move and resize a window to a set of standard positions on the screen.
+    Possible positions are:
+    top, bottom, left, right, top-left, top-right, bottom-left, bottom-right
+    '''
+
+    mgr = plt.get_current_fig_manager()
+    #mgr.full_screen_toggle()  # primitive but works to get screen size
+    mgr.window.showMaximized()
+    py = mgr.canvas.height()
+    px = mgr.canvas.width()
+
+    d = 10  # width of the window border in pixels
+    if position == "top":
+        # x-top-left-corner, y-top-left-corner, x-width, y-width (in pixels)
+        mgr.window.setGeometry(d, 4*d, px - 2*d, py/2 - 4*d)
+    elif position == "bottom":
+        mgr.window.setGeometry(d, py/2 + 5*d, px - 2*d, py/2 - 4*d)
+    elif position == "left":
+        mgr.window.setGeometry(d, 4*d, px/2 - 2*d, py - 4*d)
+    elif position == "right":
+        mgr.window.setGeometry(px/2 + d, 4*d, px/2 - 2*d, py - 4*d)
+    elif position == "top-left":
+        mgr.window.setGeometry(d, 4*d, px/2 - 2*d, py/2 - 4*d)
+    elif position == "top-right":
+        mgr.window.setGeometry(px/2 + d, 4*d, px/2 - 2*d, py/2 - 4*d)
+    elif position == "bottom-left":
+        mgr.window.setGeometry(d, py/2 + 5*d, px/2 - 2*d, py/2 - 4*d)
+    elif position == "bottom-right":
+        mgr.window.setGeometry(px/2 + d, py/2 + 5*d, px/2 - 2*d, py/2 - 4*d)
+
+def radial_non_max(kp_list, dist):
+    kp = np.array(kp_list)
+    kp_mask = np.ones(len(kp), dtype=bool)
+    pts = [k.pt for k in kp]
+    tree = spatial.cKDTree(pts)
+    #print ("len of kp1:",len(kp))
+    for i, k in enumerate(kp):
+        if kp_mask[i]:
+            pt = tree.data[i]
+            idx = tree.query_ball_point(tree.data[i], dist, p=2., eps=0, n_jobs=1)
+            resp = [kp[ii].response for ii in idx]
+            _, maxi = max([(v,i) for i,v in enumerate(resp)])
+            del idx[maxi]
+            for kp_i in idx:
+                kp_mask[kp_i] = False
+    return kp[kp_mask].tolist()

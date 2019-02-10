@@ -69,7 +69,7 @@ print(K,D)
 
 #Initiate ORB detector
 detector = cv2.ORB_create(nfeatures=25000, edgeThreshold=65, patchSize=65, nlevels=4, 
-                     fastThreshold=20, scaleFactor=4.0, WTA_K=4,
+                     fastThreshold=10, scaleFactor=10.0, WTA_K=4,
                      scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
                      
 #detector = cv2.AKAZE_create(threshold=.0005)
@@ -85,18 +85,22 @@ kp2 = sorted(kp2, key = lambda x:x.response, reverse = True)
 kp3 = sorted(kp3, key = lambda x:x.response, reverse = True)
 print ("Points sorted: ")
 
-kp1 = SSC(kp1, 5000, 0.1, gr1.shape[1], gr1.shape[0])
-kp2 = SSC(kp2, 5000, 0.1, gr1.shape[1], gr1.shape[0])
-kp3 = SSC(kp3, 5000, 0.1, gr1.shape[1], gr1.shape[0])
+kp1 = SSC(kp1, 10000, 0.1, gr1.shape[1], gr1.shape[0])
+kp2 = SSC(kp2, 10000, 0.1, gr1.shape[1], gr1.shape[0])
+kp3 = SSC(kp3, 10000, 0.1, gr1.shape[1], gr1.shape[0])
 print ("Points nonmax supression: ")
 '''
+kp1 = radial_non_max(kp1,25)
+kp2 = radial_non_max(kp2,25)
+kp3 = radial_non_max(kp3,25)
+
 kp1, des1 = detector.compute(gr1,kp1)
 kp2, des2 = detector.compute(gr2,kp2)
 kp3, des3 = detector.compute(gr3,kp3)
 print ("Descriptors computed: ")
 
 # create BFMatcher object - Brute Force
-matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 #FLANN_INDEX_LSH = 6
 #FLANN_INDEX_KDTREE = 1
 #matcher = cv2.FlannBasedMatcher(dict(algorithm = FLANN_INDEX_LSH, table_number = 6, key_size = 20,
@@ -104,20 +108,18 @@ matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
 #                              dict(checks=100))
 
 # Match descriptors.
-
+'''
 kp1_match_12, kp2_match_12, matches12 = knn_match_and_filter(matcher, kp1, kp2, des1, des2)
 kp2_match_23, kp3_match_23, matches23 = knn_match_and_filter(matcher, kp2, kp3, des2, des3)
 
 '''
 matches12 = matcher.match(des1,des2)
 matches23 = matcher.match(des2,des3)
-
 kp1_match_12 = np.array([kp1[mat.queryIdx].pt for mat in matches12])
 kp2_match_12 = np.array([kp2[mat.trainIdx].pt for mat in matches12])
 
 kp2_match_23 = np.array([kp2[mat.queryIdx].pt for mat in matches23])
 kp3_match_23 = np.array([kp3[mat.trainIdx].pt for mat in matches23])
-'''
 
 #matches12 = sorted(matches12, key = lambda x:x.distance)
 #matches12 = matches12[:(int)(len(matches12)*.75)]
@@ -126,7 +128,7 @@ kp1_match_12_ud = cv2.undistortPoints(np.expand_dims(kp1_match_12,axis=1),K,D)
 kp2_match_12_ud = cv2.undistortPoints(np.expand_dims(kp2_match_12,axis=1),K,D)
 
 E_12, mask_e_12 = cv2.findEssentialMat(kp1_match_12_ud, kp2_match_12_ud, focal=1.0, pp=(0., 0.), 
-                               method=cv2.RANSAC, prob=0.999, threshold=0.0001)
+                               method=cv2.RANSAC, prob=0.999, threshold=0.001)
 
 print ("Essential matrix: used ",np.sum(mask_e_12) ," of total ",len(matches12),"matches")
 
@@ -139,7 +141,8 @@ print("t:",t_21.T)
 
 img12 = displayMatches(gr1,kp1,gr2,kp2,matches12,mask_RP_12, False)
 fig1 = plt.figure(1)
-plt.get_current_fig_manager().window.setGeometry(0, 0, 928, 1028)
+#plt.get_current_fig_manager().window.setGeometry(0, 0, 928, 1028)
+move_figure(position="left")
 plt.imshow(img12),
 plt.ion()
 #plt.show()
@@ -152,7 +155,8 @@ landmarks_12 = triangulate(np.eye(4), T_1_2, kp1_match_12_ud[mask_RP_12[:,0]==1]
 
 fig = plt.figure(2)
 ax2 = fig.add_subplot(111, projection='3d')
-plt.get_current_fig_manager().window.setGeometry(992, 430, 928, 1028)
+#plt.get_current_fig_manager().window.setGeometry(992, 430, 928, 1028)
+move_figure(position="right")
 ax2.set_aspect('equal')         # important!
 title = ax2.set_title('After triangulation with 1 and 2')
 graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker="o")
@@ -176,7 +180,7 @@ set_axes_equal(ax2)
 ax2.view_init(-70, -90)
 
 plt.draw()
-plt.pause(.5)
+plt.pause(.001)
 input("Press [enter] to continue.")
 '''
 process frame
@@ -193,14 +197,14 @@ lm[mask_RP_12.ravel()==1]=np.arange(np.sum(mask_RP_12))
 frame2_to_lm = {mat.trainIdx:lm_id for lm_id,mat in zip(lm, matches12)
                 if lm_id!=-1 }
 
-kp2_match_23_ud = undistortKeyPoints(kp2_match_23,K,D)
-kp3_match_23_ud = undistortKeyPoints(kp3_match_23,K,D)
+kp2_match_23_ud = cv2.undistortPoints(np.expand_dims(kp2_match_23,axis=1),K,D)
+kp3_match_23_ud = cv2.undistortPoints(np.expand_dims(kp3_match_23,axis=1),K,D)
 
 E_23, mask_e_23 = cv2.findEssentialMat(kp2_match_23_ud, kp3_match_23_ud, focal=1.0, pp=(0., 0.), 
-                               method=cv2.RANSAC, prob=0.999, threshold=0.0001)
+                               method=cv2.RANSAC, prob=0.999, threshold=0.001)
 
 print ("Essential matrix: used ",np.sum(mask_e_23) ," of total ",len(matches23),"matches")
-
+#mask_RP_23 = mask_e_23
 points, R_32, t_32, mask_RP_23 = cv2.recoverPose(E_23, kp2_match_23_ud, kp3_match_23_ud,mask=mask_e_23)
 img23 = displayMatches(gr2,kp2,gr3,kp3,matches23,mask_RP_23, False)
 
@@ -226,6 +230,9 @@ landmarks_23 = np.array([landmarks_12[frame3_to_lm[k]] for k in
 lm_kps_3 = np.array([kp3[k].pt for k in frame3_to_lm.keys()])
 success, T_2_3, inliers = T_from_PNP(landmarks_23, lm_kps_3, K, D)
 
+landmarks_23_new = triangulate(T_1_2, T_2_3, kp2_match_23_ud[mask_RP_23[:,0]==1], 
+                                             kp3_match_23_ud[mask_RP_23[:,0]==1])
+
 plt.figure(2)
 graph = plot_3d_points(ax2, landmarks_23, linestyle="", marker="o", color='r')
 plot_pose3_on_axes(ax2, T_2_3, axis_length=2.0)
@@ -237,6 +244,13 @@ if CHESSBOARD:
 
 set_axes_equal(ax2)             # important!
 plt.draw()
-plt.pause(0.5)
+plt.pause(0.01)
+input("Press [enter] to continue.")
+landmarks_23_new = triangulate(T_1_2, T_2_3, kp2_match_23_ud[mask_RP_23[:,0]==1], 
+                                             kp3_match_23_ud[mask_RP_23[:,0]==1])
+graph = plot_3d_points(ax2, landmarks_23_new, linestyle="", marker="o", color='g')
+set_axes_equal(ax2)             # important!
+plt.draw()
+plt.pause(0.01)
 input("Press [enter] to continue.")
 plt.close(fig='all')
