@@ -34,12 +34,14 @@ objp = objp * CHESSBOARD_SIZE
 objpoints = [] # 3d point in real world space
 imgpoints = [] # 2d points in image plane.
 
-images = glob.glob(path+'data/goprocalib_80.75mm_target_set_2/*.JPG')
+images = sorted(glob.glob(path+'data/new_set_80.75mm_target/*.JPG'))
 #cv2.namedWindow('image', cv2.WINDOW_NORMAL)
 #cv2.resizeWindow('image', (800,600))
 
 fig = plt.figure(1)
-
+mgr = plt.get_current_fig_manager()
+mgr.window.showMaximized()
+plt.axis("off")
 
 for fname in images:
     print ("File - ", fname)
@@ -56,20 +58,12 @@ for fname in images:
 
         corners2 = cv2.cornerSubPix(gray,corners,(11,11),(-1,-1),criteria)
         imgpoints.append(corners2)
+        plt.title(fname)
         img = cv2.drawChessboardCorners(img, (CHESSBOARD_W,CHESSBOARD_H), corners2,ret)
         
         plt.imshow(img)
-        #plt.ion()
-        #plt.show()
         plt.draw()
-        plt.pause(0.5)
-        #input("Press [enter] to continue.")
-
-
-        # Draw and display the corners
-        #
-        #cv2.imshow('image',img)
-        #cv2.waitKey(500)
+        plt.pause(0.01)
 
 ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1],None,None)
 print("Img pts shape: ",len(imgpoints))
