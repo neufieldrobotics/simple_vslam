@@ -70,16 +70,18 @@ def undistortKeyPoints(kps, K, D):
     return	cv2.undistortPoints(np.expand_dims(kps, axis=1), 
                                cameraMatrix=K, distCoeffs=D)[:,0,:]
 
-def displayMatches(img_left,kp1,img_right,kp2, matches, mask, display_invalid):
+def displayMatches(img_left,kp1,img_right,kp2, matches, mask, display_invalid, in_image=None, color=(0, 255, 0)):
     '''
     This function extracts takes a 2 images, set of keypoints and a mask of valid
     (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
     The mask should be the same length as matches
     '''
     bool_mask = mask.astype(bool)
-    img_valid = cv2.drawMatches(img_left,kp1,img_right,kp2,matches, None, 
-                                matchColor=(0, 255, 0), 
-                                matchesMask=bool_mask.ravel().tolist(), flags=2)
+    if in_image is None: mode_flag=2
+    else: mode_flag =1
+    img_valid = cv2.drawMatches(img_left,kp1,img_right,kp2,matches, in_image, 
+                                matchColor=color, 
+                                matchesMask=bool_mask.ravel().tolist(), flags=mode_flag)
     
     if display_invalid:
         img_valid = cv2.drawMatches(img_left,kp1,img_right,kp2,matches, img_valid, 
@@ -226,10 +228,12 @@ def move_figure(position="top-right"):
     '''
 
     mgr = plt.get_current_fig_manager()
-    #mgr.full_screen_toggle()  # primitive but works to get screen size
-    mgr.window.showMaximized()
-    py = mgr.canvas.height()
-    px = mgr.canvas.width()
+    ##mgr.full_screen_toggle()  # primitive but works to get screen size
+    #mgr.window.showMaximized()
+    #py = mgr.canvas.height()
+    #px = mgr.canvas.width()
+    py = 900
+    px = 1600
 
     d = 10  # width of the window border in pixels
     if position == "top":
@@ -264,5 +268,5 @@ def radial_non_max(kp_list, dist):
             _, maxi = max([(v,i) for i,v in enumerate(resp)])
             del idx[maxi]
             for kp_i in idx:
-                kp_mask[kp_i] = False
+                kp_mask[kp_i] = False 
     return kp[kp_mask].tolist()
