@@ -77,7 +77,7 @@ def displayMatches(img_left,kp1,img_right,kp2, matches, mask, display_invalid, i
     The mask should be the same length as matches
     '''
     bool_mask = mask.astype(bool)
-    if in_image is None: mode_flag=2
+    if in_image is None: mode_flag=0
     else: mode_flag =1
     img_valid = cv2.drawMatches(img_left,kp1,img_right,kp2,matches, in_image, 
                                 matchColor=color, 
