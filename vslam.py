@@ -26,28 +26,25 @@ else:
     path = '/home/vik748/'
     window_xadj = 65
     window_yadj = 430
-img1 = cv2.imread(path+'data/chess_board2/GOPR1492.JPG',1)          # queryImage
-img2 = cv2.imread(path+'data/chess_board2/GOPR1493.JPG',1)  
-img3 = cv2.imread(path+'data/chess_board2/GOPR1494.JPG',1)  
-img4 = cv2.imread(path+'data/chess_board2/GOPR1497.JPG',1)
+img1 = cv2.imread(path+'data/chess_board3/GOPR1550.JPG',1)          # queryImage
+img2 = cv2.imread(path+'data/chess_board3/GOPR1551.JPG',1)  
+img3 = cv2.imread(path+'data/chess_board3/GOPR1552.JPG',1)  
+img4 = cv2.imread(path+'data/chess_board3/GOPR1553.JPG',1)
+img5 = cv2.imread(path+'data/chess_board3/GOPR1554.JPG',1)
 
-mask_pts_1488 = np.array([[1180, 960], [2740, 1000], [2700, 2040], [1180, 1980]])
-mask_pts_1489 = np.array([[1180, 1225], [2550, 1475], [2400, 2340], [1100, 2100]])
-mask_pts_1490 = np.array([[1550, 1250], [2870, 1030], [2900, 1890], [1680, 2200]])
-mask_pts_1491 = np.array([[760, 880], [2100, 1090], [2180, 1980], [780, 2100]])
-mask_pts_1492 = np.array([[1697, 1227], [2600, 1271], [2560, 1840], [1670, 1817]])
-mask_pts_1493 = np.array([[1346, 1021], [2231, 1043], [2210, 1643], [1330, 1595]])
-mask_pts_1494 = np.array([[1102, 1000], [1981, 1027], [1965, 1622], [1102, 1595]])
-mask_pts_1496 = np.array([[400, 650], [1300, 680], [1280, 1300], [390, 1260]])
-mask_pts_1497 = np.array([[760, 1055], [1600, 1080], [1560, 1670], [755, 1630]])
-mask_pts_1498 = np.array([[1030, 740], [1820, 840], [1785, 1085], [1675, 1400], [975, 1285]])
+mask_pts_1550 = np.array([[2119, 1318], [3409, 1332], [3400, 2184], [2107, 2218]])
+mask_pts_1551 = np.array([[1863, 1326], [3181, 1338], [3176, 2213], [1855, 2224]])
+mask_pts_1552 = np.array([[1488, 1281], [2818, 1301], [2801, 2170], [1474, 2178]])
+mask_pts_1553 = np.array([[1247, 1286], [2562, 1295], [2556, 2178], [1224, 2164]])
+mask_pts_1554 = np.array([[946, 1264], [2255, 1281], [2232, 2170], [917, 2139]])
 
 mask = np.zeros(img1.shape[:2], dtype=np.uint8)
 
-mask1 = 255 - cv2.fillConvexPoly(mask, mask_pts_1492, color=[255, 255, 255])
-mask2 = 255 - cv2.fillConvexPoly(mask, mask_pts_1493, color=[255, 255, 255])
-mask3 = 255 - cv2.fillConvexPoly(mask, mask_pts_1494, color=[255, 255, 255])
-mask4 = 255 - cv2.fillConvexPoly(mask, mask_pts_1497, color=[255, 255, 255])
+mask1 = 255 - cv2.fillConvexPoly(mask, mask_pts_1550, color=[255, 255, 255])
+mask2 = 255 - cv2.fillConvexPoly(mask, mask_pts_1551, color=[255, 255, 255])
+mask3 = 255 - cv2.fillConvexPoly(mask, mask_pts_1552, color=[255, 255, 255])
+mask4 = 255 - cv2.fillConvexPoly(mask, mask_pts_1553, color=[255, 255, 255])
+mask5 = 255 - cv2.fillConvexPoly(mask, mask_pts_1554, color=[255, 255, 255])
 '''
 img1 = cv2.imread(path+'data/chess_board2/GOPR1496.JPG',1)          # queryImage
 img2 = cv2.imread(path+'data/chess_board2/GOPR1497.JPG',1)  
@@ -175,8 +172,6 @@ plt.get_current_fig_manager().window.setGeometry(window_xadj,338+window_yadj,640
 img2_track = draw_feature_tracks(gr1,kp1,gr2,kp2,matches12,mask_RP_12)
 plt.imshow(img2_track)
 plt.title('Image 1 to 2 matches')
-#plt.ion()
-#plt.show()
 plt.axis("off")
 fig3.subplots_adjust(0,0,1,1)
 plt.draw()
@@ -336,7 +331,8 @@ frame3_to_lm = {mat.trainIdx:lm_id for lm_id,mat in zip(lm_23, matches23)
 '''
 FRAME 4
 '''
-def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm, machespc_prev, lm_prev, T_prev, corners_prev_ud):
+def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm, 
+                  matchespc_prev, lm_prev, T_prev, corners_prev_ud):
     gr_curr = cv2.cvtColor(img_curr,cv2.COLOR_BGR2GRAY)
     kp_curr = detector.detect(gr_curr,mask_curr)
     
@@ -369,7 +365,7 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm, ma
     To plot matches in 2-3 which are found in 4 etc.
     mask_lm_cinp = np.zeros(mask_RP_prev.shape)
     lm_2pf = dict([[v,k] for k,v in frame3_to_lm.items()])
-    frame_p2_matchespc_prev = {mat.trainIdx:match_id for match_id,mat in enumerate(machespc_prev)}
+    frame_p2_matchespc_prev = {mat.trainIdx:match_id for match_id,mat in enumerate(matchespc_prev)}
 
 
     for frame_ckp, lm_id in frame_c2lm.items():
@@ -387,6 +383,16 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm, ma
     
     plt.imshow(img_matches)
     plt.title('Current frame matches to prev'); plt.draw(); plt.pause(0.001)
+    '''
+    fig3 = plt.figure(3)
+    img3_track = draw_feature_tracks(gr1,kp1,gr2,kp2,matches12,mask_RP_12)
+    plt.imshow(img2_track)
+    plt.title('Image 1 to 2 matches')
+    plt.axis("off")
+    fig3.subplots_adjust(0,0,1,1)
+    plt.draw()
+    plt.pause(0.001)
+    '''
     input("Press [enter] to continue.")
     
     print("frame_c2lm: ",len(frame_c2lm))
@@ -395,7 +401,7 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm, ma
     
     lm_cur_kps_in_frame = np.array([kp_curr[k].pt for k in frame_c2lm.keys()])
     success, T_cur, inliers = T_from_PNP(lm_cur, lm_cur_kps_in_frame, K, D)
-    
+    print("PNP status: ", success)
     plt.figure(2)
     plt.title('Image prev to curr PNP')
     graph = plot_3d_points(ax2, lm_cur, linestyle="", marker="o", color='r')
@@ -416,7 +422,20 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm, ma
     graph = plot_3d_points(ax2, lm_cur_new, linestyle="", marker="o", color='g')
     plt.title('Image 2 to 3 New Landmarks'); set_axes_equal(ax2); plt.draw(); plt.pause(0.01)
     input("Press [enter] to continue.")
-        
+    
+    lm_nos = -np.ones(mask_RP.shape[0],dtype=int)
+    lm_nos[mask_RP.ravel()==1]=np.arange(np.sum(mask_RP))
+    
+    # Create a dictionary {KP2 index of match : landmark number}
+    frame_c2lmnos = {mat.trainIdx:lm_id for lm_id,mat in zip(lm_nos, matchespc_prev)
+                    if lm_id!=-1 }
 
-process_frame(img4, mask4, gr3, kp3, des3, frame3_to_lm, matches23, landmarks_23_new, T_2_3, corners3_ud)
+    
+    return gr_curr, kp_curr, des_curr, frame_c2lmnos, matchespc, lm_cur_new, T_cur, corners_curr_ud
+
+gr4, kp4, des4, frame4_to_lm, matches34, landmarks_34_new, T_3_4, corners4_ud = process_frame(img4, mask4, gr3, kp3, des3, frame3_to_lm, matches23, landmarks_23_new, T_2_3, corners3_ud)
+print ("\n \n FRAME 4 COMPLETE \n \n")
+process_frame(img5, mask5, gr4, kp4, des4, frame4_to_lm, matches34, landmarks_34_new, T_3_4, corners4_ud)
+
+
 plt.close(fig='all')
