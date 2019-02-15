@@ -332,14 +332,12 @@ lm_23[mask_RP_23.ravel()==1]=np.arange(np.sum(mask_RP_23))
 # Create a dictionary {KP2 index of match : landmark number}
 frame3_to_lm = {mat.trainIdx:lm_id for lm_id,mat in zip(lm_23, matches23)
                 if lm_id!=-1 }
-lm_to_frame3 = dict([[v,k] for k,v in frame3_to_lm.items()])
-frame3_to_matches23 = {mat.trainIdx:match_id for match_id,mat in enumerate(matches23)}
 
 '''
 FRAME 4
 '''
-def process_frame(img_curr, mask_curr):
-    gr_curr=cv2.cvtColor(img_curr,cv2.COLOR_BGR2GRAY)
+def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm, machespc_prev, lm_prev, T_prev, corners_prev_ud):
+    gr_curr = cv2.cvtColor(img_curr,cv2.COLOR_BGR2GRAY)
     kp_curr = detector.detect(gr_curr,mask_curr)
     
     if RADIAL_NON_MAX:
@@ -348,86 +346,77 @@ def process_frame(img_curr, mask_curr):
     
     kp_curr, des_curr = detector.compute(gr_curr,kp_curr)
     
-    matches34 = matcher.match(des3,des_curr)
-    kp3_match_34 = np.array([kp3[mat.queryIdx].pt for mat in matches34])
-    kp4_match_34 = np.array([kp_curr[mat.trainIdx].pt for mat in matches34])
+    matchespc = matcher.match(des_prev,des_curr)
+    kp_prev_matchpc = np.array([kp_prev[mat.queryIdx].pt for mat in matchespc])
+    kp_curr_matchpc = np.array([kp_curr[mat.trainIdx].pt for mat in matchespc])
     
-    kp3_match_34_ud = cv2.undistortPoints(np.expand_dims(kp3_match_34,axis=1),K,D)
-    kp4_match_34_ud = cv2.undistortPoints(np.expand_dims(kp4_match_34,axis=1),K,D)
+    kp_prev_matchpc_ud = cv2.undistortPoints(np.expand_dims(kp_prev_matchpc,axis=1),K,D)
+    kp_curr_matchpc_ud = cv2.undistortPoints(np.expand_dims(kp_curr_matchpc,axis=1),K,D)
     
-    E_34, mask_e_34 = cv2.findEssentialMat(kp3_match_34_ud, kp4_match_34_ud, focal=1.0, pp=(0., 0.), 
+    E, mask_e = cv2.findEssentialMat(kp_prev_matchpc_ud, kp_curr_matchpc_ud, focal=1.0, pp=(0., 0.), 
                                    method=cv2.RANSAC, prob=0.999, threshold=0.001)
     
-    print ("Essential matrix: used ",np.sum(mask_e_34) ," of total ",len(matches34),"matches")
-    #mask_RP_23 = mask_e_23
-    points, R_32, t_32, mask_RP_34 = cv2.recoverPose(E_34, kp3_match_34_ud, kp4_match_34_ud,mask=mask_e_34)
+    print ("Essential matrix: used ",np.sum(mask_e) ," of total ",len(matchespc),"matches")
+    _, _, _, mask_RP = cv2.recoverPose(E, kp_prev_matchpc_ud, kp_curr_matchpc_ud,mask=mask_e)
     
-    matches34_filt = [matches34[i] for i in range(len(matches34)) if mask_RP_34[i]==1]
+    matchespc_filt = [matchespc[i] for i in range(len(matchespc)) if mask_RP[i]==1]
+    frame_c2p = {mat.trainIdx:mat.queryIdx for mat in matchespc_filt}
     
-    frame4_to_frame3 = {mat.trainIdx:mat.queryIdx for mat in matches34_filt}
-    
-    frame4_to_lm = {id:frame3_to_lm.get(frame4_to_frame3[id]) 
-                    for id in frame4_to_frame3.keys() 
-                    if frame3_to_lm.get(frame4_to_frame3[id]) is not None}
-    
+    frame_c2lm = {id:frame_p2lm.get(frame_c2p[id]) 
+                    for id in frame_c2p.keys() 
+                    if frame_p2lm.get(frame_c2p[id]) is not None}
+    '''
+    To plot matches in 2-3 which are found in 4 etc.
+    mask_lm_cinp = np.zeros(mask_RP_prev.shape)
+    lm_2pf = dict([[v,k] for k,v in frame3_to_lm.items()])
+    frame_p2_matchespc_prev = {mat.trainIdx:match_id for match_id,mat in enumerate(machespc_prev)}
+
+
+    for frame_ckp, lm_id in frame_c2lm.items():
+        frame_pkp = lm_2pf[lm_id]
+        matches_prev_id = frame_p2_matchespc_prev[frame_pkp]
+        mask_lm_cinp[matches_prev_id]=1.0
+    '''
     fig1 = plt.figure(1)
-    plt.title('Image 1 to 2 - Landmarks found in 3')
-    mask_lm4_in_23 = np.zeros(mask_RP_23.shape)
+    #plt.title('Image 1 to 2 - Landmarks found in 3')
+    #img23_lm = displayMatches(gr2,kp2,gr3,kp_prev,matches23,mask_lm_cinp, False, in_image=img23, color=(255,165,0))
+    #plt.imshow(img23_lm); plt.draw(); plt.pause(.001)
+    #input("Press [enter] to continue.")
     
-    for frame4_kp, lm_id in frame4_to_lm.items():
-        #print (lm_id)
-        frame3_kp = lm_to_frame3[lm_id]
-        matches_23_id = frame3_to_matches23[frame3_kp]
-        mask_lm4_in_23[matches_23_id]=1.0
-        
-    img23_lm = displayMatches(gr2,kp2,gr3,kp3,matches23,mask_lm4_in_23, False, in_image=img23, color=(255,165,0))
-    plt.imshow(img23_lm)
-    plt.draw()
-    plt.pause(.001)
+    img_matches = displayMatches(gr_prev,kp_prev,gr_curr,kp_curr,matchespc,mask_RP, False)
+    
+    plt.imshow(img_matches)
+    plt.title('Current frame matches to prev'); plt.draw(); plt.pause(0.001)
     input("Press [enter] to continue.")
     
+    print("frame_c2lm: ",len(frame_c2lm))
     
-    img34 = displayMatches(gr3,kp3,gr_curr,kp_curr,matches34,mask_RP_34, False)
+    lm_cur = np.array([lm_prev[frame_c2lm[k]] for k in frame_c2lm.keys()])
     
-    plt.imshow(img34)
-    plt.title('Image 3 to 4')
-    plt.draw()
-    plt.pause(0.001)
-    input("Press [enter] to continue.")
-    
-    print("Frame3_to_lm: ",len(frame4_to_lm))
-    
-    landmarks_34 = np.array([landmarks_23_new[frame4_to_lm[k]] for k in 
-                            frame4_to_lm.keys()])
-    
-    lm_kps_4 = np.array([kp_curr[k].pt for k in frame4_to_lm.keys()])
-    success, T_3_4, inliers = T_from_PNP(landmarks_34, lm_kps_4, K, D)
+    lm_cur_kps_in_frame = np.array([kp_curr[k].pt for k in frame_c2lm.keys()])
+    success, T_cur, inliers = T_from_PNP(lm_cur, lm_cur_kps_in_frame, K, D)
     
     plt.figure(2)
-    plt.title('Image 3 to 4 PNP')
-    graph = plot_3d_points(ax2, landmarks_34, linestyle="", marker="o", color='r')
-    plot_pose3_on_axes(ax2, T_3_4, axis_length=2.0)
+    plt.title('Image prev to curr PNP')
+    graph = plot_3d_points(ax2, lm_cur, linestyle="", marker="o", color='r')
+    plot_pose3_on_axes(ax2, T_cur, axis_length=2.0)
     
     if CHESSBOARD:
-        ret4, corners4 = cv2.findChessboardCorners(gr_curr, (16,9),None)
-        corners4_ud = cv2.undistortPoints(corners4,K,D)
+        ret, corners_curr = cv2.findChessboardCorners(gr_curr, (16,9),None)
+        corners_curr_ud = cv2.undistortPoints(corners_curr,K,D)
     
-        corners_34 = triangulate(T_2_3, T_3_4, corners3_ud, corners4_ud)
-        graph = plot_3d_points(ax2, corners_34, linestyle="", marker=".",color='black')
+        corners = triangulate(T_prev, T_cur, corners_prev_ud, corners_curr_ud)
+        graph = plot_3d_points(ax2, corners, linestyle="", marker=".",color='black')
     
-    set_axes_equal(ax2)             # important!
-    plt.draw()
-    plt.pause(0.01)
-    input("Press [enter] to continue.")
-    landmarks_34_new = triangulate(T_2_3, T_3_4, kp3_match_34_ud[mask_RP_34[:,0]==1], 
-                                                 kp4_match_34_ud[mask_RP_34[:,0]==1])
-    graph = plot_3d_points(ax2, landmarks_34_new, linestyle="", marker="o", color='g')
-    set_axes_equal(ax2)             # important!
-    plt.title('Image 2 to 3 New Landmarks')
-    plt.draw()
-    plt.pause(0.01)
+    set_axes_equal(ax2); plt.draw(); plt.pause(0.001)
     input("Press [enter] to continue.")
     
-    plt.close(fig='all')
+    lm_cur_new = triangulate(T_prev, T_cur, kp_prev_matchpc_ud[mask_RP[:,0]==1], 
+                                                 kp_curr_matchpc_ud[mask_RP[:,0]==1])
+    graph = plot_3d_points(ax2, lm_cur_new, linestyle="", marker="o", color='g')
+    plt.title('Image 2 to 3 New Landmarks'); set_axes_equal(ax2); plt.draw(); plt.pause(0.01)
+    input("Press [enter] to continue.")
+        
 
-process_frame(img4, mask4)
+process_frame(img4, mask4, gr3, kp3, des3, frame3_to_lm, matches23, landmarks_23_new, T_2_3, corners3_ud)
+plt.close(fig='all')
