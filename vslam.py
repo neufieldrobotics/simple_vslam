@@ -2,6 +2,8 @@
 import numpy as np
 from numpy.linalg import inv
 import cv2
+import matplotlib
+matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import time
@@ -14,6 +16,7 @@ print (sys.platform)
 
 RADIAL_NON_MAX = True
 CHESSBOARD = True
+RADIA_NON_MAX_RADIUS = 15
 
 # Inputs, images and camera info
 
@@ -116,8 +119,8 @@ kp3 = SSC(kp3, 5000, 0.1, gr1.shape[1], gr1.shape[0])
 print ("Points nonmax supression: ")
 '''
 if RADIAL_NON_MAX:
-    kp1 = radial_non_max(kp1,25)
-    kp2 = radial_non_max(kp2,25)
+    kp1 = radial_non_max(kp1,RADIA_NON_MAX_RADIUS)
+    kp2 = radial_non_max(kp2,RADIA_NON_MAX_RADIUS)
     print ("Points after radial supression: ",len(kp1))
 
 
@@ -187,7 +190,7 @@ plt.get_current_fig_manager().window.setGeometry(640+window_xadj,window_yadj,640
 #move_figure(position="right")
 ax2.set_aspect('equal')         # important!
 title = ax2.set_title('Image 1 to 2 after triangulation')
-graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker="o")
+graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker=".", markersize=2)
 
 if CHESSBOARD:
     ret1, corners1 = cv2.findChessboardCorners(gr1, (16,9),None)
@@ -197,7 +200,7 @@ if CHESSBOARD:
     corners2_ud = cv2.undistortPoints(corners2,K,D)
    
     corners_12 = triangulate(np.eye(4), T_1_2, corners1_ud, corners2_ud)
-    graph = plot_3d_points(ax2, corners_12, linestyle="", marker=".",color='g')
+    graph = plot_3d_points(ax2, corners_12, linestyle="", color='g', marker=".", markersize=2)
 
 plot_pose3_on_axes(ax2, T_1_2, axis_length=1.0)
 plot_pose3_on_axes(ax2,np.eye(4), axis_length=0.5)
@@ -230,7 +233,7 @@ gr3=cv2.cvtColor(img3,cv2.COLOR_BGR2GRAY)
 kp3 = detector.detect(gr3,mask3)
 
 if RADIAL_NON_MAX:
-    kp3 = radial_non_max(kp3,25)
+    kp3 = radial_non_max(kp3,RADIA_NON_MAX_RADIUS)
     print ("Points after radial supression: ",len(kp1))
 
 kp3, des3 = detector.compute(gr3,kp3)
@@ -295,10 +298,11 @@ landmarks_23 = np.array([landmarks_12[frame3_to_lm[k]] for k in
 
 lm_kps_3 = np.array([kp3[k].pt for k in frame3_to_lm.keys()])
 success, T_2_3, inliers = T_from_PNP(landmarks_23, lm_kps_3, K, D)
+("T from PNP, status: ", success)
 
 plt.figure(2)
 plt.title('Image 2 to 3 PNP')
-graph = plot_3d_points(ax2, landmarks_23, linestyle="", marker="o", color='r')
+graph = plot_3d_points(ax2, landmarks_23, linestyle="", color='r', marker=".", markersize=2)
 plot_pose3_on_axes(ax2, T_2_3, axis_length=2.0)
 
 if CHESSBOARD:
@@ -306,7 +310,7 @@ if CHESSBOARD:
     corners3_ud = cv2.undistortPoints(corners3,K,D)
 
     corners_23 = triangulate(T_1_2, T_2_3, corners2_ud, corners3_ud)
-    graph = plot_3d_points(ax2, corners_23, linestyle="", marker=".",color='tab:orange')
+    graph = plot_3d_points(ax2, corners_23, linestyle="", color='tab:orange', marker=".", markersize=2)
 
 set_axes_equal(ax2)             # important!
 plt.draw()
@@ -314,7 +318,7 @@ plt.pause(0.01)
 input("Press [enter] to continue.")
 landmarks_23_new = triangulate(T_1_2, T_2_3, kp2_match_23_ud[mask_RP_23[:,0]==1], 
                                              kp3_match_23_ud[mask_RP_23[:,0]==1])
-graph = plot_3d_points(ax2, landmarks_23_new, linestyle="", marker="o", color='g')
+graph = plot_3d_points(ax2, landmarks_23_new, linestyle="", color='g', marker=".", markersize=2)
 set_axes_equal(ax2)             # important!
 plt.title('Image 2 to 3 New Landmarks')
 plt.draw()
@@ -337,7 +341,7 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     kp_curr = detector.detect(gr_curr,mask_curr)
     
     if RADIAL_NON_MAX:
-        kp_curr = radial_non_max(kp_curr,25)
+        kp_curr = radial_non_max(kp_curr,RADIA_NON_MAX_RADIUS)
         print ("Points after radial supression: ",len(kp_curr))
     
     kp_curr, des_curr = detector.compute(gr_curr,kp_curr)
@@ -372,27 +376,23 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
         frame_pkp = lm_2pf[lm_id]
         matches_prev_id = frame_p2_matchespc_prev[frame_pkp]
         mask_lm_cinp[matches_prev_id]=1.0
-    '''
-    fig1 = plt.figure(1)
     #plt.title('Image 1 to 2 - Landmarks found in 3')
     #img23_lm = displayMatches(gr2,kp2,gr3,kp_prev,matches23,mask_lm_cinp, False, in_image=img23, color=(255,165,0))
     #plt.imshow(img23_lm); plt.draw(); plt.pause(.001)
     #input("Press [enter] to continue.")
+    '''
+
+    fig1 = plt.figure(1)
     
     img_matches = displayMatches(gr_prev,kp_prev,gr_curr,kp_curr,matchespc,mask_RP, False)
     
     plt.imshow(img_matches)
     plt.title('Current frame matches to prev'); plt.draw(); plt.pause(0.001)
-    '''
     fig3 = plt.figure(3)
-    img3_track = draw_feature_tracks(gr1,kp1,gr2,kp2,matches12,mask_RP_12)
+    img3_track = draw_feature_tracks(gr_prev,kp_prev,gr_curr,kp_curr,matchespc,mask_RP)
     plt.imshow(img2_track)
-    plt.title('Image 1 to 2 matches')
-    plt.axis("off")
-    fig3.subplots_adjust(0,0,1,1)
-    plt.draw()
-    plt.pause(0.001)
-    '''
+    plt.title('Image 1 to 2 matches'); plt.draw(); plt.pause(0.001)
+    
     input("Press [enter] to continue.")
     
     print("frame_c2lm: ",len(frame_c2lm))
@@ -404,7 +404,7 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     print("PNP status: ", success)
     plt.figure(2)
     plt.title('Image prev to curr PNP')
-    graph = plot_3d_points(ax2, lm_cur, linestyle="", marker="o", color='r')
+    graph = plot_3d_points(ax2, lm_cur, linestyle="", color='r', marker=".", markersize=2)
     plot_pose3_on_axes(ax2, T_cur, axis_length=2.0)
     
     if CHESSBOARD:
@@ -412,14 +412,14 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
         corners_curr_ud = cv2.undistortPoints(corners_curr,K,D)
     
         corners = triangulate(T_prev, T_cur, corners_prev_ud, corners_curr_ud)
-        graph = plot_3d_points(ax2, corners, linestyle="", marker=".",color='black')
+        graph = plot_3d_points(ax2, corners, linestyle="",color='black', marker=".", markersize=2)
     
     set_axes_equal(ax2); plt.draw(); plt.pause(0.001)
     input("Press [enter] to continue.")
     
     lm_cur_new = triangulate(T_prev, T_cur, kp_prev_matchpc_ud[mask_RP[:,0]==1], 
                                                  kp_curr_matchpc_ud[mask_RP[:,0]==1])
-    graph = plot_3d_points(ax2, lm_cur_new, linestyle="", marker="o", color='g')
+    graph = plot_3d_points(ax2, lm_cur_new, linestyle="", color='g', marker=".", markersize=2)
     plt.title('Image 2 to 3 New Landmarks'); set_axes_equal(ax2); plt.draw(); plt.pause(0.01)
     input("Press [enter] to continue.")
     
@@ -427,15 +427,20 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     lm_nos[mask_RP.ravel()==1]=np.arange(np.sum(mask_RP))
     
     # Create a dictionary {KP2 index of match : landmark number}
-    frame_c2lmnos = {mat.trainIdx:lm_id for lm_id,mat in zip(lm_nos, matchespc_prev)
+    frame_c2lmnos = {mat.trainIdx:lm_id for lm_id,mat in zip(lm_nos, matchespc)
                     if lm_id!=-1 }
 
     
     return gr_curr, kp_curr, des_curr, frame_c2lmnos, matchespc, lm_cur_new, T_cur, corners_curr_ud
 
-gr4, kp4, des4, frame4_to_lm, matches34, landmarks_34_new, T_3_4, corners4_ud = process_frame(img4, mask4, gr3, kp3, des3, frame3_to_lm, matches23, landmarks_23_new, T_2_3, corners3_ud)
+out4 = process_frame(img4, mask4, gr3, kp3, des3, frame3_to_lm, matches23, 
+                     landmarks_23_new, T_2_3, corners3_ud)
+
+gr4, kp4, des4, frame4_to_lm, matches34, landmarks_34_new, T_3_4, corners4_ud = out4
+
 print ("\n \n FRAME 4 COMPLETE \n \n")
-process_frame(img5, mask5, gr4, kp4, des4, frame4_to_lm, matches34, landmarks_34_new, T_3_4, corners4_ud)
+
+process_frame(img5, mask5, *out4)
 
 
 plt.close(fig='all')
