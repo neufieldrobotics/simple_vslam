@@ -13,7 +13,7 @@ from ssc import *
 np.set_printoptions(precision=3,suppress=True)
  
 print (sys.platform)
-
+TILEY=16; TILEX=12; TILE_KP = False
 RADIAL_NON_MAX = True
 CHESSBOARD = True
 RADIA_NON_MAX_RADIUS = 15
@@ -118,6 +118,11 @@ kp2 = SSC(kp2, 5000, 0.1, gr1.shape[1], gr1.shape[0])
 kp3 = SSC(kp3, 5000, 0.1, gr1.shape[1], gr1.shape[0])
 print ("Points nonmax supression: ")
 '''
+if TILE_KP:
+    kp1 = tiled_features(kp1, gr1.shape, TILEY, TILEX)
+    kp2 = tiled_features(kp2, gr2.shape, TILEY, TILEX)
+    print ("Points after tiling supression: ",len(kp1))
+
 if RADIAL_NON_MAX:
     kp1 = radial_non_max(kp1,RADIA_NON_MAX_RADIUS)
     kp2 = radial_non_max(kp2,RADIA_NON_MAX_RADIUS)
@@ -186,10 +191,12 @@ landmarks_12 = triangulate(np.eye(4), T_1_2, kp1_match_12_ud[mask_RP_12[:,0]==1]
 
 fig2 = plt.figure(2)
 ax2 = fig2.add_subplot(111, projection='3d')
+fig2.subplots_adjust(0,0,1,1)
 plt.get_current_fig_manager().window.setGeometry(640+window_xadj,window_yadj,640,676) #(864, 430, 800, 900)
 #move_figure(position="right")
 ax2.set_aspect('equal')         # important!
-title = ax2.set_title('Image 1 to 2 after triangulation')
+fig2.suptitle('Image 1 to 2 after triangulation')
+
 graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker=".", markersize=2)
 
 if CHESSBOARD:
@@ -206,8 +213,7 @@ plot_pose3_on_axes(ax2, T_1_2, axis_length=1.0)
 plot_pose3_on_axes(ax2,np.eye(4), axis_length=0.5)
 
 set_axes_equal(ax2)
-ax2.view_init(-70, -90)
-fig1.subplots_adjust(0,0,1,1)
+ax2.view_init(0, -90)
 
 plt.draw()
 plt.pause(.001)
@@ -231,6 +237,10 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     global frame_no
     gr_curr = cv2.cvtColor(img_curr,cv2.COLOR_BGR2GRAY)
     kp_curr = detector.detect(gr_curr,mask_curr)
+    
+    if TILE_KP:
+        kp_curr = tiled_features(kp_curr, gr_curr.shape, TILEY, TILEX)
+        print ("Points after tiling supression: ",len(kp1))
     
     if RADIAL_NON_MAX:
         kp_curr = radial_non_max(kp_curr,RADIA_NON_MAX_RADIUS)

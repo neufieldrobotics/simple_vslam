@@ -199,9 +199,9 @@ def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
     return bb_filter
 
 
-def tiled_features(kp, img, tiley, tilex):
+def tiled_features(kp, img_shape, tiley, tilex):
     feat_per_cell = int(len(kp)/(tilex*tiley))
-    HEIGHT, WIDTH = img.shape
+    HEIGHT, WIDTH = img_shape
     assert WIDTH%tiley == 0, "Width is not a multiple of tilex"
     assert HEIGHT%tilex == 0, "Height is not a multiple of tiley"
     w_width = int(WIDTH/tiley)
