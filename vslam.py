@@ -10,16 +10,20 @@ import time
 import sys
 from vslam_helper import *
 from ssc import *
+import yaml
+import glob
+import argparse
 np.set_printoptions(precision=3,suppress=True)
+
+
+parser = argparse.ArgumentParser(description='This is the simple VSLAM pipeline')
+parser.add_argument('-c', '--config', help='location of config file in yaml format',
+                    default='config/go_pro_config.yaml')
+args = parser.parse_args()
  
 print (sys.platform)
-TILEY=32; TILEX=24; TILE_KP = False
-RADIAL_NON_MAX = False
-CHESSBOARD = True
-RADIA_NON_MAX_RADIUS = 15
 
 # Inputs, images and camera info
-
 
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/'
@@ -29,6 +33,9 @@ else:
     path = '/home/vik748/'
     window_xadj = 65
     window_yadj = 430
+    
+
+'''    
 img1 = cv2.imread(path+'data/chess_board3/GOPR1550.JPG',1)          # queryImage
 img2 = cv2.imread(path+'data/chess_board3/GOPR1551.JPG',1)  
 img3 = cv2.imread(path+'data/chess_board3/GOPR1552.JPG',1)  
@@ -40,7 +47,6 @@ mask_pts_1551 = np.array([[1863, 1326], [3181, 1338], [3176, 2213], [1855, 2224]
 mask_pts_1552 = np.array([[1488, 1281], [2818, 1301], [2801, 2170], [1474, 2178]])
 mask_pts_1553 = np.array([[1247, 1286], [2562, 1295], [2556, 2178], [1224, 2164]])
 mask_pts_1554 = np.array([[946, 1264], [2255, 1281], [2232, 2170], [917, 2139]])
-
 mask = np.zeros(img1.shape[:2], dtype=np.uint8)
 
 mask1 = 255 - cv2.fillConvexPoly(mask, mask_pts_1550, color=[255, 255, 255])
@@ -49,40 +55,36 @@ mask3 = 255 - cv2.fillConvexPoly(mask, mask_pts_1552, color=[255, 255, 255])
 mask4 = 255 - cv2.fillConvexPoly(mask, mask_pts_1553, color=[255, 255, 255])
 mask5 = 255 - cv2.fillConvexPoly(mask, mask_pts_1554, color=[255, 255, 255])
 '''
-img1 = cv2.imread(path+'data/chess_board2/GOPR1496.JPG',1)          # queryImage
-img2 = cv2.imread(path+'data/chess_board2/GOPR1497.JPG',1)  
-img3 = cv2.imread(path+'data/chess_board2/GOPR1498.JPG',1)
-'''
+
+# create a mask image filled with zeros, the size of original image
+config_dict = yaml.load(open(args.config))
+K = np.array(config_dict['K'])
+D = np.array(config_dict['D'])
+CHESSBOARD = config_dict['chessboard']
+TILEY=config_dict['tiling_non_max_tile_y']; 
+TILEX=config_dict['tiling_non_max_tile_x']; 
+TILE_KP = config_dict['use_tiling_non_max_supression']
+RADIAL_NON_MAX = config_dict['radial_non_max']
+RADIAL_NON_MAX_RADIUS = config_dict['radial_non_max_radius']
+image_folder = config_dict['image_folder']
+image_ext = config_dict['image_ext']
+
+images = sorted(glob.glob(path+'data/'+image_folder+'/*.'+image_ext))
+
+print(K,D)
+
+img1 = cv2.imread(images[0])
+img2 = cv2.imread(images[2])
+mask = 255 - np.zeros(img1.shape[:2], dtype=np.uint8)
+mask1 = mask
+mask2 = mask
 
 gr1=cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
 gr2=cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
 
-# create a mask image filled with zeros, the size of original image
-
-'''
-fx = 3551.342810
-fy = 3522.689669
-cx = 2033.513326
-cy = 1455.489194
-
-K = np.float64([[fx, 0, cx], 
-                [0, fy, cy], 
-                [0, 0, 1]])
-'''    
-K = np.array([[3.50275628e+03, 0.00000000e+00, 2.01997668e+03],
-              [0.00000000e+00, 3.47709480e+03, 1.44976175e+03],
-              [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
-    
-D = np.array([[-2.85711277e-01,  1.61304120e-01,  5.36070359e-05, -1.48554708e-04,
-               -7.71783829e-02]])
-
-print(K,D)
 
 #Initiate ORB detector
-
-detector = cv2.ORB_create(nfeatures=2500, edgeThreshold=65, patchSize=65, nlevels=6, 
-                     fastThreshold=10, scaleFactor=4.0, WTA_K=4,
-                     scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
+detector = cv2.ORB_create(**config_dict['ORB_settings'])
 matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 '''
 FLANN_INDEX_LSH = 6
@@ -124,8 +126,8 @@ if TILE_KP:
     print ("Points after tiling supression: ",len(kp1))
 
 if RADIAL_NON_MAX:
-    kp1 = radial_non_max(kp1,RADIA_NON_MAX_RADIUS)
-    kp2 = radial_non_max(kp2,RADIA_NON_MAX_RADIUS)
+    kp1 = radial_non_max(kp1,RADIAL_NON_MAX_RADIUS)
+    kp2 = radial_non_max(kp2,RADIAL_NON_MAX_RADIUS)
     print ("Points after radial supression: ",len(kp1))
 
 
@@ -208,7 +210,9 @@ if CHESSBOARD:
    
     corners_12 = triangulate(np.eye(4), T_1_2, corners1_ud, corners2_ud)
     graph = plot_3d_points(ax2, corners_12, linestyle="", color='g', marker=".", markersize=2)
-
+else:
+    corners2_ud = None
+    
 plot_pose3_on_axes(ax2, T_1_2, axis_length=1.0)
 plot_pose3_on_axes(ax2,np.eye(4), axis_length=0.5)
 
@@ -243,7 +247,7 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
         print ("Points after tiling supression: ",len(kp1))
     
     if RADIAL_NON_MAX:
-        kp_curr = radial_non_max(kp_curr,RADIA_NON_MAX_RADIUS)
+        kp_curr = radial_non_max(kp_curr,RADIAL_NON_MAX_RADIUS)
         print ("Points after radial supression: ",len(kp_curr))
     
     kp_curr, des_curr = detector.compute(gr_curr,kp_curr)
@@ -291,11 +295,11 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     plt.imshow(img_matches)
     plt.title('Current frame matches to prev'); plt.draw(); plt.pause(0.001)
     fig3 = plt.figure(3)
-    img3_track = draw_feature_tracks(gr_prev,kp_prev,gr_curr,kp_curr,matchespc,mask_RP)
-    plt.imshow(img2_track)
-    plt.title('Image 1 to 2 matches'); plt.draw(); plt.pause(0.001)
+    img_track = draw_feature_tracks(gr_prev,kp_prev,gr_curr,kp_curr,matchespc,mask_RP)
+    plt.imshow(img_track)
+    plt.title('Image 1 to 2 matches'); plt.draw(); plt.pause(0.1)
     
-    input("Press [enter] to continue.")
+    #input("Press [enter] to continue.")
     
     print("frame_c2lm: ",len(frame_c2lm))
     
@@ -311,7 +315,7 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     plt.figure(2)
     plt.title('Image prev to curr PNP pos and landmarks used')
     graph_pnp = plot_3d_points(ax2, lm_cur, linestyle="", color='r', marker=".", markersize=2)
-    plot_pose3_on_axes(ax2, T_cur, axis_length=2.0)
+    plot_pose3_on_axes(ax2, T_cur, axis_length=2.0, center_plot=True)
     
     if CHESSBOARD:
         ret, corners_curr = cv2.findChessboardCorners(gr_curr, (16,9),None)
@@ -320,9 +324,11 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
         corners = triangulate(T_prev, T_cur, corners_prev_ud, corners_curr_ud)
         graph = plot_3d_points(ax2, corners, linestyle="", marker=".", markersize=2, 
                                color='black' if frame_no%2==0 else 'orange')
+    else:
+        corners_curr_ud = None
     
-    set_axes_equal(ax2); plt.draw(); plt.pause(0.001)
-    input("Press [enter] to continue.")
+    set_axes_equal(ax2); plt.draw(); plt.pause(0.01)
+    #input("Press [enter] to continue.")
     
     mask_newpts = np.array([1 if (mask_RP[i,0]==1 and frame_c2lm.get(matchespc[i].trainIdx) is None) 
                            else 0 for i in range(len(kp_curr_matchpc_ud))],dtype='int')
@@ -331,7 +337,7 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
                                             kp_curr_matchpc_ud[mask_newpts==1])
     graph_newlm = plot_3d_points(ax2, lm_cur_new, linestyle="", color='g', marker=".", markersize=2)
     plt.title('Current frame New Landmarks'); set_axes_equal(ax2); plt.draw(); plt.pause(0.001)
-    input("Press [enter] to continue.")
+    #input("Press [enter] to continue.")
     
     # color landmarks back to blue
     #graph = plot_3d_points(ax2, lm_cur, linestyle="", color='C0', marker=".", markersize=2)
@@ -339,14 +345,9 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     graph_newlm.remove()
     graph_newlm = plot_3d_points(ax2, lm_cur_new, linestyle="", color='C0', marker=".", markersize=2)    
     plt.title('Current frame landmaks added in'); set_axes_equal(ax2); plt.draw(); plt.pause(0.001)
-
-    
-    #lm_nos = -np.ones(mask_RP.shape[0],dtype=int)
-    #lm_nos[mask_RP.ravel()==1]=np.arange(np.sum(mask_RP))
     
     lm_newids = -np.ones(mask_newpts.shape[0],dtype=int)
     lm_newids[mask_newpts.ravel()==1]=np.arange(np.sum(mask_newpts))+len(lm_prev)
-
     
     # Create a dictionary {KP2 index of match : landmark number}
     frame_c2lm_new = {mat.trainIdx:lm_id for lm_id,mat in zip(lm_newids, matchespc)
@@ -358,18 +359,15 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     frame_no += 1
     return gr_curr, kp_curr, des_curr, frame_c2lm, matchespc, lm_updated, T_cur, corners_curr_ud
 
-out3 = process_frame(img3, mask3, gr2, kp2, des2, frame2_to_lm, matches12, 
+img3 = cv2.imread(images[3])
+mask3 = mask
+
+out = process_frame(img3, mask3, gr2, kp2, des2, frame2_to_lm, matches12, 
                      landmarks_12, T_1_2, corners2_ud)
 
-out4 = process_frame(img4, mask4, *out3)
-                     #gr3, kp3, des3, frame3_to_lm, matches23, 
-                     #landmarks_23_new, T_2_3, corners3_ud)
-
-gr4, kp4, des4, frame4_to_lm, matches34, landmarks_34_new, T_3_4, corners4_ud = out4
-
-print ("\n \n FRAME 4 COMPLETE \n \n")
-
-process_frame(img5, mask5, *out4)
-
+for i in range(4,len(images),3):
+    img = cv2.imread(images[i])
+    out = process_frame(img, mask, *out)
+    print ("\n \n FRAME ",i," COMPLETE \n \n")
 
 plt.close(fig='all')
