@@ -1,0 +1,34 @@
+#K: 
+#- [fx, 0, cx], 
+#- [0, fy, cy], 
+#- [0, 0, 1]])
+
+K:
+- [718.856, 0.0, 607.1928]
+- [0.0, 718.856, 185.2157]
+- [0.0, 0.0, 1.0]
+
+D: 
+- [0.0, 0.0, 0.0, 0.0, 0.0]
+
+tiling_non_max_tile_y: 17 
+tiling_non_max_tile_x: 4 
+use_tiling_non_max_supression: False
+
+radial_non_max: False
+radial_non_max_radius: 5
+
+image_folder: 'kitti/00/image_0'
+image_ext: 'png'
+chessboard: False
+
+ORB_settings:
+ WTA_K: 4
+ edgeThreshold: 31
+ patchSize: 31
+ fastThreshold: 10
+ firstLevel: 0
+ nfeatures: 5000
+ nlevels: 8
+ scaleFactor: 2.0
+ scoreType: 0

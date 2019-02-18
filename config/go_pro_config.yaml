@@ -1,0 +1,34 @@
+#K: 
+#- [fx, 0, cx], 
+#- [0, fy, cy], 
+#- [0, 0, 1]])
+
+K:
+- [3502.75628, 0.0, 2019.97668]
+- [0.0, 3477.0948, 1449.76175]
+- [0.0, 0.0, 1.0]
+
+D: 
+- [-0.285711277, 0.16130412, 5.36070359e-05, -0.000148554708, -0.0771783829]
+
+tiling_non_max_tile_y: 8 
+tiling_non_max_tile_x: 6 
+use_tiling_non_max_supression: False
+
+radial_non_max: False
+radial_non_max_radius: 5
+
+image_folder: 'chess_board3'
+image_ext: 'JPG'
+chessboard: False
+
+ORB_settings:
+ WTA_K: 4
+ edgeThreshold: 65
+ patchSize: 65
+ fastThreshold: 10
+ firstLevel: 0
+ nfeatures: 2500
+ nlevels: 6
+ scaleFactor: 2.0
+ scoreType: 0
