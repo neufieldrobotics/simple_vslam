@@ -13,8 +13,8 @@ from ssc import *
 np.set_printoptions(precision=3,suppress=True)
  
 print (sys.platform)
-TILEY=16; TILEX=12; TILE_KP = False
-RADIAL_NON_MAX = True
+TILEY=32; TILEX=24; TILE_KP = False
+RADIAL_NON_MAX = False
 CHESSBOARD = True
 RADIA_NON_MAX_RADIUS = 15
 
@@ -80,8 +80,8 @@ print(K,D)
 
 #Initiate ORB detector
 
-detector = cv2.ORB_create(nfeatures=25000, edgeThreshold=65, patchSize=65, nlevels=4, 
-                     fastThreshold=10, scaleFactor=10.0, WTA_K=4,
+detector = cv2.ORB_create(nfeatures=2500, edgeThreshold=65, patchSize=65, nlevels=6, 
+                     fastThreshold=10, scaleFactor=4.0, WTA_K=4,
                      scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
 matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 '''
@@ -303,10 +303,14 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     
     lm_cur_kps_in_frame = np.array([kp_curr[k].pt for k in frame_c2lm.keys()])
     success, T_cur, inliers = T_from_PNP(lm_cur, lm_cur_kps_in_frame, K, D)
+    if not success:
+        print ("PNP faile in frame ",frame_no," Exiting...")
+        exit()
+        
     print("PNP status: ", success)
     plt.figure(2)
-    plt.title('Image prev to curr PNP')
-    graph = plot_3d_points(ax2, lm_cur, linestyle="", color='r', marker=".", markersize=2)
+    plt.title('Image prev to curr PNP pos and landmarks used')
+    graph_pnp = plot_3d_points(ax2, lm_cur, linestyle="", color='r', marker=".", markersize=2)
     plot_pose3_on_axes(ax2, T_cur, axis_length=2.0)
     
     if CHESSBOARD:
@@ -320,21 +324,39 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     set_axes_equal(ax2); plt.draw(); plt.pause(0.001)
     input("Press [enter] to continue.")
     
-    lm_cur_new = triangulate(T_prev, T_cur, kp_prev_matchpc_ud[mask_RP[:,0]==1], 
-                                                 kp_curr_matchpc_ud[mask_RP[:,0]==1])
-    graph = plot_3d_points(ax2, lm_cur_new, linestyle="", color='g', marker=".", markersize=2)
-    plt.title('Image 2 to 3 New Landmarks'); set_axes_equal(ax2); plt.draw(); plt.pause(0.01)
+    mask_newpts = np.array([1 if (mask_RP[i,0]==1 and frame_c2lm.get(matchespc[i].trainIdx) is None) 
+                           else 0 for i in range(len(kp_curr_matchpc_ud))],dtype='int')
+    
+    lm_cur_new = triangulate(T_prev, T_cur, kp_prev_matchpc_ud[mask_newpts==1], 
+                                            kp_curr_matchpc_ud[mask_newpts==1])
+    graph_newlm = plot_3d_points(ax2, lm_cur_new, linestyle="", color='g', marker=".", markersize=2)
+    plt.title('Current frame New Landmarks'); set_axes_equal(ax2); plt.draw(); plt.pause(0.001)
     input("Press [enter] to continue.")
     
-    lm_nos = -np.ones(mask_RP.shape[0],dtype=int)
-    lm_nos[mask_RP.ravel()==1]=np.arange(np.sum(mask_RP))
+    # color landmarks back to blue
+    #graph = plot_3d_points(ax2, lm_cur, linestyle="", color='C0', marker=".", markersize=2)
+    graph_pnp.remove()
+    graph_newlm.remove()
+    graph_newlm = plot_3d_points(ax2, lm_cur_new, linestyle="", color='C0', marker=".", markersize=2)    
+    plt.title('Current frame landmaks added in'); set_axes_equal(ax2); plt.draw(); plt.pause(0.001)
+
+    
+    #lm_nos = -np.ones(mask_RP.shape[0],dtype=int)
+    #lm_nos[mask_RP.ravel()==1]=np.arange(np.sum(mask_RP))
+    
+    lm_newids = -np.ones(mask_newpts.shape[0],dtype=int)
+    lm_newids[mask_newpts.ravel()==1]=np.arange(np.sum(mask_newpts))+len(lm_prev)
+
     
     # Create a dictionary {KP2 index of match : landmark number}
-    frame_c2lmnos = {mat.trainIdx:lm_id for lm_id,mat in zip(lm_nos, matchespc)
+    frame_c2lm_new = {mat.trainIdx:lm_id for lm_id,mat in zip(lm_newids, matchespc)
                     if lm_id!=-1 }
+    frame_c2lm.update(frame_c2lm_new)
+    lm_updated = np.concatenate((lm_prev,lm_cur_new))
+    print ("Adding ",len(frame_c2lm_new), " landmars. Total landmarks: ", lm_updated.shape[0])
 
     frame_no += 1
-    return gr_curr, kp_curr, des_curr, frame_c2lmnos, matchespc, lm_cur_new, T_cur, corners_curr_ud
+    return gr_curr, kp_curr, des_curr, frame_c2lm, matchespc, lm_updated, T_cur, corners_curr_ud
 
 out3 = process_frame(img3, mask3, gr2, kp2, des2, frame2_to_lm, matches12, 
                      landmarks_12, T_1_2, corners2_ud)
