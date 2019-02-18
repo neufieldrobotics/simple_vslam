@@ -119,7 +119,21 @@ def draw_feature_tracks(img_left,kp1,img_right,kp2, matches, mask, display_inval
     
     return img_right_out
 
+def center_3d_plot_around_pt(ax, origin):
+    xmin,xmax = ax.get_xlim3d()
+    ymin,ymax = ax.get_ylim3d()
+    zmin,zmax = ax.get_xlim3d()
+    xrange = (xmax - xmin)/2
+    yrange = (ymax - ymin)/2
+    zrange = (zmax - zmin)/2
+    print ("Origin:",origin, "type", origin.dtype)
+    print("ranges: ",xrange, yrange, zrange)
+    ax.set_xlim3d([origin[0] - xrange, origin[0] + xrange])
+    ax.set_ylim3d([origin[1] - yrange, origin[1] + yrange])
+    ax.set_zlim3d([origin[2] - zrange, origin[2] + zrange])
+
 def set_axes_radius(ax, origin, radius):
+    print("origin shape", origin.shape)
     ax.set_xlim3d([origin[0] - radius, origin[0] + radius])
     ax.set_ylim3d([origin[1] - radius, origin[1] + radius])
     ax.set_zlim3d([origin[2] - radius, origin[2] + radius])
@@ -143,11 +157,11 @@ def set_axes_equal(ax):
     radius = 0.5 * np.max(np.abs(limits[:, 1] - limits[:, 0]))
     set_axes_radius(ax, origin, radius)
 
-def plot_pose3_on_axes(axes, T, axis_length=0.1):
+def plot_pose3_on_axes(axes, T, axis_length=0.1, center_plot=False):
     """Plot a 3D pose 4x4 homogenous transform  on given axis 'axes' with given 'axis_length'."""
-    plot_pose3RT_on_axes(axes, *decompose_T(T), axis_length)
+    plot_pose3RT_on_axes(axes, *decompose_T(T), axis_length, center_plot)
 
-def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1):
+def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1, center_plot=False):
     """Plot a 3D pose on given axis 'axes' with given 'axis_length'."""
     # draw the camera axes
     x_axis = origin + gRp[:, 0] * axis_length
@@ -161,6 +175,10 @@ def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1):
     z_axis = origin + gRp[:, 2] * axis_length
     line = np.append(origin, z_axis, axis=0)
     axes.plot(line[:, 0], line[:, 1], line[:, 2], 'b-')
+    
+    if center_plot:
+        center_3d_plot_around_pt(axes,origin[0])
+    
 
 def plot_3d_points(axes, vals, *args, **kwargs):
     graph, = axes.plot(vals[:,0], vals[:,1], vals[:,2], *args, **kwargs)
