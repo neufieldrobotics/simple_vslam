@@ -29,7 +29,7 @@ def T_inv(T_in):
     t_out = -np.matmul(R_out,t_in)
     return np.vstack((np.hstack((R_out,t_out)),np.array([0, 0, 0, 1])))
 
-def triangulate(T_w_1, T_w_2, pts_1, pts_2 ):
+def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
     '''
     This function accepts two homogeneous transforms (poses) of 2 cameras in world coordinates,
     along with corresponding matching points and returns the 3D coordinates in world coordinates
@@ -43,11 +43,12 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2 ):
     print ("P_2_1: ", P_2_1)
     
     # Calculate points in 0,0,0 frame
-    pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1, pts_2).T
+    pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1[mask==1], 
+                                              pts_2[mask==1]).T
     pts_3d_frame1_hom_norm = pts_3d_frame1_hom /  pts_3d_frame1_hom[:,-1][:,None]
     # Move 3d points to world frame by transforming with T_w_1
     pts_3d_w_hom = pts_3d_frame1_hom_norm @ T_w_1.T
-    return pts_3d_w_hom[:, :3]
+    return pts_3d_w_hom[:, :3], mask
 
 def T_from_PNP(coord_3d, img_pts, K, D):
     success, rvec_to_obj, tvecs_to_obj, inliers = cv2.solvePnPRansac(coord_3d, img_pts, K, D)
@@ -126,14 +127,11 @@ def center_3d_plot_around_pt(ax, origin):
     xrange = (xmax - xmin)/2
     yrange = (ymax - ymin)/2
     zrange = (zmax - zmin)/2
-    print ("Origin:",origin, "type", origin.dtype)
-    print("ranges: ",xrange, yrange, zrange)
     ax.set_xlim3d([origin[0] - xrange, origin[0] + xrange])
     ax.set_ylim3d([origin[1] - yrange, origin[1] + yrange])
     ax.set_zlim3d([origin[2] - zrange, origin[2] + zrange])
 
 def set_axes_radius(ax, origin, radius):
-    print("origin shape", origin.shape)
     ax.set_xlim3d([origin[0] - radius, origin[0] + radius])
     ax.set_ylim3d([origin[1] - radius, origin[1] + radius])
     ax.set_zlim3d([origin[2] - radius, origin[2] + radius])

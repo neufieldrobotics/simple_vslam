@@ -18,7 +18,7 @@ use_tiling_non_max_supression: False
 radial_non_max: False
 radial_non_max_radius: 5
 
-image_folder: 'chess_board3'
+image_folder: 'Lars2_081018_test_set'
 image_ext: 'JPG'
 chessboard: False
 init_image_indxs: [0, 1]
