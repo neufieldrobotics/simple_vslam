@@ -18,7 +18,7 @@ np.set_printoptions(precision=3,suppress=True)
 
 parser = argparse.ArgumentParser(description='This is the simple VSLAM pipeline')
 parser.add_argument('-c', '--config', help='location of config file in yaml format',
-                    default='config/go_pro_config.yaml')
+                    default='config/kitti_config.yaml')
 args = parser.parse_args()
  
 print (sys.platform)
@@ -68,13 +68,15 @@ RADIAL_NON_MAX = config_dict['radial_non_max']
 RADIAL_NON_MAX_RADIUS = config_dict['radial_non_max_radius']
 image_folder = config_dict['image_folder']
 image_ext = config_dict['image_ext']
+init_imgs_indx = config_dict['init_image_indxs']
+img_step = config_dict['image_step']
 
 images = sorted(glob.glob(path+'data/'+image_folder+'/*.'+image_ext))
 
 print(K,D)
 
-img1 = cv2.imread(images[0])
-img2 = cv2.imread(images[2])
+img1 = cv2.imread(images[init_imgs_indx[0]])
+img2 = cv2.imread(images[init_imgs_indx[1]])
 mask = 255 - np.zeros(img1.shape[:2], dtype=np.uint8)
 mask1 = mask
 mask2 = mask
@@ -85,14 +87,15 @@ gr2=cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
 
 #Initiate ORB detector
 detector = cv2.ORB_create(**config_dict['ORB_settings'])
-matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-'''
+
+#matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
 FLANN_INDEX_LSH = 6
 FLANN_INDEX_KDTREE = 1
 matcher = cv2.FlannBasedMatcher(dict(algorithm = FLANN_INDEX_LSH, table_number = 6, key_size = 20,
                                    multi_probe_level = 2), dict(checks=100))
 
-
+'''
 detector = cv2.xfeatures2d.SIFT_create(edgeThreshold = 7, nOctaveLayers = 3)
 matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
 FLANN_INDEX_LSH = 6
@@ -168,7 +171,7 @@ img12 = displayMatches(gr1,kp1,gr2,kp2,matches12,mask_RP_12, False)
 fig1 = plt.figure(1)
 plt.get_current_fig_manager().window.setGeometry(window_xadj,window_yadj,640,338) #(0, 0, 800, 900)
 #move_figure(position="left")
-plt.imshow(img12)
+fig1_image = plt.imshow(img12)
 plt.title('Image 1 to 2 matches')
 #plt.ion()
 #plt.show()
@@ -180,7 +183,7 @@ plt.pause(0.001)
 fig3 = plt.figure(3)
 plt.get_current_fig_manager().window.setGeometry(window_xadj,338+window_yadj,640,338) #(0, 0, 800, 900)
 img2_track = draw_feature_tracks(gr1,kp1,gr2,kp2,matches12,mask_RP_12)
-plt.imshow(img2_track)
+fig3_image = plt.imshow(img2_track)
 plt.title('Image 1 to 2 matches')
 plt.axis("off")
 fig3.subplots_adjust(0,0,1,1)
@@ -188,8 +191,8 @@ plt.draw()
 plt.pause(0.001)
 input("Press [enter] to continue.")
 
-landmarks_12 = triangulate(np.eye(4), T_1_2, kp1_match_12_ud[mask_RP_12[:,0]==1], 
-                                             kp2_match_12_ud[mask_RP_12[:,0]==1])
+landmarks_12, mask_RP_12 = triangulate(np.eye(4), T_1_2, kp1_match_12_ud, 
+                                       kp2_match_12_ud, mask_RP_12[:,0])
 
 fig2 = plt.figure(2)
 ax2 = fig2.add_subplot(111, projection='3d')
@@ -288,16 +291,20 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     #input("Press [enter] to continue.")
     '''
 
-    fig1 = plt.figure(1)
+    #fig1 = plt.figure(1)
     
     img_matches = displayMatches(gr_prev,kp_prev,gr_curr,kp_curr,matchespc,mask_RP, False)
     
-    plt.imshow(img_matches)
-    plt.title('Current frame matches to prev'); plt.draw(); plt.pause(0.001)
-    fig3 = plt.figure(3)
+    #plt.imshow(img_matches)
+    fig1_image.set_data(img_matches)
+    #plt.title('Current frame matches to prev'); 
+    fig1.canvas.draw_idle() #plt.pause(0.001)
+    #fig3 = plt.figure(3)
     img_track = draw_feature_tracks(gr_prev,kp_prev,gr_curr,kp_curr,matchespc,mask_RP)
-    plt.imshow(img_track)
-    plt.title('Image 1 to 2 matches'); plt.draw(); plt.pause(0.1)
+    #plt.imshow(img_track)
+    #plt.title('Image 1 to 2 matches'); plt.draw(); plt.pause(0.1)
+    fig3_image.set_data(img_track)
+    fig3.canvas.draw_idle()
     
     #input("Press [enter] to continue.")
     
@@ -312,10 +319,14 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
         exit()
         
     print("PNP status: ", success)
-    plt.figure(2)
-    plt.title('Image prev to curr PNP pos and landmarks used')
+    #plt.figure(2)
+    #plt.title('Image prev to curr PNP pos and landmarks used')
+    
+    st = time.time()
     graph_pnp = plot_3d_points(ax2, lm_cur, linestyle="", color='r', marker=".", markersize=2)
+    
     plot_pose3_on_axes(ax2, T_cur, axis_length=2.0, center_plot=True)
+    fig2.canvas.draw_idle()
     
     if CHESSBOARD:
         ret, corners_curr = cv2.findChessboardCorners(gr_curr, (16,9),None)
@@ -327,17 +338,14 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     else:
         corners_curr_ud = None
     
-    set_axes_equal(ax2); plt.draw(); plt.pause(0.01)
-    #input("Press [enter] to continue.")
-    
     mask_newpts = np.array([1 if (mask_RP[i,0]==1 and frame_c2lm.get(matchespc[i].trainIdx) is None) 
                            else 0 for i in range(len(kp_curr_matchpc_ud))],dtype='int')
     
-    lm_cur_new = triangulate(T_prev, T_cur, kp_prev_matchpc_ud[mask_newpts==1], 
-                                            kp_curr_matchpc_ud[mask_newpts==1])
+    lm_cur_new, mask_newpts = triangulate(T_prev, T_cur, kp_prev_matchpc_ud, 
+                                          kp_curr_matchpc_ud, mask_newpts)
+    
     graph_newlm = plot_3d_points(ax2, lm_cur_new, linestyle="", color='g', marker=".", markersize=2)
     plt.title('Current frame New Landmarks'); set_axes_equal(ax2); plt.draw(); plt.pause(0.001)
-    #input("Press [enter] to continue.")
     
     # color landmarks back to blue
     #graph = plot_3d_points(ax2, lm_cur, linestyle="", color='C0', marker=".", markersize=2)
@@ -359,15 +367,18 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     frame_no += 1
     return gr_curr, kp_curr, des_curr, frame_c2lm, matchespc, lm_updated, T_cur, corners_curr_ud
 
-img3 = cv2.imread(images[3])
+img3 = cv2.imread(images[init_imgs_indx[1]+1])
 mask3 = mask
 
 out = process_frame(img3, mask3, gr2, kp2, des2, frame2_to_lm, matches12, 
                      landmarks_12, T_1_2, corners2_ud)
 
-for i in range(4,len(images),3):
+for i in range(init_imgs_indx[1]+2,len(images),img_step):
     img = cv2.imread(images[i])
+    st = time.time()
     out = process_frame(img, mask, *out)
+    print("Time to process last frame: ",time.time()-st)
     print ("\n \n FRAME ",i," COMPLETE \n \n")
+    # press 'q' to exit
 
 plt.close(fig='all')

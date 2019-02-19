@@ -21,6 +21,8 @@ radial_non_max_radius: 5
 image_folder: 'kitti/00/image_0'
 image_ext: 'png'
 chessboard: False
+init_image_indxs: [145, 147]
+image_step: 1
 
 ORB_settings:
  WTA_K: 4
@@ -28,7 +30,7 @@ ORB_settings:
  patchSize: 31
  fastThreshold: 10
  firstLevel: 0
- nfeatures: 5000
+ nfeatures: 1000
  nlevels: 8
  scaleFactor: 2.0
  scoreType: 0
