@@ -18,7 +18,7 @@ np.set_printoptions(precision=3,suppress=True)
 
 parser = argparse.ArgumentParser(description='This is the simple VSLAM pipeline')
 parser.add_argument('-c', '--config', help='location of config file in yaml format',
-                    default='config/kitti_config.yaml')
+                    default='config/go_pro_icebergs_config.yaml')
 args = parser.parse_args()
  
 print (sys.platform)
@@ -72,14 +72,16 @@ init_imgs_indx = config_dict['init_image_indxs']
 img_step = config_dict['image_step']
 
 images = sorted(glob.glob(path+'data/'+image_folder+'/*.'+image_ext))
+masks = sorted(glob.glob(path+'data/'+image_folder+'_masks_out/*.'+'png'))
+
 
 print(K,D)
 
 img1 = cv2.imread(images[init_imgs_indx[0]])
 img2 = cv2.imread(images[init_imgs_indx[1]])
 mask = 255 - np.zeros(img1.shape[:2], dtype=np.uint8)
-mask1 = mask
-mask2 = mask
+mask1 = cv2.imread(masks[init_imgs_indx[0]],cv2.IMREAD_GRAYSCALE)
+mask2 = cv2.imread(masks[init_imgs_indx[1]],cv2.IMREAD_GRAYSCALE)
 
 gr1=cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
 gr2=cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
