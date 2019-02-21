@@ -12,13 +12,14 @@ from vslam_helper import *
 from ssc import *
 import yaml
 import glob
+import re
 import argparse
 np.set_printoptions(precision=3,suppress=True)
 
 
 parser = argparse.ArgumentParser(description='This is the simple VSLAM pipeline')
 parser.add_argument('-c', '--config', help='location of config file in yaml format',
-                    default='config/go_pro_icebergs_config.yaml')
+                    default='config/go_pro_icebergs_config.yaml') #go_pro_icebergs_config.yaml
 args = parser.parse_args()
  
 print (sys.platform)
@@ -64,28 +65,44 @@ CHESSBOARD = config_dict['chessboard']
 TILEY=config_dict['tiling_non_max_tile_y']; 
 TILEX=config_dict['tiling_non_max_tile_x']; 
 TILE_KP = config_dict['use_tiling_non_max_supression']
+USE_MASKS = config_dict['use_masks']
 RADIAL_NON_MAX = config_dict['radial_non_max']
 RADIAL_NON_MAX_RADIUS = config_dict['radial_non_max_radius']
 image_folder = config_dict['image_folder']
 image_ext = config_dict['image_ext']
 init_imgs_indx = config_dict['init_image_indxs']
 img_step = config_dict['image_step']
+PAUSES = False
+USE_CLAHE = True
 
-images = sorted(glob.glob(path+'data/'+image_folder+'/*.'+image_ext))
-masks = sorted(glob.glob(path+'data/'+image_folder+'_masks_out/*.'+'png'))
-
+images = sorted([f for f in glob.glob(path+image_folder+'/*') 
+                 if re.match('^.*\.'+image_ext+'$', f, flags=re.IGNORECASE)])
 
 print(K,D)
 
 img1 = cv2.imread(images[init_imgs_indx[0]])
 img2 = cv2.imread(images[init_imgs_indx[1]])
-mask = 255 - np.zeros(img1.shape[:2], dtype=np.uint8)
-mask1 = cv2.imread(masks[init_imgs_indx[0]],cv2.IMREAD_GRAYSCALE)
-mask2 = cv2.imread(masks[init_imgs_indx[1]],cv2.IMREAD_GRAYSCALE)
+#mask = 255 - np.zeros(img1.shape[:2], dtype=np.uint8)
+
+if USE_MASKS:
+    masks_folder = config_dict['masks_folder']
+    masks_ext = config_dict['masks_ext']
+    masks = sorted([f for f in glob.glob(path+masks_folder+'/*') 
+                    if re.match('^.*\.'+masks_ext+'$', f, flags=re.IGNORECASE)])
+    mask1 = cv2.imread(masks[init_imgs_indx[0]],cv2.IMREAD_GRAYSCALE)
+    mask2 = cv2.imread(masks[init_imgs_indx[1]],cv2.IMREAD_GRAYSCALE)
+else:
+    mask1 = None
+    mask2 = None
 
 gr1=cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
 gr2=cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
 
+clahe = cv2.createCLAHE(clipLimit=10.0, tileGridSize=(8,6))
+
+if USE_CLAHE:
+    gr1 = clahe.apply(gr1)
+    gr2 = clahe.apply(gr2)
 
 #Initiate ORB detector
 detector = cv2.ORB_create(**config_dict['ORB_settings'])
@@ -237,25 +254,35 @@ frame2_to_lm = {mat.trainIdx:lm_id for lm_id,mat in zip(lm_12, matches12)
 lm_to_frame2 = dict([[v,k] for k,v in frame2_to_lm.items()])
 frame2_to_matches12 = {mat.trainIdx:match_id for match_id,mat in enumerate(matches12)}
 
+fig4 = plt.figure(4)
+plt.draw()
+
 '''
 PROCESS FRAME
 '''
 frame_no = 3
 def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm, 
                   matchespc_prev, lm_prev, T_prev, corners_prev_ud):
+    #plt.imshow(mask_curr)
+    plt.draw()
     global frame_no
     gr_curr = cv2.cvtColor(img_curr,cv2.COLOR_BGR2GRAY)
+    if USE_CLAHE: gr_curr = clahe.apply(gr_curr)
     kp_curr = detector.detect(gr_curr,mask_curr)
+    print ("Points detected: ",len(kp_curr))
     
     if TILE_KP:
         kp_curr = tiled_features(kp_curr, gr_curr.shape, TILEY, TILEX)
         print ("Points after tiling supression: ",len(kp1))
-    
+
     if RADIAL_NON_MAX:
         kp_curr = radial_non_max(kp_curr,RADIAL_NON_MAX_RADIUS)
         print ("Points after radial supression: ",len(kp_curr))
     
     kp_curr, des_curr = detector.compute(gr_curr,kp_curr)
+        
+    #print(des_prev, des_curr)
+    #des_curr = np.ascontiguousarray(des_curr)
     
     matchespc = matcher.match(des_prev,des_curr)
     kp_prev_matchpc = np.array([kp_prev[mat.queryIdx].pt for mat in matchespc])
@@ -267,8 +294,12 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     E, mask_e = cv2.findEssentialMat(kp_prev_matchpc_ud, kp_curr_matchpc_ud, focal=1.0, pp=(0., 0.), 
                                    method=cv2.RANSAC, prob=0.999, threshold=0.001)
     
+    mask_e_copy = mask_e.copy()
+    
     print ("Essential matrix: used ",np.sum(mask_e) ," of total ",len(matchespc),"matches")
     _, _, _, mask_RP = cv2.recoverPose(E, kp_prev_matchpc_ud, kp_curr_matchpc_ud,mask=mask_e)
+
+    print ("Recover pose: used ",np.sum(mask_RP) ," of total ",len(matchespc),"matches")
     
     matchespc_filt = [matchespc[i] for i in range(len(matchespc)) if mask_RP[i]==1]
     frame_c2p = {mat.trainIdx:mat.queryIdx for mat in matchespc_filt}
@@ -290,9 +321,8 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     #plt.title('Image 1 to 2 - Landmarks found in 3')
     #img23_lm = displayMatches(gr2,kp2,gr3,kp_prev,matches23,mask_lm_cinp, False, in_image=img23, color=(255,165,0))
     #plt.imshow(img23_lm); plt.draw(); plt.pause(.001)
-    #input("Press [enter] to continue.")
+    #
     '''
-
     #fig1 = plt.figure(1)
     
     img_matches = displayMatches(gr_prev,kp_prev,gr_curr,kp_curr,matchespc,mask_RP, False)
@@ -308,7 +338,7 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     fig3_image.set_data(img_track)
     fig3.canvas.draw_idle()
     
-    #input("Press [enter] to continue.")
+    if PAUSES: input("Press [enter] to continue.")
     
     print("frame_c2lm: ",len(frame_c2lm))
     
@@ -329,6 +359,7 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     
     plot_pose3_on_axes(ax2, T_cur, axis_length=2.0, center_plot=True)
     fig2.canvas.draw_idle()
+    if PAUSES: input("Press [enter] to continue.")
     
     if CHESSBOARD:
         ret, corners_curr = cv2.findChessboardCorners(gr_curr, (16,9),None)
@@ -369,13 +400,23 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     frame_no += 1
     return gr_curr, kp_curr, des_curr, frame_c2lm, matchespc, lm_updated, T_cur, corners_curr_ud
 
-img3 = cv2.imread(images[init_imgs_indx[1]+1])
-mask3 = mask
+print ("\n \n FRAME 2 COMPLETE \n \n")
 
-out = process_frame(img3, mask3, gr2, kp2, des2, frame2_to_lm, matches12, 
+img3 = cv2.imread(images[init_imgs_indx[1]+img_step])
+
+if USE_MASKS:
+    mask = cv2.imread(masks[init_imgs_indx[1]+1],cv2.IMREAD_GRAYSCALE)
+else:
+    mask = None
+
+out = process_frame(img3, mask, gr2, kp2, des2, frame2_to_lm, matches12, 
                      landmarks_12, T_1_2, corners2_ud)
 
+print ("\n \n FRAME 3 COMPLETE \n \n")
+
 for i in range(init_imgs_indx[1]+2,len(images),img_step):
+    if USE_MASKS:
+        mask = cv2.imread(masks[i],cv2.IMREAD_GRAYSCALE)
     img = cv2.imread(images[i])
     st = time.time()
     out = process_frame(img, mask, *out)
