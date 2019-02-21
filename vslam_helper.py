@@ -47,8 +47,23 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
                                               pts_2[mask==1]).T
     pts_3d_frame1_hom_norm = pts_3d_frame1_hom /  pts_3d_frame1_hom[:,-1][:,None]
     # Move 3d points to world frame by transforming with T_w_1
+    
+    pt_iter = 0
+    rows_to_del = []
+    for i,v in enumerate(mask):
+        if v==1: 
+            if pts_3d_frame1_hom_norm[pt_iter,2]<=0 or \
+            pts_3d_frame1_hom_norm[pt_iter,2]>15:
+            #abs(pts_3d_frame1_hom_norm[pt_iter,0])<0.5:
+                mask[i]=0 
+                rows_to_del.append(pt_iter)
+            pt_iter +=1
+    
+    pts_3d_frame1_hom_norm = np.delete(pts_3d_frame1_hom_norm,rows_to_del,axis=0)
     pts_3d_w_hom = pts_3d_frame1_hom_norm @ T_w_1.T
-    return pts_3d_w_hom[:, :3], mask
+    pts_3d_w = pts_3d_w_hom[:, :3]
+    print(pts_3d_w.shape)
+    return pts_3d_w, mask
 
 def T_from_PNP(coord_3d, img_pts, K, D):
     success, rvec_to_obj, tvecs_to_obj, inliers = cv2.solvePnPRansac(coord_3d, img_pts, K, D)
