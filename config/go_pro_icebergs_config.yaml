@@ -18,19 +18,22 @@ use_tiling_non_max_supression: False
 radial_non_max: False
 radial_non_max_radius: 5
 
-image_folder: 'Lars2_081018'
-image_ext: 'JPG'
+image_folder: 'data/Lars2_081018'
+image_ext: 'jpg'
 chessboard: False
-init_image_indxs: [0, 1]
-image_step: 1
+init_image_indxs: [80, 90]
+image_step: 10
+use_masks: True
+masks_folder: 'data/Lars2_081018_clahe_masks2_out'
+masks_ext: 'png'
 
 ORB_settings:
- WTA_K: 4
- edgeThreshold: 65
- patchSize: 65
- fastThreshold: 10
+ WTA_K: 2
+ edgeThreshold: 125
+ patchSize: 125
+ fastThreshold: 5
  firstLevel: 0
- nfeatures: 2500
- nlevels: 6
- scaleFactor: 4.0
+ nfeatures: 10000
+ nlevels: 8
+ scaleFactor: 2.0
  scoreType: 0

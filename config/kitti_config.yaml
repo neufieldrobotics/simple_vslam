@@ -18,11 +18,12 @@ use_tiling_non_max_supression: False
 radial_non_max: False
 radial_non_max_radius: 5
 
-image_folder: 'kitti/00/image_0'
+image_folder: 'data/kitti/00/image_0'
 image_ext: 'png'
 chessboard: False
 init_image_indxs: [0, 2]
 image_step: 1
+use_masks: False
 
 ORB_settings:
  WTA_K: 4
