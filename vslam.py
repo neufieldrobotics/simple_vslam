@@ -66,6 +66,7 @@ TILEY=config_dict['tiling_non_max_tile_y'];
 TILEX=config_dict['tiling_non_max_tile_x']; 
 TILE_KP = config_dict['use_tiling_non_max_supression']
 USE_MASKS = config_dict['use_masks']
+USE_CLAHE = config_dict['use_clahe']
 RADIAL_NON_MAX = config_dict['radial_non_max']
 RADIAL_NON_MAX_RADIUS = config_dict['radial_non_max_radius']
 image_folder = config_dict['image_folder']
@@ -73,7 +74,6 @@ image_ext = config_dict['image_ext']
 init_imgs_indx = config_dict['init_image_indxs']
 img_step = config_dict['image_step']
 PAUSES = False
-USE_CLAHE = True
 
 images = sorted([f for f in glob.glob(path+image_folder+'/*') 
                  if re.match('^.*\.'+image_ext+'$', f, flags=re.IGNORECASE)])
@@ -107,27 +107,9 @@ if USE_CLAHE:
 #Initiate ORB detector
 detector = cv2.ORB_create(**config_dict['ORB_settings'])
 
-#matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-
-FLANN_INDEX_LSH = 6
-FLANN_INDEX_KDTREE = 1
-matcher = cv2.FlannBasedMatcher(dict(algorithm = FLANN_INDEX_LSH, table_number = 6, key_size = 20,
-                                   multi_probe_level = 2), dict(checks=100))
-
-'''
-detector = cv2.xfeatures2d.SIFT_create(edgeThreshold = 7, nOctaveLayers = 3)
-matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
-FLANN_INDEX_LSH = 6
-FLANN_INDEX_KDTREE = 1
-Smatcher = cv2.FlannBasedMatcher(dict(algorithm = FLANN_INDEX_KDTREE, table_number = 6, key_size = 20,
-                                   multi_probe_level = 2), dict(checks=100))
-# Match descriptors.
-'''                     
-#detector = cv2.AKAZE_create(threshold=.0005)
-#detector = cv2.BRISK_create(thresh = 15, octaves = 10, patternScale = 1.0 )
 # find the keypoints and descriptors with ORB
 kp1 = detector.detect(gr1,mask1)
-kp2 = detector.detect(gr2,mask2)
+#kp2 = detector.detect(gr2,mask2)
 
 print ("Points detected: ",len(kp1))
 
@@ -144,40 +126,48 @@ print ("Points nonmax supression: ")
 '''
 if TILE_KP:
     kp1 = tiled_features(kp1, gr1.shape, TILEY, TILEX)
-    kp2 = tiled_features(kp2, gr2.shape, TILEY, TILEX)
+#    kp2 = tiled_features(kp2, gr2.shape, TILEY, TILEX)
     print ("Points after tiling supression: ",len(kp1))
 
 if RADIAL_NON_MAX:
     kp1 = radial_non_max(kp1,RADIAL_NON_MAX_RADIUS)
-    kp2 = radial_non_max(kp2,RADIAL_NON_MAX_RADIUS)
+ #   kp2 = radial_non_max(kp2,RADIAL_NON_MAX_RADIUS)
     print ("Points after radial supression: ",len(kp1))
 
+'''
 
 kp1, des1 = detector.compute(gr1,kp1)
 kp2, des2 = detector.compute(gr2,kp2)
 print ("Descriptors computed: ")
 
 # create BFMatcher object - Brute Force
-'''
 kp1_match_12, kp2_match_12, matches12 = knn_match_and_filter(matcher, kp1, kp2, des1, des2)
 kp2_match_23, kp3_match_23, matches23 = knn_match_and_filter(matcher, kp2, kp3, des2, des3)
 
-'''
 matches12 = matcher.match(des1,des2)
 
 kp1_match_12 = np.array([kp1[mat.queryIdx].pt for mat in matches12])
 kp2_match_12 = np.array([kp2[mat.trainIdx].pt for mat in matches12])
+'''
+
+lk_params = dict( winSize  = (65,65),
+                  maxLevel = 4,
+                  criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.03))
+
+
+kp1_match_12  = np.expand_dims(np.array([o.pt for o in kp1],dtype='float32'),1)
+kp2_match_12, st, err = cv2.calcOpticalFlowPyrLK(gr1, gr2, kp1_match_12, None, **lk_params)
 
 #matches12 = sorted(matches12, key = lambda x:x.distance)
 #matches12 = matches12[:(int)(len(matches12)*.75)]
 
-kp1_match_12_ud = cv2.undistortPoints(np.expand_dims(kp1_match_12,axis=1),K,D)
-kp2_match_12_ud = cv2.undistortPoints(np.expand_dims(kp2_match_12,axis=1),K,D)
+kp1_match_12_ud = cv2.undistortPoints(kp1_match_12,K,D)
+kp2_match_12_ud = cv2.undistortPoints(kp2_match_12,K,D)
 
 E_12, mask_e_12 = cv2.findEssentialMat(kp1_match_12_ud, kp2_match_12_ud, focal=1.0, pp=(0., 0.), 
                                        method=cv2.RANSAC, prob=0.999, threshold=0.001)
 
-print ("Essential matrix: used ",np.sum(mask_e_12) ," of total ",len(matches12),"matches")
+print ("Essential matrix: used ",np.sum(st) ," of total ",len(kp1_match_12),"matches")
 
 points, R_21, t_21, mask_RP_12 = cv2.recoverPose(E_12, kp1_match_12_ud, kp2_match_12_ud,mask=mask_e_12)
 T_2_1 = compose_T(R_21,t_21)
@@ -186,7 +176,9 @@ print("points:",points,"\trecover pose mask:",np.sum(mask_RP_12!=0))
 print("R:",R_21)
 print("t:",t_21.T)
 
-img12 = displayMatches(gr1,kp1,gr2,kp2,matches12,mask_RP_12, False)
+#img12 = displayMatches(gr1,kp1,gr2,kp2,matches12,mask_RP_12, False)
+img12 = draw_point_tracks(gr1,kp1_match_12,gr2,kp2_match_12,mask_RP_12, False)
+
 fig1 = plt.figure(1)
 plt.get_current_fig_manager().window.setGeometry(window_xadj,window_yadj,640,338) #(0, 0, 800, 900)
 #move_figure(position="left")
@@ -196,16 +188,6 @@ plt.title('Image 1 to 2 matches')
 #plt.show()
 plt.axis("off")
 fig1.subplots_adjust(0,0,1,1)
-plt.draw()
-plt.pause(0.001)
-
-fig3 = plt.figure(3)
-plt.get_current_fig_manager().window.setGeometry(window_xadj,338+window_yadj,640,338) #(0, 0, 800, 900)
-img2_track = draw_feature_tracks(gr1,kp1,gr2,kp2,matches12,mask_RP_12)
-fig3_image = plt.imshow(img2_track)
-plt.title('Image 1 to 2 matches')
-plt.axis("off")
-fig3.subplots_adjust(0,0,1,1)
 plt.draw()
 plt.pause(0.001)
 input("Press [enter] to continue.")
@@ -400,6 +382,8 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev, des_prev,frame_p2lm,
     frame_no += 1
     return gr_curr, kp_curr, des_curr, frame_c2lm, matchespc, lm_updated, T_cur, corners_curr_ud
 
+    print ("\n \n FRAME "+frame_no+" COMPLETE \n \n")
+
 print ("\n \n FRAME 2 COMPLETE \n \n")
 
 img3 = cv2.imread(images[init_imgs_indx[1]+img_step])
@@ -421,7 +405,6 @@ for i in range(init_imgs_indx[1]+2,len(images),img_step):
     st = time.time()
     out = process_frame(img, mask, *out)
     print("Time to process last frame: ",time.time()-st)
-    print ("\n \n FRAME ",i," COMPLETE \n \n")
     # press 'q' to exit
 
 plt.close(fig='all')
