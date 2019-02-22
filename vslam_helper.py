@@ -134,6 +134,21 @@ def draw_feature_tracks(img_left,kp1,img_right,kp2, matches, mask, display_inval
     
     return img_right_out
 
+def draw_point_tracks(img_left,kp1,img_right,kp2, mask, display_invalid=False, color=(0, 255, 0)):
+    '''
+    This function extracts takes a 2 images, set of keypoints and a mask of valid
+    (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
+    The mask should be the same length as matches
+    '''
+    bool_mask = mask.astype(bool)
+    valid_right_matches = kp1[bool_mask]
+    valid_left_matches = kp2[bool_mask]
+    #img_right_out = draw_points(img_right, valid_right_matches)
+    img_right_out = draw_arrows(img_right, valid_left_matches, valid_right_matches)
+    
+    
+    return img_right_out
+
 def center_3d_plot_around_pt(ax, origin):
     xmin,xmax = ax.get_xlim3d()
     ymin,ymax = ax.get_ylim3d()
@@ -246,7 +261,7 @@ def tiled_features(kp, img_shape, tiley, tilex):
     
     for ix in xx:
         for iy in yy:
-            inbox_mask = bounding_box(pts, ix,ix+w_height,iy,iy+w_height)
+            inbox_mask = bounding_box(pts, iy, iy+w_height, ix, ix+w_height)
             inbox = kp[inbox_mask]
             inbox_sorted = sorted(inbox, key = lambda x:x.response, reverse = True)
             inbox_sorted_out = inbox_sorted[:feat_per_cell]

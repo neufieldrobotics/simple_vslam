@@ -12,10 +12,10 @@ D:
 - [0.0, 0.0, 0.0, 0.0, 0.0]
 
 tiling_non_max_tile_y: 17 
-tiling_non_max_tile_x: 4 
-use_tiling_non_max_supression: False
+tiling_non_max_tile_x: 8 
+use_tiling_non_max_supression: True
 
-radial_non_max: False
+radial_non_max: True
 radial_non_max_radius: 5
 
 image_folder: 'data/kitti/00/image_0'
@@ -24,14 +24,15 @@ chessboard: False
 init_image_indxs: [0, 2]
 image_step: 1
 use_masks: False
+use_clahe: False
 
 ORB_settings:
  WTA_K: 4
  edgeThreshold: 31
  patchSize: 31
- fastThreshold: 10
+ fastThreshold: 5
  firstLevel: 0
- nfeatures: 2500
+ nfeatures: 10000
  nlevels: 8
  scaleFactor: 1.2
  scoreType: 0
