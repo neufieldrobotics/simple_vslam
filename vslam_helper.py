@@ -33,6 +33,7 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
     '''
     This function accepts two homogeneous transforms (poses) of 2 cameras in world coordinates,
     along with corresponding matching points and returns the 3D coordinates in world coordinates
+    Mask must be a dimensionless array or n, array
     '''
     T_origin = np.eye(4)
     P_origin = T_origin[:3]
@@ -43,7 +44,11 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
     print ("P_2_1: ", P_2_1)
     
     # Calculate points in 0,0,0 frame
-    pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1[mask==1], 
+    if mask is None:
+        pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1, pts_2).T
+        mask = np.ones(pts_1.shape[0])
+    else:
+        pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1[mask==1], 
                                               pts_2[mask==1]).T
     pts_3d_frame1_hom_norm = pts_3d_frame1_hom /  pts_3d_frame1_hom[:,-1][:,None]
     # Move 3d points to world frame by transforming with T_w_1
@@ -53,7 +58,7 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
     for i,v in enumerate(mask):
         if v==1: 
             if pts_3d_frame1_hom_norm[pt_iter,2]<=0: #or \pts_3d_frame1_hom_norm[pt_iter,2]>15:
-            #abs(pts_3d_frame1_hom_norm[pt_iter,0])<0.5:
+                print ("Point is negative")
                 mask[i]=0 
                 rows_to_del.append(pt_iter)
             pt_iter +=1
