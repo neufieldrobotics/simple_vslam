@@ -22,7 +22,7 @@ image_folder: 'data/kitti/00/image_0'
 image_ext: 'png'
 chessboard: False
 init_image_indxs: [0, 2]
-image_step: 1
+image_step: 2
 use_masks: False
 use_clahe: False
 
