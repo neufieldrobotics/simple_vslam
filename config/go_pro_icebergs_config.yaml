@@ -11,18 +11,19 @@ K:
 D: 
 - [-0.285711277, 0.16130412, 5.36070359e-05, -0.000148554708, -0.0771783829]
 
-tiling_non_max_tile_y: 8 
-tiling_non_max_tile_x: 6 
-use_tiling_non_max_supression: False
+tiling_non_max_tile_y: 16 
+tiling_non_max_tile_x: 12 
+use_tiling_non_max_supression: True
 
-radial_non_max: False
+radial_non_max: True
 radial_non_max_radius: 5
 
 image_folder: 'data/Lars2_081018'
 image_ext: 'jpg'
 chessboard: False
-init_image_indxs: [80, 90]
-image_step: 10
+init_image_indxs: [165, 167]
+image_step: 5
+use_clahe: False
 use_masks: True
 masks_folder: 'data/Lars2_081018_clahe_masks2_out'
 masks_ext: 'png'

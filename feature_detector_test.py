@@ -52,7 +52,9 @@ def tiled_features(kp, img, tiley, tilex):
     w_height = int(HEIGHT/tilex)
         
     xx = np.linspace(0,HEIGHT-w_height,tilex,dtype='int')
+    print(xx)
     yy = np.linspace(0,WIDTH-w_width,tiley,dtype='int')
+    print(yy)
         
     kps = np.array([])
     pts = np.array([keypoint.pt for keypoint in kp])
@@ -60,7 +62,7 @@ def tiled_features(kp, img, tiley, tilex):
     
     for ix in xx:
         for iy in yy:
-            inbox_mask = bounding_box(pts, ix,ix+w_height,iy,iy+w_height)
+            inbox_mask = bounding_box(pts, iy,iy+w_height, ix,ix+w_height)
             inbox = kp[inbox_mask]
             inbox_sorted = sorted(inbox, key = lambda x:x.response, reverse = True)
             inbox_sorted_out = inbox_sorted[:feat_per_cell]
@@ -86,7 +88,7 @@ if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/'
 else:
     path = '/home/vik748/'
-img = cv2.imread(path+'data/chess_board2/GOPR1498.JPG',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
+img = cv2.imread(path+'data/kitti/00/image_0/000000.png',0) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
 #img = cv2.imread(path+'data/test_set/GOPR1429.JPG',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
 
 mask_pts_1488 = np.array([[1180, 960], [2740, 1000], [2700, 2040], [1180, 1980]])
@@ -97,36 +99,36 @@ mask_pts_1496 = np.array([[400, 650], [1300, 680], [1280, 1300], [390, 1260]])
 mask_pts_1497 = np.array([[760, 1055], [1600, 1080], [1560, 1670], [755, 1630]])
 mask_pts_1498 = np.array([[1030, 740], [1820, 840], [1785, 1085], [1675, 1400], [975, 1285]])
     
-gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+gray = img #cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 # create a mask image filled with zeros, the size of original image
 mask = np.ones(img.shape[:2], dtype=np.uint8)
 
 mask = cv2.fillConvexPoly(mask, mask_pts_1498, color=[0, 0, 0])
 #mask = 255-mask
 
-tiley = 16
-tilex = 12
+tiley = 17
+tilex = 4
 total_feat = 25000
 
 # defailts: int nfeatures=500, float scaleFactor=1.2f, int nlevels=8, int edgeThreshold=31, 
 # int firstLevel=0, int WTA_K=2, int scoreType=ORB::HARRIS_SCORE, 
 # int patchSize=31, int fastThreshold=20)
 
-detector1 = cv2.ORB_create(nfeatures=5000, edgeThreshold=125, patchSize=125, nlevels=8, 
+detector1 = cv2.ORB_create(nfeatures=1000, edgeThreshold=125, patchSize=125, nlevels=8, 
                      fastThreshold=20, scaleFactor=1.2, WTA_K=2,
                      scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
 
-detector2 = cv2.ORB_create(nfeatures=5000, edgeThreshold=65, patchSize=65, nlevels=4, 
+detector2 = cv2.ORB_create(nfeatures=1000, edgeThreshold=65, patchSize=65, nlevels=4, 
                      fastThreshold=20, scaleFactor=4.0, WTA_K=4,
                      scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
 
 # find the keypoints and descriptors with ORB
-kp1 = detector1.detect(img,mask)
+#kp1 = detector1.detect(img,mask)
 kp2 = detector2.detect(img,mask)
-#kpo = tiled_features(kp, gray, tiley, tilex)
+kp2p = tiled_features(kp2, gray, tiley, tilex)
 
-img1 = draw_keypoints(img,kp1)
-img2 = draw_markers(img1,kp2)
+img1 = draw_keypoints(cv2.cvtColor(img, cv2.COLOR_GRAY2RGB),kp2)
+img2 = draw_markers(img1,kp2p)
 #cv2.namedWindow('image', cv2.WINDOW_NORMAL)
 #cv2.resizeWindow('image', (800,600))
 #cv2.imshow('image', img)
@@ -134,5 +136,5 @@ img2 = draw_markers(img1,kp2)
 
 fig2 = plt.figure(2)
 plt.axis("off")
-plt.imshow(cv2.cvtColor(img2, cv2.COLOR_BGR2RGB))
+plt.imshow(img2)
 plt.show()
