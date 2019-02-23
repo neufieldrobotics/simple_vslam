@@ -98,7 +98,7 @@ if RADIAL_NON_MAX:
     print ("Points after radial supression: ",len(kp1))
 
 lk_params = dict( winSize  = (65,65),
-                  maxLevel = 4,
+                  maxLevel = 8,
                   criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.03))
 
 kp1_match_12  = np.expand_dims(np.array([o.pt for o in kp1],dtype='float32'),1)
@@ -300,9 +300,10 @@ out = process_frame(img3, mask, gr2, kp2_match_12, landmarks_12, T_1_2, corners2
     
 print ("\n \n FRAME 3 COMPLETE \n \n")
 
-for i in range(init_imgs_indx[1]+img_step+1,len(images),img_step):
+for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
     if USE_MASKS:
         mask = cv2.imread(masks[i],cv2.IMREAD_GRAYSCALE)
+    print("Processing image: ",images[i])
     img = cv2.imread(images[i])
     st = time.time()
     out = process_frame(img, mask, *out)
