@@ -48,7 +48,9 @@ image_folder = config_dict['image_folder']
 image_ext = config_dict['image_ext']
 init_imgs_indx = config_dict['init_image_indxs']
 img_step = config_dict['image_step']
-PAUSES = True
+PAUSES = False
+paused = False
+cue_to_exit = False
 
 images = sorted([f for f in glob.glob(path+image_folder+'/*') 
                  if re.match('^.*\.'+image_ext+'$', f, flags=re.IGNORECASE)])
@@ -76,10 +78,22 @@ gr1=cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
 gr2=cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
 
 if USE_CLAHE:
-    clahe = cv2.createCLAHE(clipLimit=10.0, tileGridSize=(8,6))
+    clahe = cv2.createCLAHE(**config_dict['CLAHE_settings'])
     gr1 = clahe.apply(gr1)
     gr2 = clahe.apply(gr2)
 
+#def onClick(event):
+#    print("Click")
+
+def onKey(event):
+    global paused, cue_to_exit
+    #print('you pressed', event.key, event.xdata, event.ydata)
+    if event.key==" ":
+        paused = not paused
+    if event.key=="q":
+        cue_to_exit = True
+
+            
 #Initiate ORB detector
 detector = cv2.ORB_create(**config_dict['ORB_settings'])
 
@@ -96,13 +110,13 @@ if TILE_KP:
 if RADIAL_NON_MAX:
     kp1 = radial_non_max(kp1,RADIAL_NON_MAX_RADIUS)
     print ("Points after radial supression: ",len(kp1))
-
+'''
 lk_params = dict( winSize  = (65,65),
-                  maxLevel = 8,
+                  maxLevel = 4,
                   criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.03))
-
+'''
 kp1_match_12  = np.expand_dims(np.array([o.pt for o in kp1],dtype='float32'),1)
-kp2_match_12, mask_klt, err = cv2.calcOpticalFlowPyrLK(gr1, gr2, kp1_match_12, None, **lk_params)
+kp2_match_12, mask_klt, err = cv2.calcOpticalFlowPyrLK(gr1, gr2, kp1_match_12, None, **config_dict['KLT_settings'])
 print ("KLT tracked: ",np.sum(mask_klt) ," of total ",len(kp1_match_12),"keypoints")
 
 kp1_match_12 = kp1_match_12[mask_klt[:,0]==1]
@@ -116,7 +130,6 @@ E_12, mask_e_12 = cv2.findEssentialMat(kp1_match_12_ud, kp2_match_12_ud, focal=1
 print ("Essential matrix: used ",np.sum(mask_e_12) ," of total ",len(kp1_match_12),"matches")
 essen_mat_pts = np.sum(mask_e_12)
 points, R_21, t_21, mask_RP_12 = cv2.recoverPose(E_12, kp1_match_12_ud, kp2_match_12_ud,mask=mask_e_12)
-print("points:",points,"\trecover pose mask:",np.sum(mask_RP_12!=0))
 print ("Recover pose used ",np.sum(mask_RP_12) ," of total ",essen_mat_pts," matches in Essential matrix")
 T_2_1 = compose_T(R_21,t_21)
 T_1_2 = T_inv(T_2_1)
@@ -172,75 +185,102 @@ plot_pose3_on_axes(ax2,np.eye(4), axis_length=0.5)
 
 set_axes_equal(ax2)
 ax2.view_init(0, -90)
+#fig2.canvas.mpl_connect('button_press_event', onClick)
+fig2.canvas.mpl_connect('key_press_event', onKey)
+
 
 plt.draw()
 plt.pause(.001)
 input("Press [enter] to continue.")
 
-'''
-lm_12 = -np.ones(mask_RP_12.shape[0],dtype=int)
-lm_12[mask_RP_12.ravel()==1]=np.arange(np.sum(mask_RP_12))
+kp2 = detector.detect(gr2,mask2)
+print ("KP2 Points detected: ",len(kp2))
 
-# Create a dictionary {KP2 index of match : landmark number}
-frame2_to_lm = {mat.trainIdx:lm_id for lm_id,mat in zip(lm_12, matches12)
-                if lm_id!=-1 }
-lm_to_frame2 = dict([[v,k] for k,v in frame2_to_lm.items()])
-frame2_to_matches12 = {mat.trainIdx:match_id for match_id,mat in enumerate(matches12)}
-'''
+if TILE_KP:
+    kp2 = tiled_features(kp2, gr2.shape, TILEY, TILEX)
+    print ("Points after tiling supression: ",len(kp2))
+
+if RADIAL_NON_MAX:
+    kp2 = radial_non_max(kp2,RADIAL_NON_MAX_RADIUS)
+    print ("Points after radial supression: ",len(kp2))
+
+kp2_pts  = np.expand_dims(np.array([o.pt for o in kp2],dtype='float32'),1)
+     
+kp2_pts = remove_redundant_newkps(kp2_pts, kp2_match_12, 5)
+
+print ("Points after redudancy check with current kps: ",len(kp2_pts))
+
+img12_newpts = draw_points(img12,kp2_pts[:,0,:], color=[255,255,0])
+fig1_image.set_data(img12_newpts)
+fig1.canvas.draw_idle() #plt.pause(0.001)
+if PAUSES: input("Press [enter] to continue.")
+                    
 
 '''
 PROCESS FRAME
 '''
 frame_no = 3
-def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, lm_prev, T_prev, corners_prev_ud):
+def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, lm_prev, T_prev, corners_prev_ud):
     #plt.imshow(mask_curr)
     plt.draw()
     global frame_no
     gr_curr = cv2.cvtColor(img_curr,cv2.COLOR_BGR2GRAY)
     if USE_CLAHE: gr_curr = clahe.apply(gr_curr)
     
-    kp_curr_matchpc, mask_klt, err = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, kp_prev_matchpc, None, **lk_params)
+    
+    kp_curr_matchpc, mask_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
+                                                            kp_prev_matchpc, None, **config_dict['KLT_settings'])
+    kp_curr_cand_matchpc, mask_cand_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
+                                                                      kp_prev_cand, None, **config_dict['KLT_settings'])
 
     print ("KLT Tracked: ",np.sum(mask_klt)," of total ",len(kp_prev_matchpc),"keypoints")
+    print ("KLT Candidates Tracked: ",np.sum(mask_cand_klt)," of total ",len(kp_prev_cand),"keypoints")
+ 
     
     kp_prev_matchpc = kp_prev_matchpc[mask_klt[:,0]==1]
     kp_curr_matchpc = kp_curr_matchpc[mask_klt[:,0]==1]
+    kp_prev_cand = kp_prev_cand[mask_cand_klt[:,0]==1]
+    kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_cand_klt[:,0]==1]
     lm_prev = lm_prev[mask_klt[:,0]==1]
     
-    kp_prev_matchpc_ud = cv2.undistortPoints(kp_prev_matchpc,K,D)
-    kp_curr_matchpc_ud = cv2.undistortPoints(kp_curr_matchpc,K,D)
-
-    E, mask_e = cv2.findEssentialMat(kp_prev_matchpc_ud, kp_curr_matchpc_ud, focal=1.0, pp=(0., 0.), 
-                                   method=cv2.RANSAC, prob=0.999, threshold=0.001)
-    essen_mat_pts = np.sum(mask_e)    
+    kp_prev_all = np.vstack((kp_prev_matchpc, kp_prev_cand))
+    kp_curr_all = np.vstack((kp_curr_matchpc, kp_curr_cand_matchpc))
     
-    print ("Essential matrix: used ",essen_mat_pts ," of total ",len(kp_curr_matchpc),"matches")
-    _, _, _, mask_RP = cv2.recoverPose(E, kp_prev_matchpc_ud, kp_curr_matchpc_ud,mask=mask_e)
+    #kp_prev_matchpc_ud = cv2.undistortPoints(kp_prev_matchpc,K,D)
+    #kp_curr_matchpc_ud = cv2.undistortPoints(kp_curr_matchpc,K,D)
 
-    print ("Recover pose: used ",np.sum(mask_RP) ," of total ",essen_mat_pts," matches")
+    kp_prev_all_ud = cv2.undistortPoints(kp_prev_all,K,D)
+    kp_curr_all_ud = cv2.undistortPoints(kp_curr_all,K,D)
 
-    img_track = draw_point_tracks(gr_prev,kp_prev_matchpc,gr_curr,kp_curr_matchpc,mask_RP, False)
-    fig1_image.set_data(img_track)
+    E, mask_e_all = cv2.findEssentialMat(kp_prev_all_ud, kp_curr_all_ud, focal=1.0, pp=(0., 0.), 
+                                   method=cv2.RANSAC, prob=0.999, threshold=0.001)
+    essen_mat_pts = np.sum(mask_e_all)    
+    
+    print ("Essential matrix: used ",essen_mat_pts ," of total ",len(kp_curr_all),"matches")
+    _, _, _, mask_RP_all = cv2.recoverPose(E, kp_prev_all_ud, kp_curr_all_ud, np.eye(3), 100.0, mask=mask_e_all)
+
+    print ("Recover pose: used ",np.sum(mask_RP_all) ," of total ",essen_mat_pts," matches")
+    
+    mask_RP_feat = mask_RP_all[:len(kp_prev_matchpc)]
+    mask_RP_cand = mask_RP_all[-len(kp_prev_cand):]
+
+    img_track_feat = draw_point_tracks(gr_prev,kp_prev_matchpc,gr_curr,kp_curr_matchpc,mask_RP_feat, False)
+    img_track_all = draw_point_tracks(gr_prev,kp_prev_cand,img_track_feat,kp_curr_cand_matchpc,mask_RP_cand, False, color=[255,255,0])
+
+    fig1_image.set_data(img_track_all)
     fig1.canvas.draw_idle() #plt.pause(0.001)
     if PAUSES: input("Press [enter] to continue.")
     
-    print("mask_RP: ",mask_RP.shape," KP_curr", kp_curr_matchpc[mask_RP==1].shape, " lm_prev: ", lm_prev[mask_RP[:,0]==1].shape)
+    #print("mask_RP: ",mask_RP.shape," KP_curr", kp_curr_matchpc[mask_RP==1].shape, " lm_prev: ", lm_prev[mask_RP[:,0]==1].shape)
     
-    success, T_cur, inliers = T_from_PNP(lm_prev[mask_RP[:,0]==1], 
-                                         kp_curr_matchpc[mask_RP==1], K, D)
+    success, T_cur, inliers = T_from_PNP(lm_prev[mask_RP_feat[:,0]==1], 
+                                         kp_curr_matchpc[mask_RP_feat==1], K, D)
     if not success:
         print ("PNP faile in frame ",frame_no," Exiting...")
         exit()
-        
-    print("PNP status: ", success)
-       
+               
     st = time.time()
-    #graph_pnp = plot_3d_points(ax2, lm_cur, linestyle="", color='r', marker=".", markersize=2)
-    plot_pose3_on_axes(ax2, T_cur, axis_length=2.0, center_plot=True)
-    fig2.canvas.draw_idle()
-    
-    if PAUSES: input("Press [enter] to continue.")
-    
+        
     if CHESSBOARD:
         ret, corners_curr = cv2.findChessboardCorners(gr_curr, (16,9),None)
         corners_curr_ud = cv2.undistortPoints(corners_curr,K,D)
@@ -250,40 +290,61 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, lm_prev, T_prev
                                color='black' if frame_no%2==0 else 'orange')
     else:
         corners_curr_ud = None
-    lm_updated = lm_prev[mask_RP[:,0]==1]
-    kp_curr_matchpc = kp_curr_matchpc[mask_RP[:,0]==1]    
-        
-    '''
-    mask_newpts = np.array([1 if (mask_RP[i,0]==1 and frame_c2lm.get(matchespc[i].trainIdx) is None) 
-                           else 0 for i in range(len(kp_curr_matchpc_ud))],dtype='int')
+    lm_updated = lm_prev[mask_RP_feat[:,0]==1]
+    kp_curr_matchpc = kp_curr_matchpc[mask_RP_feat[:,0]==1]    
     
-    lm_cur_new, mask_newpts = triangulate(T_prev, T_cur, kp_prev_matchpc_ud, 
-                                          kp_curr_matchpc_ud, mask_newpts)
+    kp_prev_cand_ud = kp_prev_all_ud[-len(kp_prev_cand):]
+    kp_curr_cand_ud = kp_curr_all_ud[-len(kp_prev_cand):]
     
-    graph_newlm = plot_3d_points(ax2, lm_cur_new, linestyle="", color='g', marker=".", markersize=2)
+    #print("kp_prev_cand_ud: ", kp_prev_cand_ud.shape, " kp_curr_cand_ud: ",kp_curr_cand_ud.shape)
+
+    kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_RP_cand[:,0]==1]    
+    kp_prev_cand_ud = kp_prev_cand_ud[mask_RP_cand[:,0]==1]
+    kp_curr_cand_ud = kp_curr_cand_ud[mask_RP_cand[:,0]==1]
     
-    plt.title('Current frame New Landmarks'); set_axes_equal(ax2); plt.draw(); plt.pause(0.001)
+    lm_cand, mask_tri = triangulate(T_prev, T_cur, kp_prev_cand_ud, 
+                                          kp_curr_cand_ud, None)
+    #print(mask_tri.shape)
+    print("Point rejected in triangulation: ", np.sum(mask_tri)," out of length: ", len(mask_tri))
     
-    # color landmarks back to blue
-    #graph = plot_3d_points(ax2, lm_cur, linestyle="", color='C0', marker=".", markersize=2)
+    #lm_updated = lm_prev[mask_RP_feat[:,0]==1]
+    kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_tri==1]
+
+    graph_pnp = plot_3d_points(ax2, lm_cand, linestyle="", color='r', marker=".", markersize=2)
+    plot_pose3_on_axes(ax2, T_cur, axis_length=2.0, center_plot=True)
+    fig2.canvas.draw_idle(); plt.pause(0.1)
+    if PAUSES: input("Press [enter] to continue.")
+    
     graph_pnp.remove()
-    graph_newlm.remove()
-    graph_newlm = plot_3d_points(ax2, lm_cur_new, linestyle="", color='C0', marker=".", markersize=2)    
-    plt.title('Current frame landmaks added in'); set_axes_equal(ax2); plt.draw(); plt.pause(0.001)
-
-    lm_newids = -np.ones(mask_newpts.shape[0],dtype=int)
-    lm_newids[mask_newpts.ravel()==1]=np.arange(np.sum(mask_newpts))+len(lm_prev)
+    graph_newlm = plot_3d_points(ax2, lm_cand, linestyle="", color='C0', marker=".", markersize=2)    
+    fig2.canvas.draw_idle(); plt.pause(0.1)
     
-    # Create a dictionary {KP2 index of match : landmark number}
-    frame_c2lm_new = {mat.trainIdx:lm_id for lm_id,mat in zip(lm_newids, matchespc)
-                    if lm_id!=-1 }
-    frame_c2lm.update(frame_c2lm_new)
-    lm_updated = np.concatenate((lm_prev,lm_cur_new))
-    print ("Adding ",len(frame_c2lm_new), " landmars. Total landmarks: ", lm_updated.shape[0])
-    '''
-
+    lm_updated = np.concatenate((lm_updated,lm_cand))
+    kp_curr_matchpc = np.concatenate((kp_curr_matchpc,kp_curr_cand_matchpc))
+    
+    kp_curr_cand = detector.detect(gr_curr,mask_curr)
+    print ("New feature candidates detected: ",len(kp_curr_cand))
+    
+    if TILE_KP:
+        kp_curr_cand = tiled_features(kp_curr_cand, gr_curr.shape, TILEY, TILEX)
+        print ("candidates points after tiling supression: ",len(kp_curr_cand))
+    
+    if RADIAL_NON_MAX:
+        kp_curr_cand = radial_non_max(kp_curr_cand,RADIAL_NON_MAX_RADIUS)
+        print ("candidates points after radial supression: ",len(kp_curr_cand))
+    
+    kp_curr_cand_pts  = np.expand_dims(np.array([o.pt for o in kp_curr_cand],dtype='float32'),1)
+         
+    kp_curr_cand_pts = remove_redundant_newkps(kp_curr_cand_pts, kp_curr_matchpc, 5)
+    
+    print ("Candidate points after redudancy check against current kps: ",len(kp_curr_cand_pts))
+    
+    img_cand_pts = draw_points(img_track_all,kp_curr_cand_pts[:,0,:], color=[255,255,0])
+    fig1_image.set_data(img_cand_pts)
+    fig1.canvas.draw_idle(); plt.pause(0.1)
+    
     frame_no += 1
-    return gr_curr, kp_curr_matchpc,  lm_updated, T_cur, corners_curr_ud
+    return gr_curr, kp_curr_matchpc,  kp_curr_cand_pts, lm_updated, T_cur, corners_curr_ud
 
     print ("\n \n FRAME "+frame_no+" COMPLETE \n \n")
 
@@ -296,11 +357,17 @@ if USE_MASKS:
 else:
     mask = None
 
-out = process_frame(img3, mask, gr2, kp2_match_12, landmarks_12, T_1_2, corners2_ud)
+out = process_frame(img3, mask, gr2, kp2_match_12, kp2_pts, landmarks_12, T_1_2, corners2_ud)
     
 print ("\n \n FRAME 3 COMPLETE \n \n")
 
 for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
+    while(paused):   
+        print('.', end='', flush=True)
+        #fig1.canvas.draw_idle()
+        #fig2.canvas.draw_idle()
+        plt.pause(0.1)
+    if cue_to_exit: prnint("EXITING!!!"); break
     if USE_MASKS:
         mask = cv2.imread(masks[i],cv2.IMREAD_GRAYSCALE)
     print("Processing image: ",images[i])
@@ -308,6 +375,7 @@ for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
     st = time.time()
     out = process_frame(img, mask, *out)
     print("Time to process last frame: ",time.time()-st)
-    # press 'q' to exit
+    plt.pause(0.001)
+    print ("\n \n FRAME ", i ," COMPLETE \n \n")
 
 plt.close(fig='all')
