@@ -16,17 +16,21 @@ tiling_non_max_tile_x: 12
 use_tiling_non_max_supression: True
 
 radial_non_max: True
-radial_non_max_radius: 5
+radial_non_max_radius: 15
 
 image_folder: 'data/Lars2_081018'
 image_ext: 'jpg'
 chessboard: False
 init_image_indxs: [165, 170]
-image_step: 5
-use_clahe: False
+image_step: 4
+use_clahe: True
 use_masks: True
 masks_folder: 'data/Lars2_081018_clahe_masks2_out'
 masks_ext: 'png'
+
+CLAHE_settings:
+ clipLimit: 10.0
+ tileGridSize: !!python/tuple [8,6]
 
 ORB_settings:
  WTA_K: 2
@@ -35,6 +39,11 @@ ORB_settings:
  fastThreshold: 5
  firstLevel: 0
  nfeatures: 10000
- nlevels: 8
- scaleFactor: 2.0
+ nlevels: 5
+ scaleFactor: 4.0
  scoreType: 0
+
+KLT_settings:
+ criteria: !!python/tuple [3, 50, 0.01] #criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.03))
+ maxLevel: 4
+ winSize: !!python/tuple [125,125]
