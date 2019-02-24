@@ -58,7 +58,7 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
     for i,v in enumerate(mask):
         if v==1: 
             if pts_3d_frame1_hom_norm[pt_iter,2]<=0: #or \pts_3d_frame1_hom_norm[pt_iter,2]>15:
-                print ("Point is negative")
+                #print ("Point is negative")
                 mask[i]=0 
                 rows_to_del.append(pt_iter)
             pt_iter +=1
@@ -66,7 +66,6 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
     pts_3d_frame1_hom_norm = np.delete(pts_3d_frame1_hom_norm,rows_to_del,axis=0)
     pts_3d_w_hom = pts_3d_frame1_hom_norm @ T_w_1.T
     pts_3d_w = pts_3d_w_hom[:, :3]
-    print(pts_3d_w.shape)
     return pts_3d_w, mask
 
 def T_from_PNP(coord_3d, img_pts, K, D):
@@ -111,17 +110,18 @@ def displayMatches(img_left,kp1,img_right,kp2, matches, mask, display_invalid, i
     return img_valid
 
 def draw_points(vis_orig, points, color = (0, 255, 0), thick = 3):
-    vis = cv2.cvtColor(vis_orig,cv2.COLOR_GRAY2RGB)
+    if vis_orig.shape[2] == 3: vis = vis_orig
+    else: vis = cv2.cvtColor(vis_orig,cv2.COLOR_GRAY2RGB)
     rad = int(vis.shape[1]/200)
     for pt in points:
         cv2.circle(vis, (int(pt[0]), int(pt[1])), rad , color, thickness=thick)
-    return vis_o
+    return vis
 
 def draw_arrows(vis_orig, points1, points2, color = (0, 255, 0), thick = 3):
-    vis = cv2.cvtColor(vis_orig,cv2.COLOR_GRAY2RGB)
-    #rad = int(vis.shape[1]/200)
+    if len(vis_orig.shape) == 2: vis = cv2.cvtColor(vis_orig,cv2.COLOR_GRAY2RGB)
+    else: vis = vis_orig
     for p1,p2 in zip(points1,points2):
-        cv2.arrowedLine(vis, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1])), color=(0,255,0), thickness=thick)
+        cv2.arrowedLine(vis, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1])), color=color, thickness=thick)
     return vis
 
 def draw_feature_tracks(img_left,kp1,img_right,kp2, matches, mask, display_invalid=False, color=(0, 255, 0)):
@@ -146,10 +146,10 @@ def draw_point_tracks(img_left,kp1,img_right,kp2, mask, display_invalid=False, c
     The mask should be the same length as matches
     '''
     bool_mask = mask.astype(bool)
-    valid_right_matches = kp1[bool_mask]
-    valid_left_matches = kp2[bool_mask]
+    valid_left_matches = kp1[bool_mask]
+    valid_right_matches = kp2[bool_mask]
     #img_right_out = draw_points(img_right, valid_right_matches)
-    img_right_out = draw_arrows(img_right, valid_left_matches, valid_right_matches)
+    img_right_out = draw_arrows(img_right, valid_left_matches, valid_right_matches, color=color)
     
     
     return img_right_out
@@ -349,3 +349,11 @@ def radial_non_max(kp_list, dist):
             for kp_i in idx:
                 kp_mask[kp_i] = False 
     return kp[kp_mask].tolist()
+
+def remove_redundant_newkps(kp_new, kp_old, dist):
+    old_feat_pts = kp_old[:,0,:]
+    tree = spatial.cKDTree(old_feat_pts)
+    new_feat_pts = kp_new[:,0,:]
+    idx = tree.query_ball_point(new_feat_pts, dist, p=2., eps=0, n_jobs=1)
+    newpt_mask = idx.astype(bool)
+    return kp_new[~newpt_mask]
