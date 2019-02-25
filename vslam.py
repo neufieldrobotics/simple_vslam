@@ -49,7 +49,7 @@ image_ext = config_dict['image_ext']
 init_imgs_indx = config_dict['init_image_indxs']
 img_step = config_dict['image_step']
 PAUSES = False
-PLOT_LANDMARKS = True
+PLOT_LANDMARKS = False
 paused = False
 cue_to_exit = False
 
@@ -137,7 +137,7 @@ T_1_2 = T_inv(T_2_1)
 print("R:",R_21)
 print("t:",t_21.T)
 
-img12 = draw_point_tracks(gr1,kp1_match_12,gr2,kp2_match_12,mask_RP_12, False)
+img12 = draw_point_tracks(kp1_match_12,gr2,kp2_match_12,mask_RP_12, False)
 
 fig1 = plt.figure(1)
 plt.get_current_fig_manager().window.setGeometry(window_xadj,window_yadj,640,338)
@@ -233,19 +233,21 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
     if USE_CLAHE: gr_curr = clahe.apply(gr_curr)
     
     kp_curr_matchpc, mask_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
-                                                            kp_prev_matchpc, None, **config_dict['KLT_settings'])
+                                    kp_prev_matchpc, None, **config_dict['KLT_settings'])
     kp_curr_cand_matchpc, mask_cand_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
-                                                                      kp_prev_cand, None, **config_dict['KLT_settings'])
+                                              kp_prev_cand, None, **config_dict['KLT_settings'])
 
     print ("KLT Tracked: ",np.sum(mask_klt)," of total ",len(kp_prev_matchpc),"keypoints")
     print ("KLT Candidates Tracked: ",np.sum(mask_cand_klt)," of total ",len(kp_prev_cand),"keypoints")
 
+    # Filter out points that are not tracked
     kp_prev_matchpc = kp_prev_matchpc[mask_klt[:,0]==1]
     kp_curr_matchpc = kp_curr_matchpc[mask_klt[:,0]==1]
     kp_prev_cand = kp_prev_cand[mask_cand_klt[:,0]==1]
     kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_cand_klt[:,0]==1]
     lm_prev = lm_prev[mask_klt[:,0]==1]
     
+    # Merge tracked LM and candidate pts to filter together in findEssential
     kp_prev_all = np.vstack((kp_prev_matchpc, kp_prev_cand))
     kp_curr_all = np.vstack((kp_curr_matchpc, kp_curr_cand_matchpc))
     
@@ -258,31 +260,39 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
     
     print ("Essential matrix: used ",essen_mat_pts ," of total ",len(kp_curr_all),"matches")
     '''
+    # Recover Pose filtering is breaking under certain conditions. Leave out for now.
     _, _, _, mask_RP_all = cv2.recoverPose(E, kp_prev_all_ud, kp_curr_all_ud, np.eye(3), 100.0, mask=mask_e_all)
     print ("Recover pose: used ",np.sum(mask_RP_all) ," of total ",essen_mat_pts," matches")
     '''   
     mask_RP_all = mask_e_all
   
+    # Split the combined mask to lm features and candidates
     mask_RP_feat = mask_RP_all[:len(kp_prev_matchpc)]
     mask_RP_cand = mask_RP_all[-len(kp_prev_cand):]
     
+    # Display translucent mask on image.
     if mask_curr is not None:
         gr_curr_masked = cv2.addWeighted(mask_curr, 0.2, gr_curr, 1 - 0.2, 0)
     else: gr_curr_masked = gr_curr
     
-    img_track_feat = draw_point_tracks(gr_prev,kp_prev_matchpc,gr_curr_masked,kp_curr_matchpc,mask_RP_feat, False)
-    img_track_all = draw_point_tracks(gr_prev,kp_prev_cand,img_track_feat,kp_curr_cand_matchpc,mask_RP_cand, False, color=[255,255,0])
+    print(mask_RP_cand)
+
+    img_track_feat = draw_point_tracks(kp_prev_matchpc,gr_curr_masked,
+                                       kp_curr_matchpc,mask_RP_feat, False)
+    img_track_all = draw_point_tracks(kp_prev_cand,img_track_feat,
+                                      kp_curr_cand_matchpc,mask_RP_cand, False, 
+                                      color=[255,255,0])
 
     fig1_image.set_data(img_track_all)
     fig1.canvas.draw_idle(); plt.pause(0.01)
     if PAUSES: input("Press [enter] to continue.")
 
     lm_updated = lm_prev[mask_RP_feat[:,0]==1]
-    print("kp_curr_matchpc: ",kp_curr_matchpc.shape)
-    kp_curr_matchpc = kp_curr_matchpc[mask_RP_feat[:,0]==1] #kp_curr_matchpc[mask_RP_feat==1] 
-    print("kp_curr_matchpc: ",kp_curr_matchpc.shape)
-       
+    print("LM prev was: ",len(lm_prev), " LM updated after Ess mat filter is :",len(lm_updated))
+    kp_curr_matchpc = kp_curr_matchpc[mask_RP_feat[:,0]==1]
+           
     success, T_cur, inliers = T_from_PNP(lm_updated, kp_curr_matchpc, K, D)
+    print("PNP inliers: ",len(inliers), " of ",len(lm_updated))
     if not success:
         print ("PNP faile in frame ",frame_no," Exiting...")
         exit()
@@ -302,21 +312,24 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
     
     #print("kp_prev_cand_ud: ", kp_prev_cand_ud.shape, " kp_curr_cand_ud: ",kp_curr_cand_ud.shape)
 
+    kp_prev_cand = kp_prev_cand[mask_RP_cand[:,0]==1]    
     kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_RP_cand[:,0]==1]    
     kp_prev_cand_ud = kp_prev_cand_ud[mask_RP_cand[:,0]==1]
     kp_curr_cand_ud = kp_curr_cand_ud[mask_RP_cand[:,0]==1]
     
     lm_cand, mask_tri = triangulate(T_prev, T_cur, kp_prev_cand_ud, 
-                                          kp_curr_cand_ud, None)
-    print(mask_tri.shape)
+                                    kp_curr_cand_ud, None)
+    print("Shape of mask_tri: ", mask_tri.shape)
     #print(kp_curr_cand.shape)
-    print("Point after rejected in triangulation: ", np.sum(mask_tri)," out of length: ", len(mask_tri))
-    #img_rej_pts = draw_points(img_track_all,kp_curr_cand[:,0,:], color=[255,255,0])
-    #fig1_image.set_data(img_rej_pts)
-    #fig1.canvas.draw_idle(); plt.pause(0.05)
+    print("Point after rejection in triangulation: ", np.sum(mask_tri)," out of length: ", len(mask_tri))
+    
+    img_rej_pts = draw_point_tracks(kp_prev_cand, img_track_all, 
+                                    kp_curr_cand_matchpc, 1-mask_tri, False, color=[255,0,0])
+    fig1_image.set_data(img_rej_pts)
+    fig1.canvas.draw_idle(); plt.pause(0.1)
     
     #lm_updated = lm_prev[mask_RP_feat[:,0]==1]
-    kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_tri==1]
+    kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_tri[:,0]==1]
 
     graph_pnp = plot_3d_points(ax2, lm_cand, linestyle="", color='r', marker=".", markersize=2)
     plot_pose3_on_axes(ax2, T_cur, axis_length=2.0, center_plot=True, line_obj_list=cam_pose)
