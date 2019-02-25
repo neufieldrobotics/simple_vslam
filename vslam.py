@@ -49,6 +49,7 @@ image_ext = config_dict['image_ext']
 init_imgs_indx = config_dict['init_image_indxs']
 img_step = config_dict['image_step']
 PAUSES = False
+PLOT_LANDMARKS = False
 paused = False
 cue_to_exit = False
 
@@ -166,7 +167,14 @@ plt.get_current_fig_manager().window.setGeometry(640+window_xadj,window_yadj,640
 ax2.set_aspect('equal')         # important!
 fig2.suptitle('Image 1 to 2 after triangulation')
 
-graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker=".", markersize=2)
+graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='r')
+set_axes_equal(ax2)
+ax2.view_init(0, -90)
+fig2.canvas.draw_idle(); plt.pause(0.01)
+graph.remove()
+
+if PLOT_LANDMARKS:
+    graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='C0')
 
 if CHESSBOARD:
     ret1, corners1 = cv2.findChessboardCorners(gr1, (16,9),None)
@@ -180,17 +188,16 @@ if CHESSBOARD:
 else:
     corners2_ud = None
     
-plot_pose3_on_axes(ax2, T_1_2, axis_length=1.0)
-plot_pose3_on_axes(ax2,np.eye(4), axis_length=0.5)
+cam_pose_0 = plot_pose3_on_axes(ax2,np.eye(4), axis_length=0.5)
+cam_pose = plot_pose3_on_axes(ax2, T_1_2, axis_length=1.0)
 
-set_axes_equal(ax2)
-ax2.view_init(0, -90)
+cam_trail_pts = T_1_2[:3,[-1]].T
+cam_pose_trail = plot_3d_points(ax2, cam_trail_pts, linestyle="", color='g', marker=".", markersize=2)
+
 #fig2.canvas.mpl_connect('button_press_event', onClick)
 fig2.canvas.mpl_connect('key_press_event', onKey)
 
-
-plt.draw()
-plt.pause(.001)
+plt.pause(.01)
 input("Press [enter] to continue.")
 
 kp2 = detector.detect(gr2,mask2)
@@ -212,7 +219,7 @@ print ("Points after redudancy check with current kps: ",len(kp2_pts))
 
 img12_newpts = draw_points(img12,kp2_pts[:,0,:], color=[255,255,0])
 fig1_image.set_data(img12_newpts)
-fig1.canvas.draw_idle() #plt.pause(0.001)
+fig1.canvas.draw_idle(); plt.pause(0.01)
 if PAUSES: input("Press [enter] to continue.")
                     
 
@@ -221,7 +228,7 @@ PROCESS FRAME
 '''
 frame_no = 3
 def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, lm_prev, T_prev, corners_prev_ud):
-    global frame_no
+    global frame_no, cam_pose_trail, cam_trail_pts, cam_pose
     gr_curr = cv2.cvtColor(img_curr,cv2.COLOR_BGR2GRAY)
     if USE_CLAHE: gr_curr = clahe.apply(gr_curr)
     
@@ -232,8 +239,7 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
 
     print ("KLT Tracked: ",np.sum(mask_klt)," of total ",len(kp_prev_matchpc),"keypoints")
     print ("KLT Candidates Tracked: ",np.sum(mask_cand_klt)," of total ",len(kp_prev_cand),"keypoints")
- 
-    
+
     kp_prev_matchpc = kp_prev_matchpc[mask_klt[:,0]==1]
     kp_curr_matchpc = kp_curr_matchpc[mask_klt[:,0]==1]
     kp_prev_cand = kp_prev_cand[mask_cand_klt[:,0]==1]
@@ -243,9 +249,6 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
     kp_prev_all = np.vstack((kp_prev_matchpc, kp_prev_cand))
     kp_curr_all = np.vstack((kp_curr_matchpc, kp_curr_cand_matchpc))
     
-    #kp_prev_matchpc_ud = cv2.undistortPoints(kp_prev_matchpc,K,D)
-    #kp_curr_matchpc_ud = cv2.undistortPoints(kp_curr_matchpc,K,D)
-
     kp_prev_all_ud = cv2.undistortPoints(kp_prev_all,K,D)
     kp_curr_all_ud = cv2.undistortPoints(kp_curr_all,K,D)
 
@@ -256,10 +259,10 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
     print ("Essential matrix: used ",essen_mat_pts ," of total ",len(kp_curr_all),"matches")
     '''
     _, _, _, mask_RP_all = cv2.recoverPose(E, kp_prev_all_ud, kp_curr_all_ud, np.eye(3), 100.0, mask=mask_e_all)
-    '''
-    mask_RP_all = mask_e_all
     print ("Recover pose: used ",np.sum(mask_RP_all) ," of total ",essen_mat_pts," matches")
-    
+    '''   
+    mask_RP_all = mask_e_all
+  
     mask_RP_feat = mask_RP_all[:len(kp_prev_matchpc)]
     mask_RP_cand = mask_RP_all[-len(kp_prev_cand):]
     
@@ -273,9 +276,13 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
     fig1_image.set_data(img_track_all)
     fig1.canvas.draw_idle(); plt.pause(0.01)
     if PAUSES: input("Press [enter] to continue.")
-        
-    success, T_cur, inliers = T_from_PNP(lm_prev[mask_RP_feat[:,0]==1], 
-                                         kp_curr_matchpc[mask_RP_feat==1], K, D)
+
+    lm_updated = lm_prev[mask_RP_feat[:,0]==1]
+    print("kp_curr_matchpc: ",kp_curr_matchpc.shape)
+    kp_curr_matchpc = kp_curr_matchpc[mask_RP_feat[:,0]==1] #kp_curr_matchpc[mask_RP_feat==1] 
+    print("kp_curr_matchpc: ",kp_curr_matchpc.shape)
+       
+    success, T_cur, inliers = T_from_PNP(lm_updated, kp_curr_matchpc, K, D)
     if not success:
         print ("PNP faile in frame ",frame_no," Exiting...")
         exit()
@@ -289,8 +296,6 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
                                color='black' if frame_no%2==0 else 'orange')
     else:
         corners_curr_ud = None
-    lm_updated = lm_prev[mask_RP_feat[:,0]==1]
-    kp_curr_matchpc = kp_curr_matchpc[mask_RP_feat[:,0]==1]    
     
     kp_prev_cand_ud = kp_prev_all_ud[-len(kp_prev_cand):]
     kp_curr_cand_ud = kp_curr_all_ud[-len(kp_prev_cand):]
@@ -303,20 +308,29 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
     
     lm_cand, mask_tri = triangulate(T_prev, T_cur, kp_prev_cand_ud, 
                                           kp_curr_cand_ud, None)
-    #print(mask_tri.shape)
-    print("Point rejected in triangulation: ", np.sum(mask_tri)," out of length: ", len(mask_tri))
+    print(mask_tri.shape)
+    #print(kp_curr_cand.shape)
+    print("Point after rejected in triangulation: ", np.sum(mask_tri)," out of length: ", len(mask_tri))
+    #img_rej_pts = draw_points(img_track_all,kp_curr_cand[:,0,:], color=[255,255,0])
+    #fig1_image.set_data(img_rej_pts)
+    #fig1.canvas.draw_idle(); plt.pause(0.05)
     
     #lm_updated = lm_prev[mask_RP_feat[:,0]==1]
     kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_tri==1]
 
     graph_pnp = plot_3d_points(ax2, lm_cand, linestyle="", color='r', marker=".", markersize=2)
-    plot_pose3_on_axes(ax2, T_cur, axis_length=2.0, center_plot=True)
-    fig2.canvas.draw_idle(); plt.pause(0.01)
-    if PAUSES: input("Press [enter] to continue.")
+    plot_pose3_on_axes(ax2, T_cur, axis_length=2.0, center_plot=True, line_obj_list=cam_pose)
     
-    graph_pnp.remove()
-    graph_newlm = plot_3d_points(ax2, lm_cand, linestyle="", color='C0', marker=".", markersize=2)    
-    fig2.canvas.draw_idle(); plt.pause(0.1)
+    cam_trail_pts = np.append(cam_trail_pts,T_cur[:3,[-1]].T,axis=0)
+    cam_pose_trail = plot_3d_points(ax2,cam_trail_pts , line_obj=cam_pose_trail, linestyle="", color='g', marker=".", markersize=2)
+    fig2.canvas.draw_idle(); plt.pause(0.05)
+    if PAUSES: input("Press [enter] to continue.")
+
+    # Remove pose lines and landmarks to speed plotting
+    if PLOT_LANDMARKS:
+        graph_newlm = plot_3d_points(ax2, lm_cand, linestyle="", color='C0', marker=".", markersize=2)    
+        fig2.canvas.draw_idle(); plt.pause(0.01)
+    
     
     lm_updated = np.concatenate((lm_updated,lm_cand))
     kp_curr_matchpc = np.concatenate((kp_curr_matchpc,kp_curr_cand_matchpc))
@@ -340,12 +354,16 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
     
     img_cand_pts = draw_points(img_track_all,kp_curr_cand_pts[:,0,:], color=[255,255,0])
     fig1_image.set_data(img_cand_pts)
-    fig1.canvas.draw_idle(); plt.pause(0.01)
+    fig1.canvas.draw_idle(); plt.pause(0.05)
     
     frame_no += 1
+    
+    graph_pnp.remove()
+
+    print ("FRAME deq "+str(frame_no)+" COMPLETE")
+
     return gr_curr, kp_curr_matchpc,  kp_curr_cand_pts, lm_updated, T_cur, corners_curr_ud
 
-    print ("\n \n FRAME "+frame_no+" COMPLETE \n \n")
 
 print ("\n \n FRAME 2 COMPLETE \n \n")
 
@@ -363,8 +381,6 @@ print ("\n \n FRAME 3 COMPLETE \n \n")
 for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
     while(paused):   
         print('.', end='', flush=True)
-        #fig1.canvas.draw_idle()
-        #fig2.canvas.draw_idle()
         plt.pause(0.1)
     if cue_to_exit: print("EXITING!!!"); break
     if USE_MASKS:
