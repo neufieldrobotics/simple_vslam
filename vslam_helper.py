@@ -46,7 +46,7 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
     # Calculate points in 0,0,0 frame
     if mask is None:
         pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1, pts_2).T
-        mask = np.ones(pts_1.shape[0])
+        mask = np.ones((pts_1.shape[0],1),dtype='uint8')
     else:
         pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1[mask==1], 
                                               pts_2[mask==1]).T
@@ -60,7 +60,7 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
             if pts_3d_frame1_hom_norm[pt_iter,2]<=0 or \
                pts_3d_frame1_hom_norm[pt_iter,2]>100:
                 #print ("Point is negative")
-                mask[i]=0 
+                mask[i,0]=0 
                 rows_to_del.append(pt_iter)
             pt_iter +=1
     
@@ -140,7 +140,7 @@ def draw_feature_tracks(img_left,kp1,img_right,kp2, matches, mask, display_inval
     
     return img_right_out
 
-def draw_point_tracks(img_left,kp1,img_right,kp2, mask, display_invalid=False, color=(0, 255, 0)):
+def draw_point_tracks(kp1,img_right,kp2, mask, display_invalid=False, color=(0, 255, 0)):
     '''
     This function extracts takes a 2 images, set of keypoints and a mask of valid
     (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
@@ -151,7 +151,6 @@ def draw_point_tracks(img_left,kp1,img_right,kp2, mask, display_invalid=False, c
     valid_right_matches = kp2[bool_mask]
     #img_right_out = draw_points(img_right, valid_right_matches)
     img_right_out = draw_arrows(img_right, valid_left_matches, valid_right_matches, color=color)
-    
     
     return img_right_out
 
