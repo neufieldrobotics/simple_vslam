@@ -57,7 +57,8 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
     rows_to_del = []
     for i,v in enumerate(mask):
         if v==1: 
-            if pts_3d_frame1_hom_norm[pt_iter,2]<=0: #or \pts_3d_frame1_hom_norm[pt_iter,2]>15:
+            if pts_3d_frame1_hom_norm[pt_iter,2]<=0 or \
+               pts_3d_frame1_hom_norm[pt_iter,2]>100:
                 #print ("Point is negative")
                 mask[i]=0 
                 rows_to_del.append(pt_iter)
