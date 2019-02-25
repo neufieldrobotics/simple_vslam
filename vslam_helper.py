@@ -190,32 +190,59 @@ def set_axes_equal(ax):
     radius = 0.5 * np.max(np.abs(limits[:, 1] - limits[:, 0]))
     set_axes_radius(ax, origin, radius)
 
-def plot_pose3_on_axes(axes, T, axis_length=0.1, center_plot=False):
+def plot_pose3_on_axes(axes, T, axis_length=0.1, center_plot=False, line_obj_list=None):
     """Plot a 3D pose 4x4 homogenous transform  on given axis 'axes' with given 'axis_length'."""
-    plot_pose3RT_on_axes(axes, *decompose_T(T), axis_length, center_plot)
+    return plot_pose3RT_on_axes(axes, *decompose_T(T), axis_length, center_plot, line_obj_list)
 
-def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1, center_plot=False):
+def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1, center_plot=False, line_obj_list=None):
     """Plot a 3D pose on given axis 'axes' with given 'axis_length'."""
     # draw the camera axes
     x_axis = origin + gRp[:, 0] * axis_length
-    line = np.append(origin, x_axis, axis=0)
-    axes.plot(line[:, 0], line[:, 1], line[:, 2], 'r-')
-
+    linex = np.append(origin, x_axis, axis=0)
+    
     y_axis = origin + gRp[:, 1] * axis_length
-    line = np.append(origin, y_axis, axis=0)
-    axes.plot(line[:, 0], line[:, 1], line[:, 2], 'g-')
+    liney = np.append(origin, y_axis, axis=0)
 
     z_axis = origin + gRp[:, 2] * axis_length
-    line = np.append(origin, z_axis, axis=0)
-    axes.plot(line[:, 0], line[:, 1], line[:, 2], 'b-')
-    
-    if center_plot:
-        center_3d_plot_around_pt(axes,origin[0])
-    
+    linez = np.append(origin, z_axis, axis=0)
 
-def plot_3d_points(axes, vals, *args, **kwargs):
-    graph, = axes.plot(vals[:,0], vals[:,1], vals[:,2], *args, **kwargs)
-    return graph
+
+    if line_obj_list is None:
+        print ("None")
+        xaplt = axes.plot(linex[:, 0], linex[:, 1], linex[:, 2], 'r-')    
+        yaplt = axes.plot(liney[:, 0], liney[:, 1], liney[:, 2], 'g-')    
+        zaplt = axes.plot(linez[:, 0], linez[:, 1], linez[:, 2], 'b-')
+    
+        if center_plot:
+            center_3d_plot_around_pt(axes,origin[0])
+        return [xaplt, yaplt, zaplt]
+    
+    else:
+        print ("Not None")
+
+        line_obj_list[0][0].set_data(linex[:, 0], linex[:, 1])
+        line_obj_list[0][0].set_3d_properties(linex[:,2])
+        
+        line_obj_list[1][0].set_data(liney[:, 0], liney[:, 1])
+        line_obj_list[1][0].set_3d_properties(liney[:,2])
+        
+        line_obj_list[2][0].set_data(linez[:, 0], linez[:, 1])
+        line_obj_list[2][0].set_3d_properties(linez[:,2])
+
+        if center_plot:
+            center_3d_plot_around_pt(axes,origin[0])
+        return line_obj_list
+
+def plot_3d_points(axes, vals, line_obj=None, *args, **kwargs):
+    if line_obj is None:
+        graph, = axes.plot(vals[:,0], vals[:,1], vals[:,2], *args, **kwargs)
+        return graph
+
+    else:
+        line_obj.set_data(vals[:,0], vals[:,1])
+        line_obj.set_3d_properties(vals[:,2])
+        return line_obj
+
 
 def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
                         max_y=np.inf):
