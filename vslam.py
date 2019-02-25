@@ -19,7 +19,7 @@ np.set_printoptions(precision=3,suppress=True)
 
 parser = argparse.ArgumentParser(description='This is the simple VSLAM pipeline')
 parser.add_argument('-c', '--config', help='location of config file in yaml format',
-                    default='config/kitti_config.yaml') #go_pro_icebergs_config.yaml
+                    default='config/go_pro_icebergs_config.yaml') #go_pro_icebergs_config.yaml
 args = parser.parse_args()
  
 # Inputs, images and camera info
@@ -221,12 +221,9 @@ PROCESS FRAME
 '''
 frame_no = 3
 def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, lm_prev, T_prev, corners_prev_ud):
-    #plt.imshow(mask_curr)
-    plt.draw()
     global frame_no
     gr_curr = cv2.cvtColor(img_curr,cv2.COLOR_BGR2GRAY)
     if USE_CLAHE: gr_curr = clahe.apply(gr_curr)
-    
     
     kp_curr_matchpc, mask_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
                                                             kp_prev_matchpc, None, **config_dict['KLT_settings'])
@@ -257,30 +254,32 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
     essen_mat_pts = np.sum(mask_e_all)    
     
     print ("Essential matrix: used ",essen_mat_pts ," of total ",len(kp_curr_all),"matches")
+    '''
     _, _, _, mask_RP_all = cv2.recoverPose(E, kp_prev_all_ud, kp_curr_all_ud, np.eye(3), 100.0, mask=mask_e_all)
-
+    '''
+    mask_RP_all = mask_e_all
     print ("Recover pose: used ",np.sum(mask_RP_all) ," of total ",essen_mat_pts," matches")
     
     mask_RP_feat = mask_RP_all[:len(kp_prev_matchpc)]
     mask_RP_cand = mask_RP_all[-len(kp_prev_cand):]
-
-    img_track_feat = draw_point_tracks(gr_prev,kp_prev_matchpc,gr_curr,kp_curr_matchpc,mask_RP_feat, False)
+    
+    if mask_curr is not None:
+        gr_curr_masked = cv2.addWeighted(mask_curr, 0.2, gr_curr, 1 - 0.2, 0)
+    else: gr_curr_masked = gr_curr
+    
+    img_track_feat = draw_point_tracks(gr_prev,kp_prev_matchpc,gr_curr_masked,kp_curr_matchpc,mask_RP_feat, False)
     img_track_all = draw_point_tracks(gr_prev,kp_prev_cand,img_track_feat,kp_curr_cand_matchpc,mask_RP_cand, False, color=[255,255,0])
 
     fig1_image.set_data(img_track_all)
-    fig1.canvas.draw_idle() #plt.pause(0.001)
+    fig1.canvas.draw_idle(); plt.pause(0.01)
     if PAUSES: input("Press [enter] to continue.")
-    
-    #print("mask_RP: ",mask_RP.shape," KP_curr", kp_curr_matchpc[mask_RP==1].shape, " lm_prev: ", lm_prev[mask_RP[:,0]==1].shape)
-    
+        
     success, T_cur, inliers = T_from_PNP(lm_prev[mask_RP_feat[:,0]==1], 
                                          kp_curr_matchpc[mask_RP_feat==1], K, D)
     if not success:
         print ("PNP faile in frame ",frame_no," Exiting...")
         exit()
-               
-    st = time.time()
-        
+                       
     if CHESSBOARD:
         ret, corners_curr = cv2.findChessboardCorners(gr_curr, (16,9),None)
         corners_curr_ud = cv2.undistortPoints(corners_curr,K,D)
@@ -312,7 +311,7 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
 
     graph_pnp = plot_3d_points(ax2, lm_cand, linestyle="", color='r', marker=".", markersize=2)
     plot_pose3_on_axes(ax2, T_cur, axis_length=2.0, center_plot=True)
-    fig2.canvas.draw_idle(); plt.pause(0.1)
+    fig2.canvas.draw_idle(); plt.pause(0.01)
     if PAUSES: input("Press [enter] to continue.")
     
     graph_pnp.remove()
@@ -335,13 +334,13 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
     
     kp_curr_cand_pts  = np.expand_dims(np.array([o.pt for o in kp_curr_cand],dtype='float32'),1)
          
-    kp_curr_cand_pts = remove_redundant_newkps(kp_curr_cand_pts, kp_curr_matchpc, 5)
+    kp_curr_cand_pts = remove_redundant_newkps(kp_curr_cand_pts, kp_curr_matchpc, RADIAL_NON_MAX_RADIUS)
     
     print ("Candidate points after redudancy check against current kps: ",len(kp_curr_cand_pts))
     
     img_cand_pts = draw_points(img_track_all,kp_curr_cand_pts[:,0,:], color=[255,255,0])
     fig1_image.set_data(img_cand_pts)
-    fig1.canvas.draw_idle(); plt.pause(0.1)
+    fig1.canvas.draw_idle(); plt.pause(0.01)
     
     frame_no += 1
     return gr_curr, kp_curr_matchpc,  kp_curr_cand_pts, lm_updated, T_cur, corners_curr_ud
@@ -367,7 +366,7 @@ for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
         #fig1.canvas.draw_idle()
         #fig2.canvas.draw_idle()
         plt.pause(0.1)
-    if cue_to_exit: prnint("EXITING!!!"); break
+    if cue_to_exit: print("EXITING!!!"); break
     if USE_MASKS:
         mask = cv2.imread(masks[i],cv2.IMREAD_GRAYSCALE)
     print("Processing image: ",images[i])
