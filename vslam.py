@@ -49,7 +49,7 @@ image_ext = config_dict['image_ext']
 init_imgs_indx = config_dict['init_image_indxs']
 img_step = config_dict['image_step']
 PAUSES = False
-PLOT_LANDMARKS = False
+PLOT_LANDMARKS = True
 paused = False
 cue_to_exit = False
 
@@ -382,6 +382,7 @@ for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
     while(paused):   
         print('.', end='', flush=True)
         plt.pause(0.1)
+        if cue_to_exit: break
     if cue_to_exit: print("EXITING!!!"); break
     if USE_MASKS:
         mask = cv2.imread(masks[i],cv2.IMREAD_GRAYSCALE)

@@ -16,12 +16,12 @@ tiling_non_max_tile_x: 12
 use_tiling_non_max_supression: True
 
 radial_non_max: True
-radial_non_max_radius: 15
+radial_non_max_radius: 25
 
 image_folder: 'data/Lars2_081018'
 image_ext: 'jpg'
 chessboard: False
-init_image_indxs: [165, 170]
+init_image_indxs: [150, 155]
 image_step: 4
 use_clahe: True
 use_masks: True
