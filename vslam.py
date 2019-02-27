@@ -15,19 +15,20 @@ import glob
 import re
 import argparse
 np.set_printoptions(precision=3,suppress=True)
+from multiprocessing import Process, Queue
+
 
 '''
 PROCESS FRAME
 '''
 frame_no = 3
-def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, lm_prev, T_prev, corners_prev_ud):
+def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc, kp_prev_cand, lm_prev, T_prev, corners_prev_ud):
     global frame_no, cam_pose_trail, cam_trail_pts, cam_pose
-    global inliers
     time_start = time.time()
-    gr_curr = cv2.cvtColor(img_curr,cv2.COLOR_BGR2GRAY)
+#    gr_curr = cv2.cvtColor(img_curr,cv2.COLOR_BGR2GRAY)
     print("Time elapsed in converting to gray: ",time.time()-time_start)
 
-    if USE_CLAHE: gr_curr = clahe.apply(gr_curr)
+#    if USE_CLAHE: gr_curr = clahe.apply(gr_curr)
     print("Time elapsed in CLAHE: ",time.time()-time_start)
 
     
@@ -157,7 +158,7 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
     kp_curr_matchpc = np.concatenate((kp_curr_matchpc,kp_curr_cand_matchpc))
     
     print("Time elapsed in beofre orb: ",time.time()-time_start)
-
+    '''
     kp_curr_cand = detector.detect(gr_curr,mask_curr)
     print ("New feature candidates detected: ",len(kp_curr_cand))
     
@@ -170,7 +171,7 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
         print ("candidates points after radial supression: ",len(kp_curr_cand))
     
     kp_curr_cand_pts  = np.expand_dims(np.array([o.pt for o in kp_curr_cand],dtype='float32'),1)
-         
+    '''     
     kp_curr_cand_pts = remove_redundant_newkps(kp_curr_cand_pts, kp_curr_matchpc, RADIAL_NON_MAX_RADIUS)
     
     print("Time elapsed in orb, filtering, radial: ",time.time()-time_start)
@@ -187,6 +188,46 @@ def process_frame(img_curr, mask_curr, gr_prev, kp_prev_matchpc, kp_prev_cand, l
     print ("FRAME deq "+str(frame_no)+" COMPLETE")
 
     return gr_curr, kp_curr_matchpc,  kp_curr_cand_pts, lm_updated, T_cur, corners_curr_ud
+
+def preprocess_frame(image_name, mask_name=None):
+    pt = time.time()
+    img = cv2.imread(image_name)
+    gr = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+    if mask_name is not None:
+        mask = cv2.imread(mask_name,cv2.IMREAD_GRAYSCALE)
+    else: mask= None
+
+    if USE_CLAHE: gr = clahe.apply(gr)
+    
+    kp = detector.detect(gr,mask)
+    print ("New feature candidates detected: ",len(kp))
+    
+    if TILE_KP:
+        print(TILEY, TILEX)
+        print(gr.shape)
+        kp = tiled_features(kp, gr.shape, TILEY, TILEX)
+        print ("candidates points after tiling supression: ",len(kp))
+    
+    if RADIAL_NON_MAX:
+        kp = radial_non_max(kp,RADIAL_NON_MAX_RADIUS)
+        print ("candidates points after radial supression: ",len(kp))
+    
+    kp_pts = np.expand_dims(np.array([o.pt for o in kp],dtype='float32'),1)
+    print("pre-processing time is", time.time()-pt)
+    return gr, mask, kp_pts
+
+def reader_proc(queue):
+    ## Read from the queue; this will be spawned as a separate Process
+    while True:
+        msg = queue.get()         # Read from the queue and do nothing
+        print("got: ",msg)
+        if (msg == 'DONE'):
+            break
+        
+def writer(imgnames, masknames, queue):
+    while True:
+        if not queue.full:
+            queue.put(preprocess_frame(img_name, img_mask))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='This is the simple VSLAM pipeline')
@@ -397,18 +438,20 @@ if __name__ == '__main__':
     print ("\n \n FRAME 2 COMPLETE \n \n")
 
     img3 = cv2.imread(images[init_imgs_indx[1]+img_step])
+    img3_name = images[init_imgs_indx[1]+img_step]
     
     if USE_MASKS:
         mask = cv2.imread(masks[init_imgs_indx[1]+1],cv2.IMREAD_GRAYSCALE)
+        mask_name = masks[init_imgs_indx[1]+1]
     else:
-        mask = None
+        mask_name = None
     
     print(kp2_match_12.shape)
     kp2_match_12 = kp2_match_12[mask_tri_12[:,0].astype(bool)]
     print(kp2_match_12.shape)
     
     
-    out = process_frame(img3, mask, gr2, kp2_match_12, kp2_pts, landmarks_12, T_1_2, corners2_ud)
+    out = process_frame(*preprocess_frame(img3_name, mask_name), gr2, kp2_match_12, kp2_pts, landmarks_12, T_1_2, corners2_ud)
         
     print ("\n \n FRAME 3 COMPLETE \n \n")
     
@@ -419,13 +462,17 @@ if __name__ == '__main__':
             if cue_to_exit: break
         if cue_to_exit: print("EXITING!!!"); break
         if USE_MASKS:
-            mask = cv2.imread(masks[i],cv2.IMREAD_GRAYSCALE)
+            #mask = cv2.imread(masks[i],cv2.IMREAD_GRAYSCALE)
+            mask_name = masks[i]
+        else: 
+            mask_name = None
         print("Processing image: ",images[i])
         st = time.time()
-        img = cv2.imread(images[i])
+        #img = cv2.imread(images[i])
         print("Time to read last image: ",time.time()-st)
-    
-        out = process_frame(img, mask, *out)
+        
+        print(mask_name)
+        out = process_frame(*preprocess_frame(images[i], mask_name), *out)
         print("Time to process last frame: ",time.time()-st)
         plt.pause(0.001)
         print ("\n \n FRAME ", i ," COMPLETE \n \n")
