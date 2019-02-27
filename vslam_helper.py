@@ -43,6 +43,8 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
     P_2_1 = T_2_1[:3]
     print ("P_2_1: ", P_2_1)
     
+    t_2_1 = T_2_1[:3,-1]
+    
     # Calculate points in 0,0,0 frame
     if mask is None:
         pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1, pts_2).T
@@ -51,20 +53,28 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
         pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1[mask==1], 
                                               pts_2[mask==1]).T
     pts_3d_frame1_hom_norm = pts_3d_frame1_hom /  pts_3d_frame1_hom[:,-1][:,None]
-    # Move 3d points to world frame by transforming with T_w_1
     
     pt_iter = 0
     rows_to_del = []
+    ANGLE_THRESHOLD = np.radians(.5)
+    
+    
     for i,v in enumerate(mask):
-        if v==1: 
+        if v==1:
+            lm_cand = pts_3d_frame1_hom_norm[pt_iter,:3]
+            angle = angle_between(lm_cand,lm_cand-t_2_1)
+            dist = np.linalg.norm(lm_cand-t_2_1)
+
             if pts_3d_frame1_hom_norm[pt_iter,2]<=0 or \
-               pts_3d_frame1_hom_norm[pt_iter,2]>100:
+                dist > 50.0:
+                #angle < ANGLE_THRESHOLD:
                 #print ("Point is negative")
                 mask[i,0]=0 
                 rows_to_del.append(pt_iter)
             pt_iter +=1
     
     pts_3d_frame1_hom_norm = np.delete(pts_3d_frame1_hom_norm,rows_to_del,axis=0)
+    # Move 3d points to world frame by transforming with T_w_1
     pts_3d_w_hom = pts_3d_frame1_hom_norm @ T_w_1.T
     pts_3d_w = pts_3d_w_hom[:, :3]
     return pts_3d_w, mask
@@ -277,6 +287,11 @@ def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
 
 
 def tiled_features(kp, img_shape, tiley, tilex):
+    '''
+    Given a set of keypoints, this divides the image into a grid and returns 
+    len(kp)/(tilex*tiley) maximum responses within each tell. If that cell doesn't 
+    have enough points it will return all of them.
+    '''
     feat_per_cell = int(len(kp)/(tilex*tiley))
     HEIGHT, WIDTH = img_shape
     assert WIDTH%tiley == 0, "Width is not a multiple of tilex"
@@ -361,6 +376,10 @@ def move_figure(position="top-right"):
         mgr.window.setGeometry(px/2 + d, py/2 + 5*d, px/2 - 2*d, py/2 - 4*d)
 
 def radial_non_max(kp_list, dist):
+    ''' 
+    Given a set of Keypoints this finds the maximum response within radial 
+    distance from each other 
+    '''
     kp = np.array(kp_list)
     kp_mask = np.ones(len(kp), dtype=bool)
     pts = [k.pt for k in kp]
@@ -384,3 +403,15 @@ def remove_redundant_newkps(kp_new, kp_old, dist):
     idx = tree.query_ball_point(new_feat_pts, dist, p=2., eps=0, n_jobs=1)
     newpt_mask = idx.astype(bool)
     return kp_new[~newpt_mask]
+
+
+def unit_vector(vector):
+    """ Returns the unit vector of the vector.  """
+    return vector / np.linalg.norm(vector)
+
+def angle_between(v1, v2):
+    """ Returns the angle in radians between vectors 'v1' and 'v2'::
+    """
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
