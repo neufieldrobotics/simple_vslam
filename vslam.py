@@ -14,6 +14,7 @@ import yaml
 import glob
 import re
 import argparse
+import traceback
 np.set_printoptions(precision=3,suppress=True)
 import multiprocessing as mp
 from colorama import Fore, Style
@@ -23,31 +24,34 @@ from colorama import Fore, Style
 PROCESS FRAME
 '''
 frame_no = 3
-def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc, kp_prev_cand, lm_prev, T_prev, corners_prev_ud):
+def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc, kp_prev_cand, lm_prev, T_prev):
     global frame_no, cam_pose_trail, cam_trail_pts, cam_pose
     time_start = time.time()
-#    gr_curr = cv2.cvtColor(img_curr,cv2.COLOR_BGR2GRAY)
-    print("Time elapsed in converting to gray: ",time.time()-time_start)
 
-#    if USE_CLAHE: gr_curr = clahe.apply(gr_curr)
-    print("Time elapsed in CLAHE: ",time.time()-time_start)
-
-    
     kp_curr_matchpc, mask_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
                                     kp_prev_matchpc, None, **config_dict['KLT_settings'])
-    kp_curr_cand_matchpc, mask_cand_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
-                                              kp_prev_cand, None, **config_dict['KLT_settings'])
-    
-    print("Time elapsed in optical flow: ",time.time()-time_start)
 
     print ("KLT Tracked: ",np.sum(mask_klt)," of total ",len(kp_prev_matchpc),"keypoints")
-    print ("KLT Candidates Tracked: ",np.sum(mask_cand_klt)," of total ",len(kp_prev_cand),"keypoints")
-
-    # Filter out points that are not tracked
     kp_prev_matchpc = kp_prev_matchpc[mask_klt[:,0].astype(bool)]
     kp_curr_matchpc = kp_curr_matchpc[mask_klt[:,0].astype(bool)]
-    kp_prev_cand = kp_prev_cand[mask_cand_klt[:,0].astype(bool)]
-    kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_cand_klt[:,0].astype(bool)]
+
+    
+    if len(kp_prev_cand)>0:
+        kp_curr_cand_matchpc, mask_cand_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
+                                                            kp_prev_cand, None, **config_dict['KLT_settings'])
+        print ("KLT Candidates Tracked: ",np.sum(mask_cand_klt)," of total ",len(kp_prev_cand),"keypoints")
+        kp_prev_cand = kp_prev_cand[mask_cand_klt[:,0].astype(bool)]
+        kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_cand_klt[:,0].astype(bool)]
+    else: 
+        kp_curr_cand_matchpc = np.zeros([0,1,2])
+        print ("No New KLT Candidates Tracked. ")
+        
+    print("Time elapsed in optical flow: ",time.time()-time_start)
+
+    # Filter out points that are not tracked
+    #print("kp_prev_cand: ",kp_prev_cand)
+    #print("kp_curr_cand_matchpc: ",kp_curr_cand_matchpc)
+
     lm_prev = lm_prev[mask_klt[:,0].astype(bool)]
     
     # Merge tracked LM and candidate pts to filter together in findEssential
@@ -84,9 +88,11 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc
     
     img_track_feat = draw_point_tracks(kp_prev_matchpc,gr_curr_masked,
                                        kp_curr_matchpc,mask_RP_feat, False)
-    img_track_all = draw_point_tracks(kp_prev_cand,img_track_feat,
-                                      kp_curr_cand_matchpc,mask_RP_cand, False, 
-                                      color=[255,255,0])
+    if len(kp_curr_cand_matchpc)>0:
+        img_track_all = draw_point_tracks(kp_prev_cand,img_track_feat,
+                                          kp_curr_cand_matchpc,mask_RP_cand, False, 
+                                          color=[255,255,0])
+    else: img_track_all = img_track_feat
     print("Time elapsed in drawing tracks: ",time.time()-time_start)
 
 
@@ -106,21 +112,13 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc
         print ("PNP faile in frame ",frame_no," Exiting...")
         exit()
                        
-    if CHESSBOARD:
-        ret, corners_curr = cv2.findChessboardCorners(gr_curr, (16,9),None)
-        corners_curr_ud = cv2.undistortPoints(corners_curr,K,D)
-    
-        corners = triangulate(T_prev, T_cur, corners_prev_ud, corners_curr_ud)
-        graph = plot_3d_points(ax2, corners, linestyle="", marker=".", markersize=2, 
-                               color='black' if frame_no%2==0 else 'orange')
-    else:
-        corners_curr_ud = None
     
     kp_prev_cand_ud = kp_prev_all_ud[-len(kp_prev_cand):]
     kp_curr_cand_ud = kp_curr_all_ud[-len(kp_prev_cand):]
     
-    kp_prev_cand = kp_prev_cand[mask_RP_cand[:,0].astype(bool)]    
-    kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_RP_cand[:,0].astype(bool)]    
+    if len(kp_prev_cand)>0:
+        kp_prev_cand = kp_prev_cand[mask_RP_cand[:,0].astype(bool)]    
+        kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_RP_cand[:,0].astype(bool)]    
     kp_prev_cand_ud = kp_prev_cand_ud[mask_RP_cand[:,0].astype(bool)]
     kp_curr_cand_ud = kp_curr_cand_ud[mask_RP_cand[:,0].astype(bool)]
     
@@ -130,8 +128,10 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc
 
     print("Point after rejection in triangulation: ", np.sum(mask_tri)," out of length: ", len(mask_tri))
     
-    img_rej_pts = draw_point_tracks(kp_prev_cand, img_track_all, 
-                                    kp_curr_cand_matchpc, 1-mask_tri, False, color=[255,0,0])
+    if len(kp_prev_cand)>0:
+        img_rej_pts = draw_point_tracks(kp_prev_cand, img_track_all, 
+                                        kp_curr_cand_matchpc, 1-mask_tri, False, color=[255,0,0])
+    else: img_rej_pts = img_track_all
     print("Time elapsed in draw pt tracks: ",time.time()-time_start)
 
     #fig1_image.set_data(img_rej_pts)
@@ -188,27 +188,14 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc
 
     print ("FRAME deq "+str(frame_no)+" COMPLETE")
 
-    return gr_curr, kp_curr_matchpc,  kp_curr_cand_pts, lm_updated, T_cur, corners_curr_ud
+    return gr_curr, kp_curr_matchpc,  kp_curr_cand_pts, lm_updated, T_cur
 
 def preprocess_frame(image_name, detector, mask_name=None, clahe_obj=None, tiling=None, rnm_radius=None):
-    global USE_CLAHE
-    print("Pre-processing function with: "+image_name)
+    print("Pre-processing image: "+image_name)
 
     pt = time.time()
     img = cv2.imread(image_name)
-    print("Image read", img.shape)
-    '''
-    fig1 = plt.figure(1)
-    fig1_image = plt.imshow(img)
-    plt.title('Image 1 to 2 matches')
-    plt.axis("off")
-    fig1.subplots_adjust(0,0,1,1)
-    plt.draw()
-    plt.pause(1)    #raise Exception('general exceptions not caught by specific handling')
-    '''
     gr = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-    print("Grayscale done")
-    sys.stdout.flush()
 
     if mask_name is not None:
         mask = cv2.imread(mask_name,cv2.IMREAD_GRAYSCALE)
@@ -217,24 +204,18 @@ def preprocess_frame(image_name, detector, mask_name=None, clahe_obj=None, tilin
     if clahe_obj is not None: gr = clahe_obj.apply(gr)
     
     kp = detector.detect(gr,mask)
-    print ("New feature candidates detected: "+str(len(kp)))
-    #sys.stdout.flush()
+    pbf = "New feature candidates detected: "+str(len(kp))
     
     if tiling is not None:
-        #print(TILEY, TILEX)
-        #print(gr.shape)
         kp = tiled_features(kp, gr.shape, *tiling)
-        print ("candidates points after tiling supression: ",len(kp), flush=True)
-        #sys.stdout.flush()
+        pbf += " > tiling supression: "+str(len(kp))
     
     if rnm_radius is not None:
         kp = radial_non_max(kp,rnm_radius)
-        print ("candidates points after radial supression: ",len(kp), flush=True)
-        #sys.stdout.flush()
+        pbf += " > radial supression: "+str(len(kp))
     
     kp_pts = np.expand_dims(np.array([o.pt for o in kp],dtype='float32'),1)
-    print("pre-processing time is", time.time()-pt, flush=True)
-    #sys.stdout.flush()
+    print(pbf+"\nPre-processing time is", time.time()-pt)
     return gr, mask, kp_pts
 
 def reader_proc(queue):
@@ -267,22 +248,24 @@ def writer(imgnames, masknames, config_dict, queue):
     
     print('Starting writer process...', flush=True)
     
-    for i in range(len(imgnames)):
-        print("i is:"+str(i) )
-        while queue.full():
-            time.sleep(0.1)
-            print(Fore.GREEN+"Writer queue full, waiting..."+Style.RESET_ALL)
-        #print(Fore.GREEN+"Pre-processing image: ",imgnames[i]+Style.RESET_ALL+"reset")
-        print("Pre-processing image: "+imgnames[i])
-        #queue.put(preprocess_frame(imgnames[i], masknames[i]))
-        if USE_MASKS:
-            queue.put(preprocess_frame(imgnames[i], detector, masknames[i], clahe, 
-                                       tiling, RADIAL_NON_MAX_RADIUS))
-        else: queue.put(preprocess_frame(imgnames[i], detector, None, clahe, 
-                                       tiling, RADIAL_NON_MAX_RADIUS))
-                
-        #print(Fore.GREEN+"Pre-processing completed!!!: "+imgnames[i]+Style.RESET_ALL)
-        print("Pre-processing completed!!!: ",i)
+    try:
+        for i in range(len(imgnames)):
+            if queue.empty(): print(Fore.RED+"Queue empty, reading is slow..."+Style.RESET_ALL)
+            while queue.full():
+                time.sleep(0.1)
+                #print(Fore.GREEN+"Writer queue full, waiting..."+Style.RESET_ALL)
+            if USE_MASKS:
+                queue.put(preprocess_frame(imgnames[i], detector, masknames[i], clahe, 
+                                           tiling, RADIAL_NON_MAX_RADIUS))
+            else: queue.put(preprocess_frame(imgnames[i], detector, None, clahe, 
+                                           tiling, RADIAL_NON_MAX_RADIUS))
+    except KeyboardInterrupt:
+        print ("Keyboard interrupt from me")
+        pass
+    except:
+        traceback.print_exc(file=sys.stdout)
+    
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='This is the simple VSLAM pipeline')
@@ -305,12 +288,12 @@ if __name__ == '__main__':
     K = np.array(config_dict['K'])
     D = np.array(config_dict['D'])
     CHESSBOARD = config_dict['chessboard']
-    TILEY=config_dict['tiling_non_max_tile_y']; 
-    TILEX=config_dict['tiling_non_max_tile_x']; 
-    TILE_KP = config_dict['use_tiling_non_max_supression']
+ #   TILEY=config_dict['tiling_non_max_tile_y']; 
+#    TILEX=config_dict['tiling_non_max_tile_x']; 
+#    TILE_KP = config_dict['use_tiling_non_max_supression']
     USE_MASKS = config_dict['use_masks']
-    USE_CLAHE = config_dict['use_clahe']
-    RADIAL_NON_MAX = config_dict['radial_non_max']
+#    USE_CLAHE = config_dict['use_clahe']
+#    RADIAL_NON_MAX = config_dict['radial_non_max']
     RADIAL_NON_MAX_RADIUS = config_dict['radial_non_max_radius']
     image_folder = config_dict['image_folder']
     image_ext = config_dict['image_ext']
@@ -329,11 +312,7 @@ if __name__ == '__main__':
     assert images is not None, "ERROR: No images read"
     
     print(K,D)
-        
-    img1 = cv2.imread(images[0])
-    img2 = cv2.imread(images[1])
-    #mask = 255 - np.zeros(img1.shape[:2], dtype=np.uint8)
-    
+            
     if USE_MASKS:
         masks_folder = config_dict['masks_folder']
         masks_ext = config_dict['masks_ext']
@@ -341,20 +320,8 @@ if __name__ == '__main__':
                         if re.match('^.*\.'+masks_ext+'$', f, flags=re.IGNORECASE)])
         masks = [masks_full[init_imgs_indx[0]]]+masks_full[init_imgs_indx[1]::img_step]
         assert len(masks)==len(images), "ERROR: Number of masks not equal to number of images"
-        mask1 = cv2.imread(masks[init_imgs_indx[0]],cv2.IMREAD_GRAYSCALE)
-        mask2 = cv2.imread(masks[init_imgs_indx[1]],cv2.IMREAD_GRAYSCALE)
     else:
-        mask1 = None
-        mask2 = None
-        masks = None
-     
-    gr1=cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
-    gr2=cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
-    
-    if USE_CLAHE:
-        clahe = cv2.createCLAHE(**config_dict['CLAHE_settings'])
-        gr1 = clahe.apply(gr1)
-        gr2 = clahe.apply(gr2)
+        masks = None     
     
     #def onClick(event):
     #    print("Click")
@@ -368,34 +335,16 @@ if __name__ == '__main__':
             cue_to_exit = True
     
                 
-    #Initiate ORB detector
-    detector = cv2.ORB_create(**config_dict['ORB_settings'])
-    
     mp.set_start_method('spawn')
     mpqueue = mp.Queue(5) # writer() writes to pqueue from _this_ process
     writer_p = mp.Process(target=writer, args=(images, masks, config_dict, mpqueue,))
-    #reader_p.daemon = True
+    writer_p.daemon = True
     writer_p.start()        # Launch reader_proc() as a separate python process
 
-    # find the keypoints and descriptors with ORB
-    kp1 = detector.detect(gr1,mask1)
-    #kp2 = detector.detect(gr2,mask2)
-    
-    print ("Points detected: ",len(kp1))
-    
-    if TILE_KP:
-        kp1 = tiled_features(kp1, gr1.shape, TILEY, TILEX)
-        print ("Points after tiling supression: ",len(kp1))
-    
-    if RADIAL_NON_MAX:
-        kp1 = radial_non_max(kp1,RADIAL_NON_MAX_RADIUS)
-        print ("Points after radial supression: ",len(kp1))
-    '''
-    lk_params = dict( winSize  = (65,65),
-                      maxLevel = 4,
-                      criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.03))
-    '''
-    kp1_match_12  = np.expand_dims(np.array([o.pt for o in kp1],dtype='float32'),1)
+    gr1, mask1, kp1_match_12 = mpqueue.get()
+    gr2, mask2, kp2_pts = mpqueue.get()
+
+
     kp2_match_12, mask_klt, err = cv2.calcOpticalFlowPyrLK(gr1, gr2, kp1_match_12, None, **config_dict['KLT_settings'])
     print ("KLT tracked: ",np.sum(mask_klt) ," of total ",len(kp1_match_12),"keypoints")
     
@@ -454,19 +403,7 @@ if __name__ == '__main__':
     
     if PLOT_LANDMARKS:
         graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='C0')
-    
-    if CHESSBOARD:
-        ret1, corners1 = cv2.findChessboardCorners(gr1, (16,9),None)
-        ret2, corners2 = cv2.findChessboardCorners(gr2, (16,9),None)
-        
-        corners1_ud = cv2.undistortPoints(corners1,K,D)
-        corners2_ud = cv2.undistortPoints(corners2,K,D)
-       
-        corners_12 = triangulate(np.eye(4), T_1_2, corners1_ud, corners2_ud)
-        graph = plot_3d_points(ax2, corners_12, linestyle="", color='g', marker=".", markersize=2)
-    else:
-        corners2_ud = None
-        
+            
     cam_pose_0 = plot_pose3_on_axes(ax2,np.eye(4), axis_length=0.5)
     cam_pose = plot_pose3_on_axes(ax2, T_1_2, axis_length=1.0)
     
@@ -478,20 +415,7 @@ if __name__ == '__main__':
     
     plt.pause(.01)
     input("Press [enter] to continue.")
-    
-    kp2 = detector.detect(gr2,mask2)
-    print ("KP2 Points detected: ",len(kp2))
-    
-    if TILE_KP:
-        kp2 = tiled_features(kp2, gr2.shape, TILEY, TILEX)
-        print ("Points after tiling supression: ",len(kp2))
-    
-    if RADIAL_NON_MAX:
-        kp2 = radial_non_max(kp2,RADIAL_NON_MAX_RADIUS)
-        print ("Points after radial supression: ",len(kp2))
-    
-    kp2_pts  = np.expand_dims(np.array([o.pt for o in kp2],dtype='float32'),1)
-         
+       
     kp2_pts = remove_redundant_newkps(kp2_pts, kp2_match_12, 5)
     
     print ("Points after redudancy check with current kps: ",len(kp2_pts))
@@ -503,54 +427,30 @@ if __name__ == '__main__':
     
     print ("\n \n FRAME 2 COMPLETE \n \n")
 
-    img3 = cv2.imread(images[init_imgs_indx[1]+img_step])
-    img3_name = images[init_imgs_indx[1]+img_step]
-    
-    if USE_MASKS:
-        mask = cv2.imread(masks[init_imgs_indx[1]+1],cv2.IMREAD_GRAYSCALE)
-        mask_name = masks[init_imgs_indx[1]+1]
-    else:
-        mask_name = None
-    
-    print(kp2_match_12.shape)
-    kp2_match_12 = kp2_match_12[mask_tri_12[:,0].astype(bool)]
-    print(kp2_match_12.shape)
-
-
-    
-    mpqueue.get()
-    mpqueue.get()
-    
-    
     out = process_frame(*mpqueue.get(), gr2, kp2_match_12, 
-                        kp2_pts, landmarks_12, T_1_2, corners2_ud)
+                        kp2_pts, landmarks_12, T_1_2)
         
     print ("\n \n FRAME 3 COMPLETE \n \n")
     
 
-    
-    for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
+    st = time.time()
+
+    #for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
+    i = 0
+    while not mpqueue.empty():
         while(paused):   
             print('.', end='', flush=True)
             plt.pause(0.1)
             if cue_to_exit: break
-        if cue_to_exit: print("EXITING!!!"); break
-        if USE_MASKS:
-            #mask = cv2.imread(masks[i],cv2.IMREAD_GRAYSCALE)
-            mask_name = masks[i]
-        else: 
-            mask_name = None
-        print("Processing image: ",images[i])
-        st = time.time()
-        #img = cv2.imread(images[i])
-        print("Time to read last image: ",time.time()-st)
+        if cue_to_exit: print("EXITING!!!"); raise SystemExit(0)
         
-        print(mask_name)
         out = process_frame(*mpqueue.get(), *out)
 
         print(Fore.RED+"Time to process last frame: "+str(time.time()-st)+Style.RESET_ALL)
+        st = time.time()
+
         plt.pause(0.001)
-        print ("\n \n FRAME ", i ," COMPLETE \n \n")
+        print ("\n \n FRAME seq ", i ," COMPLETE \n \n")
     
     writer_p.join()
     plt.close(fig='all')

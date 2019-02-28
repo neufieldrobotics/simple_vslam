@@ -217,7 +217,6 @@ def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1, center_plot=False, 
 
 
     if line_obj_list is None:
-        print ("None")
         xaplt = axes.plot(linex[:, 0], linex[:, 1], linex[:, 2], 'r-')    
         yaplt = axes.plot(liney[:, 0], liney[:, 1], liney[:, 2], 'g-')    
         zaplt = axes.plot(linez[:, 0], linez[:, 1], linez[:, 2], 'b-')
@@ -227,8 +226,6 @@ def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1, center_plot=False, 
         return [xaplt, yaplt, zaplt]
     
     else:
-        print ("Not None")
-
         line_obj_list[0][0].set_data(linex[:, 0], linex[:, 1])
         line_obj_list[0][0].set_3d_properties(linex[:,2])
         
