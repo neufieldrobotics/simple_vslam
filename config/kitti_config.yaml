@@ -21,7 +21,7 @@ radial_non_max_radius: 5
 image_folder: 'data/kitti/00/image_0'
 image_ext: 'png'
 chessboard: False
-init_image_indxs: [0, 2]
+init_image_indxs: [450, 452]
 image_step: 2
 use_masks: False
 use_clahe: False
