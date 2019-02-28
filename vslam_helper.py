@@ -62,11 +62,12 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
     for i,v in enumerate(mask):
         if v==1:
             lm_cand = pts_3d_frame1_hom_norm[pt_iter,:3]
-            angle = angle_between(lm_cand,lm_cand-t_2_1)
-            dist = np.linalg.norm(lm_cand-t_2_1)
+            #angle = angle_between(lm_cand,lm_cand-t_2_1)
+            #dist = np.linalg.norm(lm_cand-t_2_1)
 
             if pts_3d_frame1_hom_norm[pt_iter,2]<=0 or \
-                dist > 50.0:
+               pts_3d_frame1_hom_norm[pt_iter,2]>100: 
+                #dist > 50.0:
                 #angle < ANGLE_THRESHOLD:
                 #print ("Point is negative")
                 mask[i,0]=0 
