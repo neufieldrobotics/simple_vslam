@@ -25,6 +25,8 @@ PROCESS FRAME
 '''
 frame_no = 3
 def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc, kp_prev_cand, lm_prev, T_prev):
+    print ("len of lm_prev:",len(lm_prev))
+    print ("len of kp_prev_matchpc:",len(kp_prev_matchpc))
     global frame_no, cam_pose_trail, cam_trail_pts, cam_pose
     time_start = time.time()
 
@@ -154,8 +156,9 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc
         graph_newlm = plot_3d_points(ax2, lm_cand, linestyle="", color='C0', marker=".", markersize=2)    
         fig2.canvas.draw_idle(); #plt.pause(0.01)
     
-    
+    print("len of lm updated ", len(lm_updated))
     lm_updated = np.concatenate((lm_updated,lm_cand))
+    print("len of lm updated again ", len(lm_updated))
     kp_curr_matchpc = np.concatenate((kp_curr_matchpc,kp_curr_cand_matchpc))
     
     print("Time elapsed in beofre orb: ",time.time()-time_start)
@@ -403,7 +406,10 @@ if __name__ == '__main__':
     
     if PLOT_LANDMARKS:
         graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='C0')
-            
+    
+    kp2_match_12 = kp2_match_12[mask_tri_12[:,0].astype(bool)]
+    
+        
     cam_pose_0 = plot_pose3_on_axes(ax2,np.eye(4), axis_length=0.5)
     cam_pose = plot_pose3_on_axes(ax2, T_1_2, axis_length=1.0)
     
