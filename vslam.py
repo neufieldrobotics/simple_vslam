@@ -221,14 +221,6 @@ def preprocess_frame(image_name, detector, mask_name=None, clahe_obj=None, tilin
     print(pbf+"\nPre-processing time is", time.time()-pt)
     return gr, mask, kp_pts
 
-def reader_proc(queue):
-    ## Read from the queue; this will be spawned as a separate Process
-    while True:
-        msg = queue.get()         # Read from the queue and do nothing
-        print("got: ",msg)
-        if (msg == 'DONE'):
-            break
-        
 def writer(imgnames, masknames, config_dict, queue):
     TILE_KP = config_dict['use_tiling_non_max_supression']
     USE_MASKS = config_dict['use_masks']
@@ -338,7 +330,7 @@ if __name__ == '__main__':
             cue_to_exit = True
     
                 
-    mp.set_start_method('spawn')
+    mp.set_start_method('fork')
     mpqueue = mp.Queue(5) # writer() writes to pqueue from _this_ process
     writer_p = mp.Process(target=writer, args=(images, masks, config_dict, mpqueue,))
     writer_p.daemon = True
