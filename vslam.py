@@ -15,7 +15,8 @@ import glob
 import re
 import argparse
 np.set_printoptions(precision=3,suppress=True)
-from multiprocessing import Process, Queue
+import multiprocessing as mp
+from colorama import Fore, Style
 
 
 '''
@@ -189,31 +190,51 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc
 
     return gr_curr, kp_curr_matchpc,  kp_curr_cand_pts, lm_updated, T_cur, corners_curr_ud
 
-def preprocess_frame(image_name, mask_name=None):
+def preprocess_frame(image_name, detector, mask_name=None, clahe_obj=None, tiling=None, rnm_radius=None):
+    global USE_CLAHE
+    print("Pre-processing function with: "+image_name)
+
     pt = time.time()
     img = cv2.imread(image_name)
+    print("Image read", img.shape)
+    '''
+    fig1 = plt.figure(1)
+    fig1_image = plt.imshow(img)
+    plt.title('Image 1 to 2 matches')
+    plt.axis("off")
+    fig1.subplots_adjust(0,0,1,1)
+    plt.draw()
+    plt.pause(1)    #raise Exception('general exceptions not caught by specific handling')
+    '''
     gr = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+    print("Grayscale done")
+    sys.stdout.flush()
+
     if mask_name is not None:
         mask = cv2.imread(mask_name,cv2.IMREAD_GRAYSCALE)
     else: mask= None
 
-    if USE_CLAHE: gr = clahe.apply(gr)
+    if clahe_obj is not None: gr = clahe_obj.apply(gr)
     
     kp = detector.detect(gr,mask)
-    print ("New feature candidates detected: ",len(kp))
+    print ("New feature candidates detected: "+str(len(kp)))
+    #sys.stdout.flush()
     
-    if TILE_KP:
-        print(TILEY, TILEX)
-        print(gr.shape)
-        kp = tiled_features(kp, gr.shape, TILEY, TILEX)
-        print ("candidates points after tiling supression: ",len(kp))
+    if tiling is not None:
+        #print(TILEY, TILEX)
+        #print(gr.shape)
+        kp = tiled_features(kp, gr.shape, *tiling)
+        print ("candidates points after tiling supression: ",len(kp), flush=True)
+        #sys.stdout.flush()
     
-    if RADIAL_NON_MAX:
-        kp = radial_non_max(kp,RADIAL_NON_MAX_RADIUS)
-        print ("candidates points after radial supression: ",len(kp))
+    if rnm_radius is not None:
+        kp = radial_non_max(kp,rnm_radius)
+        print ("candidates points after radial supression: ",len(kp), flush=True)
+        #sys.stdout.flush()
     
     kp_pts = np.expand_dims(np.array([o.pt for o in kp],dtype='float32'),1)
-    print("pre-processing time is", time.time()-pt)
+    print("pre-processing time is", time.time()-pt, flush=True)
+    #sys.stdout.flush()
     return gr, mask, kp_pts
 
 def reader_proc(queue):
@@ -224,10 +245,44 @@ def reader_proc(queue):
         if (msg == 'DONE'):
             break
         
-def writer(imgnames, masknames, queue):
-    while True:
-        if not queue.full:
-            queue.put(preprocess_frame(img_name, img_mask))
+def writer(imgnames, masknames, config_dict, queue):
+    TILE_KP = config_dict['use_tiling_non_max_supression']
+    USE_MASKS = config_dict['use_masks']
+    USE_CLAHE = config_dict['use_clahe']
+    RADIAL_NON_MAX = config_dict['radial_non_max']
+         
+    if USE_CLAHE:
+        clahe = cv2.createCLAHE(**config_dict['CLAHE_settings'])
+    else: clahe = None
+    
+    if TILE_KP:
+        tiling=[config_dict['tiling_non_max_tile_y'], config_dict['tiling_non_max_tile_x']]
+    else: tiling = None
+    
+    if RADIAL_NON_MAX:
+        RADIAL_NON_MAX_RADIUS = config_dict['radial_non_max_radius']
+    else: RADIAL_NON_MAX_RADIUS = None
+    
+    detector = cv2.ORB_create(**config_dict['ORB_settings'])  
+    
+    print('Starting writer process...', flush=True)
+    
+    for i in range(len(imgnames)):
+        print("i is:"+str(i) )
+        while queue.full():
+            time.sleep(0.1)
+            print(Fore.GREEN+"Writer queue full, waiting..."+Style.RESET_ALL)
+        #print(Fore.GREEN+"Pre-processing image: ",imgnames[i]+Style.RESET_ALL+"reset")
+        print("Pre-processing image: "+imgnames[i])
+        #queue.put(preprocess_frame(imgnames[i], masknames[i]))
+        if USE_MASKS:
+            queue.put(preprocess_frame(imgnames[i], detector, masknames[i], clahe, 
+                                       tiling, RADIAL_NON_MAX_RADIUS))
+        else: queue.put(preprocess_frame(imgnames[i], detector, None, clahe, 
+                                       tiling, RADIAL_NON_MAX_RADIUS))
+                
+        #print(Fore.GREEN+"Pre-processing completed!!!: "+imgnames[i]+Style.RESET_ALL)
+        print("Pre-processing completed!!!: ",i)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='This is the simple VSLAM pipeline')
@@ -266,28 +321,33 @@ if __name__ == '__main__':
     paused = False
     cue_to_exit = False
     
-    images = sorted([f for f in glob.glob(path+image_folder+'/*') 
+    images_full = sorted([f for f in glob.glob(path+image_folder+'/*') 
                      if re.match('^.*\.'+image_ext+'$', f, flags=re.IGNORECASE)])
+    
+    images = [images_full[init_imgs_indx[0]]]+images_full[init_imgs_indx[1]::img_step]
+    
     assert images is not None, "ERROR: No images read"
     
     print(K,D)
-    
-    img1 = cv2.imread(images[init_imgs_indx[0]])
-    img2 = cv2.imread(images[init_imgs_indx[1]])
+        
+    img1 = cv2.imread(images[0])
+    img2 = cv2.imread(images[1])
     #mask = 255 - np.zeros(img1.shape[:2], dtype=np.uint8)
     
     if USE_MASKS:
         masks_folder = config_dict['masks_folder']
         masks_ext = config_dict['masks_ext']
-        masks = sorted([f for f in glob.glob(path+masks_folder+'/*') 
+        masks_full = sorted([f for f in glob.glob(path+masks_folder+'/*') 
                         if re.match('^.*\.'+masks_ext+'$', f, flags=re.IGNORECASE)])
+        masks = [masks_full[init_imgs_indx[0]]]+masks_full[init_imgs_indx[1]::img_step]
         assert len(masks)==len(images), "ERROR: Number of masks not equal to number of images"
         mask1 = cv2.imread(masks[init_imgs_indx[0]],cv2.IMREAD_GRAYSCALE)
         mask2 = cv2.imread(masks[init_imgs_indx[1]],cv2.IMREAD_GRAYSCALE)
     else:
         mask1 = None
         mask2 = None
-    
+        masks = None
+     
     gr1=cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
     gr2=cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
     
@@ -311,6 +371,12 @@ if __name__ == '__main__':
     #Initiate ORB detector
     detector = cv2.ORB_create(**config_dict['ORB_settings'])
     
+    mp.set_start_method('spawn')
+    mpqueue = mp.Queue(5) # writer() writes to pqueue from _this_ process
+    writer_p = mp.Process(target=writer, args=(images, masks, config_dict, mpqueue,))
+    #reader_p.daemon = True
+    writer_p.start()        # Launch reader_proc() as a separate python process
+
     # find the keypoints and descriptors with ORB
     kp1 = detector.detect(gr1,mask1)
     #kp2 = detector.detect(gr2,mask2)
@@ -449,11 +515,19 @@ if __name__ == '__main__':
     print(kp2_match_12.shape)
     kp2_match_12 = kp2_match_12[mask_tri_12[:,0].astype(bool)]
     print(kp2_match_12.shape)
+
+
+    
+    mpqueue.get()
+    mpqueue.get()
     
     
-    out = process_frame(*preprocess_frame(img3_name, mask_name), gr2, kp2_match_12, kp2_pts, landmarks_12, T_1_2, corners2_ud)
+    out = process_frame(*mpqueue.get(), gr2, kp2_match_12, 
+                        kp2_pts, landmarks_12, T_1_2, corners2_ud)
         
     print ("\n \n FRAME 3 COMPLETE \n \n")
+    
+
     
     for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
         while(paused):   
@@ -472,9 +546,11 @@ if __name__ == '__main__':
         print("Time to read last image: ",time.time()-st)
         
         print(mask_name)
-        out = process_frame(*preprocess_frame(images[i], mask_name), *out)
-        print("Time to process last frame: ",time.time()-st)
+        out = process_frame(*mpqueue.get(), *out)
+
+        print(Fore.RED+"Time to process last frame: "+str(time.time()-st)+Style.RESET_ALL)
         plt.pause(0.001)
         print ("\n \n FRAME ", i ," COMPLETE \n \n")
     
+    writer_p.join()
     plt.close(fig='all')
