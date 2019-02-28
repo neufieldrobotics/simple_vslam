@@ -18,7 +18,7 @@ import traceback
 np.set_printoptions(precision=3,suppress=True)
 import multiprocessing as mp
 from colorama import Fore, Style
-
+from itertools import cycle
 
 '''
 PROCESS FRAME
@@ -27,7 +27,7 @@ frame_no = 3
 def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc, kp_prev_cand, lm_prev, T_prev):
     print ("len of lm_prev:",len(lm_prev))
     print ("len of kp_prev_matchpc:",len(kp_prev_matchpc))
-    global frame_no, cam_pose_trail, cam_trail_pts, cam_pose
+    global frame_no, cam_pose_trail, cam_trail_pts, cam_pose, new_lm_graph
     time_start = time.time()
 
     kp_curr_matchpc, mask_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
@@ -48,7 +48,7 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc
         kp_curr_cand_matchpc = np.zeros([0,1,2])
         print ("No New KLT Candidates Tracked. ")
         
-    print("Time elapsed in optical flow: ",time.time()-time_start)
+    print("Time elapsed in optical flow: ",time.time()-time_start); time_start = time.time()
 
     # Filter out points that are not tracked
     #print("kp_prev_cand: ",kp_prev_cand)
@@ -63,12 +63,12 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc
     kp_prev_all_ud = cv2.undistortPoints(kp_prev_all,K,D)
     kp_curr_all_ud = cv2.undistortPoints(kp_curr_all,K,D)
 
-    print("Time elapsed in undistort: ",time.time()-time_start)
+    print("Time elapsed in undistort: ",time.time()-time_start); time_start = time.time()
 
     E, mask_e_all = cv2.findEssentialMat(kp_prev_all_ud, kp_curr_all_ud, focal=1.0, pp=(0., 0.), 
                                    method=cv2.RANSAC, prob=0.999, threshold=0.001)
     essen_mat_pts = np.sum(mask_e_all)  
-    print("Time elapsed in find E: ",time.time()-time_start)
+    print("Time elapsed in find E: ",time.time()-time_start); time_start = time.time()
 
     
     print ("Essential matrix: used ",essen_mat_pts ," of total ",len(kp_curr_all),"matches")
@@ -95,7 +95,7 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc
                                           kp_curr_cand_matchpc,mask_RP_cand, False, 
                                           color=[255,255,0])
     else: img_track_all = img_track_feat
-    print("Time elapsed in drawing tracks: ",time.time()-time_start)
+    print("Time elapsed in drawing tracks: ",time.time()-time_start);time_start = time.time()
 
 
     #fig1_image.set_data(img_track_all)
@@ -126,7 +126,7 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc
     
     lm_cand, mask_tri = triangulate(T_prev, T_cur, kp_prev_cand_ud, 
                                     kp_curr_cand_ud, None)
-    print("Time elapsed in triangulate: ",time.time()-time_start)
+    print("Time elapsed in triangulate: ",time.time()-time_start); time_start = time.time()
 
     print("Point after rejection in triangulation: ", np.sum(mask_tri)," out of length: ", len(mask_tri))
     
@@ -134,15 +134,19 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc
         img_rej_pts = draw_point_tracks(kp_prev_cand, img_track_all, 
                                         kp_curr_cand_matchpc, 1-mask_tri, False, color=[255,0,0])
     else: img_rej_pts = img_track_all
-    print("Time elapsed in draw pt tracks: ",time.time()-time_start)
+    print("Time elapsed in draw pt tracks: ",time.time()-time_start); time_start = time.time()
 
     #fig1_image.set_data(img_rej_pts)
     #fig1.canvas.draw_idle(); #plt.pause(0.01)
-    print("Time elapsed in draw pt track SET DATA: ",time.time()-time_start)
+    #print("Time elapsed in draw pt track SET DATA: ",time.time()-time_start)
 
     #lm_updated = lm_prev[mask_RP_feat[:,0]==1]
     kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_tri[:,0].astype(bool)]
-
+    
+    try:    
+        new_lm_graph.remove()
+    except NameError:
+        pass
     new_lm_graph = plot_3d_points(ax2, lm_cand, linestyle="", color='r', marker=".", markersize=2)
     plot_pose3_on_axes(ax2, T_cur, axis_length=2.0, center_plot=True, line_obj_list=cam_pose)
     
@@ -187,8 +191,6 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc
     
     frame_no += 1
     
-    new_lm_graph.remove()
-
     print ("FRAME deq "+str(frame_no)+" COMPLETE")
 
     return gr_curr, kp_curr_matchpc,  kp_curr_cand_pts, lm_updated, T_cur
@@ -260,6 +262,7 @@ def writer(imgnames, masknames, config_dict, queue):
     except:
         traceback.print_exc(file=sys.stdout)
     
+    print("Finished pre-processing all images")
 
 
 if __name__ == '__main__':
@@ -330,7 +333,7 @@ if __name__ == '__main__':
             cue_to_exit = True
     
                 
-    mp.set_start_method('fork')
+    mp.set_start_method('spawn')
     mpqueue = mp.Queue(5) # writer() writes to pqueue from _this_ process
     writer_p = mp.Process(target=writer, args=(images, masks, config_dict, mpqueue,))
     writer_p.daemon = True
@@ -434,21 +437,33 @@ if __name__ == '__main__':
     st = time.time()
 
     #for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
+    spinner = cycle(['|', '/', '-', '\\'])
     i = 0
     while not mpqueue.empty():
         while(paused):   
-            print('.', end='', flush=True)
+            print('\b'+next(spinner), end='', flush=True)
             plt.pause(0.1)
             if cue_to_exit: break
         if cue_to_exit: print("EXITING!!!"); raise SystemExit(0)
         
-        out = process_frame(*mpqueue.get(), *out)
+        ft = time.time()
+        
+        ppd = mpqueue.get()
+        print(Fore.RED+"Time for ppd: "+str(time.time()-ft)+Style.RESET_ALL)
+        
+        out = process_frame(*ppd, *out)
 
         print(Fore.RED+"Time to process last frame: "+str(time.time()-st)+Style.RESET_ALL)
+        print(Fore.RED+"Time in the function: "+str(time.time()-ft)+Style.RESET_ALL)
+
         st = time.time()
 
         plt.pause(0.001)
         print ("\n \n FRAME seq ", i ," COMPLETE \n \n")
     
     writer_p.join()
+    while(True):   
+        print('\b'+next(spinner), end='', flush=True)
+        plt.pause(0.5)
+        if cue_to_exit: break
     plt.close(fig='all')
