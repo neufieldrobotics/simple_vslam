@@ -72,13 +72,14 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc
 
     
     print ("Essential matrix: used ",essen_mat_pts ," of total ",len(kp_curr_all),"matches")
-    '''
-    # Recover Pose filtering is breaking under certain conditions. Leave out for now.
-    _, _, _, mask_RP_all = cv2.recoverPose(E, kp_prev_all_ud, kp_curr_all_ud, np.eye(3), 100.0, mask=mask_e_all)
-    print ("Recover pose: used ",np.sum(mask_RP_all) ," of total ",essen_mat_pts," matches")
-    '''   
-    mask_RP_all = mask_e_all
-  
+    
+    if FILTER_RP:
+        # Recover Pose filtering is breaking under certain conditions. Leave out for now.
+        _, _, _, mask_RP_all = cv2.recoverPose(E, kp_prev_all_ud, kp_curr_all_ud, np.eye(3), 100.0, mask=mask_e_all)
+        print ("Recover pose: used ",np.sum(mask_RP_all) ," of total ",essen_mat_pts," matches")
+    else: 
+        mask_RP_all = mask_e_all
+    
     # Split the combined mask to lm features and candidates
     mask_RP_feat = mask_RP_all[:len(kp_prev_matchpc)]
     mask_RP_cand = mask_RP_all[-len(kp_prev_cand):]
@@ -258,7 +259,7 @@ def writer(imgnames, masknames, config_dict, queue):
                                            tiling, RADIAL_NON_MAX_RADIUS))
     except KeyboardInterrupt:
         print ("Keyboard interrupt from me")
-        pass
+        passqq
     except:
         traceback.print_exc(file=sys.stdout)
     
@@ -298,7 +299,8 @@ if __name__ == '__main__':
     init_imgs_indx = config_dict['init_image_indxs']
     img_step = config_dict['image_step']
     PAUSES = False
-    PLOT_LANDMARKS = False
+    PLOT_LANDMARKS = True
+    FILTER_RP = False
     paused = False
     cue_to_exit = False
     
@@ -460,6 +462,7 @@ if __name__ == '__main__':
 
         plt.pause(0.001)
         print ("\n \n FRAME seq ", i ," COMPLETE \n \n")
+        i+= 1
     
     writer_p.join()
     while(True):   

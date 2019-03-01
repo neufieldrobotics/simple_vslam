@@ -44,7 +44,7 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
     print ("P_2_1: ", P_2_1)
     
     t_2_1 = T_2_1[:3,-1]
-    
+    print("pts_1: ",pts_1.shape)
     # Calculate points in 0,0,0 frame
     if mask is None:
         pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1, pts_2).T
@@ -62,11 +62,15 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
     for i,v in enumerate(mask):
         if v==1:
             lm_cand = pts_3d_frame1_hom_norm[pt_iter,:3]
+            p1 = pts_1[i,0,:]
+            p2 = pts_2[i,0,:]
+            pdist = np.linalg.norm(p2-p1)
             #angle = angle_between(lm_cand,lm_cand-t_2_1)
             #dist = np.linalg.norm(lm_cand-t_2_1)
 
             if pts_3d_frame1_hom_norm[pt_iter,2]<=0 or \
-               pts_3d_frame1_hom_norm[pt_iter,2]>100: 
+               pts_3d_frame1_hom_norm[pt_iter,2]>100 or \
+               pdist < .01: 
                 #dist > 50.0:
                 #angle < ANGLE_THRESHOLD:
                 #print ("Point is negative")
