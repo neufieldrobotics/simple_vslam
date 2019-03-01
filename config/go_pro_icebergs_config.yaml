@@ -16,12 +16,12 @@ tiling_non_max_tile_x: 12
 use_tiling_non_max_supression: True
 
 radial_non_max: True
-radial_non_max_radius: 25
+radial_non_max_radius: 30
 
 image_folder: 'data/Lars2_081018'
 image_ext: 'jpg'
 chessboard: False
-init_image_indxs: [150, 155]
+init_image_indxs: [230, 235]
 image_step: 4
 use_clahe: True
 use_masks: True
@@ -44,6 +44,6 @@ ORB_settings:
  scoreType: 0
 
 KLT_settings:
- criteria: !!python/tuple [3, 50, 0.01] #criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.03))
- maxLevel: 4
- winSize: !!python/tuple [125,125]
+ criteria: !!python/tuple [3, 100, 0.001] #criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.03))
+ maxLevel: 2
+ winSize: !!python/tuple [45,45]

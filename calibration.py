@@ -34,7 +34,7 @@ objp = objp * CHESSBOARD_SIZE
 objpoints = [] # 3d point in real world space
 imgpoints = [] # 2d points in image plane.
 
-images = glob.glob(path+'data/goprocalib_80.75mm_target_set_2/*.JPG')
+images = glob.glob(path+'data/goprocalib_80.75mm_target_set_2_800x600/*.png')
 #cv2.namedWindow('image', cv2.WINDOW_NORMAL)
 #cv2.resizeWindow('image', (800,600))
 
