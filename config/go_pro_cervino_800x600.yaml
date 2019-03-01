@@ -4,34 +4,36 @@
 #- [0, 0, 1]])
 
 K:
-- [718.856, 0.0, 607.1928]
-- [0.0, 718.856, 185.2157]
+- [699.33112889, 0.0, 403.23876197]
+- [0.0, 693.66457792, 293.40739086]
 - [0.0, 0.0, 1.0]
 
 D: 
-- [0.0, 0.0, 0.0, 0.0, 0.0]
+- [-2.78089511e-01,  1.30037134e-01, -1.17555797e-04, -1.55337290e-04, -4.34486330e-02]
 
-tiling_non_max_tile_y: 17 
-tiling_non_max_tile_x: 8 
+tiling_non_max_tile_y: 8 
+tiling_non_max_tile_x: 6 
 use_tiling_non_max_supression: True
 
 radial_non_max: True
-radial_non_max_radius: 5
+radial_non_max_radius: 10
 
-image_folder: 'data/kitti/00/image_0'
+image_folder: 'data/time_lapse_5_cervino_800x600'
 image_ext: 'png'
 chessboard: False
-init_image_indxs: [0, 5]
+init_image_indxs: [0, 4]
 image_step: 4
-use_masks: False
 use_clahe: True
+use_masks: False
+masks_folder: 'data/time_lapse_5_cervino_800x600_masks_out'
+masks_ext: 'png'
 
 CLAHE_settings:
  clipLimit: 10.0
  tileGridSize: !!python/tuple [8,6]
 
 ORB_settings:
- WTA_K: 4
+ WTA_K: 2
  edgeThreshold: 31
  patchSize: 31
  fastThreshold: 5
