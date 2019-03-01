@@ -16,15 +16,15 @@ tiling_non_max_tile_x: 6
 use_tiling_non_max_supression: True
 
 radial_non_max: True
-radial_non_max_radius: 10
+radial_non_max_radius: 5
 
 image_folder: 'data/time_lapse_5_cervino_800x600'
 image_ext: 'png'
 chessboard: False
-init_image_indxs: [0, 4]
-image_step: 4
-use_clahe: True
-use_masks: False
+init_image_indxs: [1025, 1035]
+image_step: 2
+use_clahe: False
+use_masks: True
 masks_folder: 'data/time_lapse_5_cervino_800x600_masks_out'
 masks_ext: 'png'
 
@@ -44,6 +44,6 @@ ORB_settings:
  scoreType: 0
 
 KLT_settings:
- criteria: !!python/tuple [3, 50, 0.01] #criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.03))
+ criteria: !!python/tuple [3, 500, 0.001] #criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.03))
  maxLevel: 4
- winSize: !!python/tuple [25,25]
+ winSize: !!python/tuple [15,15]
