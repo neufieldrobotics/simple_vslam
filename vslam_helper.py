@@ -69,8 +69,8 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
             #dist = np.linalg.norm(lm_cand-t_2_1)
 
             if pts_3d_frame1_hom_norm[pt_iter,2]<=0 or \
-               pts_3d_frame1_hom_norm[pt_iter,2]>100 or \
-               pdist < .01: 
+               pts_3d_frame1_hom_norm[pt_iter,2]>100: #or \
+               #pdist < .01: 
                 #dist > 50.0:
                 #angle < ANGLE_THRESHOLD:
                 #print ("Point is negative")
@@ -129,6 +129,8 @@ def draw_points(vis_orig, points, color = (0, 255, 0), thick = 3):
     if vis_orig.shape[2] == 3: vis = vis_orig
     else: vis = cv2.cvtColor(vis_orig,cv2.COLOR_GRAY2RGB)
     rad = int(vis.shape[1]/200)
+    thick = round(vis.shape[1]/1000)
+
     for pt in points:
         cv2.circle(vis, (int(pt[0]), int(pt[1])), rad , color, thickness=thick)
     return vis
@@ -136,6 +138,7 @@ def draw_points(vis_orig, points, color = (0, 255, 0), thick = 3):
 def draw_arrows(vis_orig, points1, points2, color = (0, 255, 0), thick = 3):
     if len(vis_orig.shape) == 2: vis = cv2.cvtColor(vis_orig,cv2.COLOR_GRAY2RGB)
     else: vis = vis_orig
+    thick = round(vis.shape[1]/1000)+1
     for p1,p2 in zip(points1,points2):
         cv2.arrowedLine(vis, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1])), color=color, thickness=thick)
     return vis
