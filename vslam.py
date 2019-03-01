@@ -376,6 +376,7 @@ if __name__ == '__main__':
     fig1.subplots_adjust(0,0,1,1)
     plt.draw()
     plt.pause(0.001)
+    fig1.canvas.mpl_connect('key_press_event', onKey)
     input("Press [enter] to continue.")
     
     # Trim the tracked key pts
