@@ -1,0 +1,49 @@
+#K: 
+#- [fx, 0, cx], 
+#- [0, fy, cy], 
+#- [0, 0, 1]])
+
+K:
+- [699.33112889, 0.0, 403.23876197]
+- [0.0, 693.66457792, 293.40739086]
+- [0.0, 0.0, 1.0]
+
+D: 
+- [-2.78089511e-01,  1.30037134e-01, -1.17555797e-04, -1.55337290e-04, -4.34486330e-02]
+
+tiling_non_max_tile_y: 8 
+tiling_non_max_tile_x: 6 
+use_tiling_non_max_supression: True
+
+radial_non_max: True
+radial_non_max_radius: 5
+
+image_folder: 'data/time_lapse_5_cervino_800x600'
+image_ext: 'png'
+chessboard: False
+init_image_indxs: [1025, 1035]
+image_step: 4
+use_clahe: False
+use_masks: True
+masks_folder: 'data/time_lapse_5_cervino_800x600_masks_out'
+masks_ext: 'png'
+
+CLAHE_settings:
+ clipLimit: 10.0
+ tileGridSize: !!python/tuple [8,6]
+
+ORB_settings:
+ WTA_K: 2
+ edgeThreshold: 31
+ patchSize: 31
+ fastThreshold: 5
+ firstLevel: 0
+ nfeatures: 10000
+ nlevels: 8
+ scaleFactor: 1.2
+ scoreType: 0
+
+KLT_settings:
+ criteria: !!python/tuple [3, 500, 0.001] #criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.03))
+ maxLevel: 4
+ winSize: !!python/tuple [15,15]
