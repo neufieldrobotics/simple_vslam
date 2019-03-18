@@ -10,6 +10,8 @@ import cv2
 from matplotlib import pyplot as plt
 from scipy import spatial
 
+def R2d_from_theta(theta):  
+    return np.array([[np.cos(theta), np.sin(theta)],[-np.sin(theta), np.cos(theta)]])
 
 def compose_T(R,t):
     return np.vstack((np.hstack((R,t)),np.array([0, 0, 0, 1])))
@@ -169,6 +171,21 @@ def set_axes_equal(ax):
     radius = 0.5 * np.max(np.abs(limits[:, 1] - limits[:, 0]))
     set_axes_radius(ax, origin, radius)
 
+def plot_pose2_on_axes(axes, pose, axis_length=0.1):
+    """Plot a 2D pose on given axis 'axes' with given 'axis_length'."""
+    # get rotation and translation (center)
+    gRp = pose[:2,:2]  # rotation from pose to global
+    origin = pose[:2,-1]
+
+    # draw the camera axes
+    x_axis = origin + gRp[:, 0] * axis_length
+    line = np.append(origin[np.newaxis], x_axis[np.newaxis], axis=0)
+    axes.plot(line[:, 0], line[:, 1], 'r-')
+
+    y_axis = origin + gRp[:, 1] * axis_length
+    line = np.append(origin[np.newaxis], y_axis[np.newaxis], axis=0)
+    axes.plot(line[:, 0], line[:, 1], 'g-')
+
 def plot_pose3_on_axes(axes, T, axis_length=0.1, center_plot=False):
     """Plot a 3D pose 4x4 homogenous transform  on given axis 'axes' with given 'axis_length'."""
     plot_pose3RT_on_axes(axes, *decompose_T(T), axis_length, center_plot)
@@ -195,6 +212,18 @@ def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1, center_plot=False):
 def plot_3d_points(axes, vals, *args, **kwargs):
     graph, = axes.plot(vals[:,0], vals[:,1], vals[:,2], *args, **kwargs)
     return graph
+
+def plot_g2o_SE2(axes, g2o_obj,text=False):
+    for key in sorted(g2o_obj.vertices().keys()):
+        vert = g2o_obj.vertices()[key]
+        print(vert.estimate().to_vector())
+        vec = vert.estimate().to_vector()
+        R = R2d_from_theta(vec[2])
+        t = np.expand_dims(vec[:2],axis=1)
+        T = np.vstack((np.hstack((R,t)),np.array([0,0,1])))
+        plot_pose2_on_axes(axes,T, axis_length=10.0)
+        if text:
+            axes.text(t[0,0]+5,t[1,0]+5,str(key))
 
 def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
                         max_y=np.inf):
