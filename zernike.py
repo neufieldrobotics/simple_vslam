@@ -42,7 +42,8 @@ def zernike_generate(nmax,radius,verbose=True):
     generate the zernike filter to caluculate zernike coefficient n,m
     '''
     desc = 0
-    Zfilt=[[None]*(nmax+1)]*(nmax+1)
+    Zfilt=[[None for x in range(nmax+1)] for y in range(nmax+1)]
+    
     for n in range(nmax+1):
         for m in range(n%2,n+1,2):
             desc = desc+1
@@ -50,6 +51,14 @@ def zernike_generate(nmax,radius,verbose=True):
                 print([radius, n, m, desc])
             Zfilt[n][m] = zerfilt(n,m,radius)
     return Zfilt,desc
-        
-      
+     
+'''
+def plot_zernike(Z):
+    #img = np.zeros((len(Z)*(Z[0][0]).shape[0],len(Z[0]*(Z[0][0]).shape[1])))
+    img_list = []
+    for x in Z:
+        row = []
+        for y in x:
+            row.append()
+'''
   
