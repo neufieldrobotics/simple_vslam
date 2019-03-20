@@ -172,7 +172,11 @@ def set_axes_equal(ax):
     set_axes_radius(ax, origin, radius)
 
 def plot_pose2_on_axes(axes, pose, axis_length=0.1):
-    """Plot a 2D pose on given axis 'axes' with given 'axis_length'."""
+    """
+    Plot a 2D pose,  on given axis 'axes' with given 'axis_length'
+    is a 2x3 or 3x3 matrix of the form [R | X] 
+    where R is 2d rotation and X is translation vector.
+    """
     # get rotation and translation (center)
     gRp = pose[:2,:2]  # rotation from pose to global
     origin = pose[:2,-1]
@@ -223,7 +227,7 @@ def plot_g2o_SE2(axes, g2o_obj,text=False):
         T = np.vstack((np.hstack((R,t)),np.array([0,0,1])))
         plot_pose2_on_axes(axes,T, axis_length=10.0)
         if text:
-            axes.text(t[0,0]+5,t[1,0]+5,str(key))
+            axes.text(t[0,0]+5,t[1,0]+5,str(key))            
 
 def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
                         max_y=np.inf):

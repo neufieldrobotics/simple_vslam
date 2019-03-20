@@ -7,7 +7,7 @@ Created on Sat Mar 16 11:02:43 2019
 """
 import numpy as np
 from matlab_imresize.imresize import imresize
-np.set_printoptions(precision=4,suppress=True)
+np.set_printoptions(precision=5,suppress=True)
 from scipy.ndimage import convolve
 from scipy.ndimage.filters import maximum_filter
 import sys
@@ -70,6 +70,9 @@ class ImagePyramid:
             self.sigi += [self.sigi[-1]/self.ratio] 
 
 def feat_extract_p2 (P, zrad, Gi):
+    '''
+    Extract multiscaled features from a Pyramid of 
+    '''
     local_maxima_nhood=3
 
     scales = P.levels
@@ -105,17 +108,18 @@ def feat_extract_p2 (P, zrad, Gi):
     # INITIALIZE feature positions and scales at highest level
     # at highest resolution coordinates of features:
     Fivec = ivec[0]
+    print("len of Fivec:",len(ivec[0]))
     Fjvec = jvec[0]
     Fsvec = np.zeros_like(Fivec) #initial scale 
     Fevec = eig[0][ivec[0],jvec[0]] #access the elements of eig at locations given by ivec,jvec
 
     #i,j position of feature at the characteristic scale
-    Fsivec = Fivec 
-    Fsjvec = Fjvec
+    Fsivec = np.copy(Fivec)
+    Fsjvec = np.copy(Fjvec)
 
     nLvec = nL[0][ivec[0],jvec[0]]
-    pivec = Fivec
-    pjvec = Fjvec
+    pivec = np.copy(Fivec)
+    pjvec = np.copy(Fjvec)
     pind = np.array(list(range(len(Fivec))))
     k = 1
 
@@ -133,8 +137,8 @@ def feat_extract_p2 (P, zrad, Gi):
 
         #scipy.io.savemat('py_orig_vecs.mat', mdict={'pysivec': sivec, 'pysjvec':sjvec })
 
-        csivec = sivec
-        csjvec = sjvec
+        csivec = np.copy(sivec)
+        csjvec = np.copy(sjvec)
         #cloc = sivec+1 + rows*(sjvec)
 
         for u in range(-1,2):  #account for motion of feature points between scales
@@ -173,9 +177,68 @@ def feat_extract_p2 (P, zrad, Gi):
         print(np.sum(Fsvec==k))
         k = k+1
         F = {'ivec':Fivec, 'jvec':Fjvec, 'svec':Fsvec,
-             'evec':Fevec, 'sivec':Fsivec, 'sjec':Fsjvec}
+             'evec':Fevec, 'sivec':Fsivec, 'sjvec':Fsjvec}
     return F
 
+def feat_thresh_sec(F,Nfeats,seci,secj,rows,cols):
+ 
+    Nsec = seci*secj
+    Nfsec = np.ceil(Nfeats/Nsec).astype(int)
+    
+    seclimi = np.linspace(0,rows-1,seci+1)
+    seclimj = np.linspace(0,cols-1,secj+1)
+    
+    Fivec = F['ivec']
+    Fjvec = F['jvec']
+    Fevec = F['evec']
+    select = np.array([],dtype=int) #zeros(size(F.ivec))
+    selind = np.array(list(range(len(ivec))))
+    for i_ll,i_ul in zip(seclimi[:-1],seclimi[1:]):
+        selecti = np.logical_and( ivec >= i_ll , ivec < i_ul)
+        for j_ll,j_ul in zip(seclimj[:-1],seclimj[1:]):
+            selectj = np.logical_and(jvec >= j_ll, jvec < j_ul)
+            selectsec = np.logical_and(selecti, selectj)
+            #print('l of selectsec:',selectsec.shape)
+            evec = Fevec[selectsec]
+            selindsec = selind[selectsec]
+            N,bin_centers = np.histogram(evec,50)
+            X = bin_centers[:-1] + np.diff(bin_centers)/2
+            #print(N, np.sum(N))
+        
+            C = np.cumsum(N[::-1])
+            bins = X[::-1]
+            #print("bins: ",bins)
+            k = 0
+            while C[k] < Nfsec and k < 50:
+                k = k+1
+
+            thresh = bins[k]
+            print(thresh)
+            selecte = evec > thresh
+  
+            while np.sum(selecte) > Nfsec:
+                thresh = thresh*1.2
+                selecte = evec > thresh
+        	
+            while np.sum(selecte) < Nfsec:
+                thresh = thresh*0.9
+                selecte = evec > thresh
+                
+            print("selecte: ", np.sum(selecte))
+            select = np.append(select, selindsec[selecte])
+            
+    print("Len of select:",select.shape)
+    '''
+    Ft.evec = F.evec(select);
+    Ft.ivec = F.ivec(select);
+    Ft.jvec = F.jvec(select);
+    Ft.svec = F.svec(select);
+    Ft.sivec = F.sivec(select);
+    Ft.sjvec = F.sjvec(select);
+    Ft.thresh = thresh;
+ 
+    Ft.Nfeats = length(Ft.ivec);  
+    '''
 def zerrad(n,m,rho):
     R = 0.0
     for s in range(0,int((n-m)/2)+1):
@@ -253,14 +316,17 @@ def z_jet_p2(P,F,z_parameters):
         for m in range(n%2,n+1,2):
             JAcoeff[n][m] = np.zeros(feats)
             JBcoeff[n][m] = np.zeros(feats)
-    '''
-    for k in range(feats+1):
-        sk = Fsvec(k) #scale of feature
-        i_s = Fsivec(k)
-        j_s = Fsjvec(k)
+    
+    for k in range(1): #(feats+1):
+        sk = F['svec'][k] #scale of feature
+        i_s = F['sivec'][k]
+        j_s = F['sjvec'][k]
         # window size
         # [size(P(sk).im) is-zrad is+zrad js-zrad js+zrad]
-        W = P[sk][i_s-zrad:i_s+zrad,j_s-zrad:j_s+zrad]
+        W = P.images[sk][i_s-zrad:i_s+zrad+1,j_s-zrad:j_s+zrad+1]
+        print(W)
+        print("W shape:",W.shape)
+        '''        
         Wh = W-mean(W(:))
         W = Wh./(sum(sum(Wh.^2))).^0.5
     
@@ -273,7 +339,8 @@ def z_jet_p2(P,F,z_parameters):
 	            Bcoef = sum(sum(Wb.*(BstrucZ(n+1,m+1).filt)))
 	            J.A(n+1,m+1).coef(k) = Acoef
 	            J.B(n+1,m+1).coef(k) = Bcoef
-'''
+        '''
+        
 
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/'
@@ -293,7 +360,7 @@ params['levels'] = 6     # pyramid levels
 params['ratio'] = 0.75   # scaling between levels
 params['sigi'] = 2.75    # integration scale 1.4.^[0:7];%1.2.^[0:10];
 params['sigd'] = 1;               # derivation scale
-params['Gi'] = fspecial_gauss(11,params['sigd'])
+params['Gi'] = fspecial_gauss(11,params['sigi'])
 params['zrad'] = np.ceil(params['sigi']*8).astype(int)   
 params['brad'] = np.ceil(0.5*params['zrad']).astype(int) # radius for secondary zernike disk
 params['nmax'] = 8                # zernike order
@@ -302,10 +369,10 @@ params['BstrucZ'],params['BstrucNdesc']=zernike_generate(params['nmax'],params['
 
 P = ImagePyramid(params['levels'],params['ratio'],params['sigd'],params['sigi'])
 P.generate_pyramid(gr1)
-fig, ax1 = plt.subplots(1,1,dpi=200)
-plt.axis("off")
+#fig, ax1 = plt.subplots(1,1,dpi=200)
+#plt.axis("off")
 #plt.imshow(P.lpimages[1],cmap='gray')
-plt.show()
+#plt.show()
 
 F = feat_extract_p2(P,params['zrad'],params['Gi'])
 
