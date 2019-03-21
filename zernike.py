@@ -306,6 +306,9 @@ def z_jet_p2(P,F,z_parameters):
     Jndesc = z_parameters['ZstrucNdesc']
     #Jnmax = nmax 
     brad = z_parameters['brad']
+    Fsvec = F['svec']
+    Fsivec = F['sivec']
+    Fsjvec = F['sjvec']
     
     JAcoeff=[[0 for x in range(nmax+1)] for y in range(nmax+1)]
     JBcoeff=[[0 for x in range(nmax+1)] for y in range(nmax+1)]
@@ -313,18 +316,18 @@ def z_jet_p2(P,F,z_parameters):
     #initialize
     for n in range(nmax+1):
         for m in range(n%2,n+1,2):
-            JAcoeff[n][m] = np.zeros(feats)
-            JBcoeff[n][m] = np.zeros(feats)
+            JAcoeff[n][m] = np.zeros(feats,dtype=complex)
+            JBcoeff[n][m] = np.zeros(feats,dtype=complex)
     
-    for k in range(1): #(feats+1):
-        sk = F['svec'][k] #scale of feature
-        i_s = F['sivec'][k]
-        j_s = F['sjvec'][k]
+    for k in range(feats): #(feats+1):
+        sk = Fsvec[k] #scale of feature
+        i_s = Fsivec[k]
+        j_s = Fsjvec[k]
         # window size
         # [size(P(sk).im) is-zrad is+zrad js-zrad js+zrad]
         W = P.images[sk][i_s-zrad:i_s+zrad+1,j_s-zrad:j_s+zrad+1]
-        print(W)
-        print("W shape:",W.shape)
+        #print(W)
+        #print("W shape:",W.shape)
                 
         Wh = W-np.mean(W)
         W = Wh/(np.sum(Wh**2)**0.5)
@@ -332,15 +335,38 @@ def z_jet_p2(P,F,z_parameters):
         Wb = P.images[sk][i_s-brad:i_s+brad+1,j_s-brad:j_s+brad+1]
         Wbh = Wb-np.mean(Wb)
         Wb = Wbh/((np.sum(Wbh**2))**0.5)
-        '''
-        for n in range(nmax+1):
-            for m = in range(n%2,n+1,2):
-    	        Acoef = sum(sum(W.*(ZstrucZ(n+1,m+1).filt)))
-	            Bcoef = sum(sum(Wb.*(BstrucZ(n+1,m+1).filt)))
-	            J.A(n+1,m+1).coef(k) = Acoef
-	            J.B(n+1,m+1).coef(k) = Bcoef
-        '''
         
+        
+        for n in range(nmax+1):
+            for m in range(n%2,n+1,2):
+                JAcoeff[n][m][k] = np.sum(W*ZstrucZ[n][m])
+                JBcoeff[n][m][k] = np.sum(Wb*BstrucZ[n][m])
+                #J.A(n+1,m+1).coef(k) = Acoef
+                #J.B(n+1,m+1).coef(k) = Bcoef
+    return JAcoeff, JBcoeff
+
+def zinvariants4(JA, JB):
+    '''
+    oriented invariants
+    invariance to affine changes in intensity
+    '''
+    [rows,cols] = size(J.A(1,1).coef)
+    V = zeros(rows,J.ndesc)
+    A = V
+    Vb = V
+    Ab = A
+    #1 through 7 are oriented gradients, relative to maximum direction
+    k = 1
+    for n = 0:J.nmax:
+        for m = [rem(n,2):2:n]:
+            V(:,k) = abs(J.A(n+1,m+1).coef)
+            Vb(:,k) = abs(J.B(n+1,m+1).coef)
+            A(:,k) = angle(J.A(n+1,m+1).coef)
+            Ab(:,k) = angle(J.B(n+1,m+1).coef)
+            k = k+1
+    V = [V Vb]
+    A = [A Ab]
+    alpha = angle(J.A(2,2).coef)
 
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/'
