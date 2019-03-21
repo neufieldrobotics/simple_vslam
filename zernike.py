@@ -191,12 +191,15 @@ def feat_thresh_sec(F,Nfeats,seci,secj,rows,cols):
     Fivec = F['ivec']
     Fjvec = F['jvec']
     Fevec = F['evec']
+    Fsvec = F['svec']
+    Fsivec = F['sivec']
+    Fsjvec = F['sjvec']
     select = np.array([],dtype=int) #zeros(size(F.ivec))
-    selind = np.array(list(range(len(ivec))))
+    selind = np.array(list(range(len(Fivec))))
     for i_ll,i_ul in zip(seclimi[:-1],seclimi[1:]):
-        selecti = np.logical_and( ivec >= i_ll , ivec < i_ul)
+        selecti = np.logical_and( Fivec >= i_ll , Fivec < i_ul)
         for j_ll,j_ul in zip(seclimj[:-1],seclimj[1:]):
-            selectj = np.logical_and(jvec >= j_ll, jvec < j_ul)
+            selectj = np.logical_and(Fjvec >= j_ll, Fjvec < j_ul)
             selectsec = np.logical_and(selecti, selectj)
             #print('l of selectsec:',selectsec.shape)
             evec = Fevec[selectsec]
@@ -213,7 +216,6 @@ def feat_thresh_sec(F,Nfeats,seci,secj,rows,cols):
                 k = k+1
 
             thresh = bins[k]
-            print(thresh)
             selecte = evec > thresh
   
             while np.sum(selecte) > Nfsec:
@@ -223,22 +225,19 @@ def feat_thresh_sec(F,Nfeats,seci,secj,rows,cols):
             while np.sum(selecte) < Nfsec:
                 thresh = thresh*0.9
                 selecte = evec > thresh
-                
-            print("selecte: ", np.sum(selecte))
+            
+            #print(thresh)
+            #print("selecte: ", np.sum(selecte))
             select = np.append(select, selindsec[selecte])
             
-    print("Len of select:",select.shape)
-    '''
-    Ft.evec = F.evec(select);
-    Ft.ivec = F.ivec(select);
-    Ft.jvec = F.jvec(select);
-    Ft.svec = F.svec(select);
-    Ft.sivec = F.sivec(select);
-    Ft.sjvec = F.sjvec(select);
-    Ft.thresh = thresh;
- 
-    Ft.Nfeats = length(Ft.ivec);  
-    '''
+    #print("Len of select:",select.shape)
+    
+    Fout = {'ivec':Fivec[select], 'jvec':Fjvec[select], 'evec':Fevec[select],
+            'sivec':Fsivec[select], 'sjvec':Fsjvec[select], 'svec':Fsvec[select]}
+    Fout['Nfeats']=len(Fout['ivec'])
+    #Fout['thresh'] = thresh
+    return Fout
+
 def zerrad(n,m,rho):
     R = 0.0
     for s in range(0,int((n-m)/2)+1):
@@ -326,13 +325,14 @@ def z_jet_p2(P,F,z_parameters):
         W = P.images[sk][i_s-zrad:i_s+zrad+1,j_s-zrad:j_s+zrad+1]
         print(W)
         print("W shape:",W.shape)
-        '''        
-        Wh = W-mean(W(:))
-        W = Wh./(sum(sum(Wh.^2))).^0.5
+                
+        Wh = W-np.mean(W)
+        W = Wh/(np.sum(Wh**2)**0.5)
     
-        Wb = P[sk][i_s-brad:i_s+brad,j_s-brad:j_s+brad]
-        Wbh = (Wb-mean(Wb(:)))
-        Wb = Wbh./(sum(sum(Wbh.^2))).^0.5
+        Wb = P.images[sk][i_s-brad:i_s+brad+1,j_s-brad:j_s+brad+1]
+        Wbh = Wb-np.mean(Wb)
+        Wb = Wbh/((np.sum(Wbh**2))**0.5)
+        '''
         for n in range(nmax+1):
             for m = in range(n%2,n+1,2):
     	        Acoef = sum(sum(W.*(ZstrucZ(n+1,m+1).filt)))
@@ -375,5 +375,6 @@ P.generate_pyramid(gr1)
 #plt.show()
 
 F = feat_extract_p2(P,params['zrad'],params['Gi'])
+Ft = feat_thresh_sec(F,600,params['seci'],params['secj'],*gr1.shape)
 
-J = z_jet_p2(P,F,params)
+J = z_jet_p2(P,Ft,params)
