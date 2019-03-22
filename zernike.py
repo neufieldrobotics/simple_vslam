@@ -241,7 +241,7 @@ def feat_thresh_sec(F,Nfeats,seci,secj,rows,cols):
 def zerrad(n,m,rho):
     R = 0.0
     for s in range(0,int((n-m)/2)+1):
-         R = R + ((-1)**s*np.math.factorial(n-s)) / \
+        R = R + ((-1)**s*np.math.factorial(n-s)) / \
                  (np.math.factorial(s)* \
                   np.math.factorial(int((n+m)/2-s))* \
                   np.math.factorial(int((n-m)/2-s)) \
@@ -259,11 +259,11 @@ def zerfilt(n,m,r):
     Z = np.zeros((xdim,ydim),dtype=complex)
     
     for y in range(-r,r+1):
-      for x in range (-r,r+1):
-        theta = np.arctan2(y,x)
-        rho = ((x**2+y**2)**0.5)/r
-        if rho <= 1:
-          Z[y+r,x+r] = (n+1)/np.pi*np.exp(-m*theta*1j)*zerrad(n,m,rho)
+        for x in range (-r,r+1):
+            theta = np.arctan2(y,x)
+            rho = ((x**2+y**2)**0.5)/r
+            if rho <= 1:
+                Z[y+r,x+r] = (n+1)/np.pi*np.exp(-m*theta*1j)*zerrad(n,m,rho)
     return Z
 
 def zernike_generate(nmax,radius,verbose=True):
@@ -345,29 +345,32 @@ def z_jet_p2(P,F,z_parameters):
                 #J.B(n+1,m+1).coef(k) = Bcoef
     return JAcoeff, JBcoeff
 
-def zinvariants4(JA, JB):
+def zinvariants4(JA, JB, params):
     '''
     oriented invariants
     invariance to affine changes in intensity
     '''
-    [rows,cols] = size(J.A(1,1).coef)
-    V = zeros(rows,J.ndesc)
-    A = V
-    Vb = V
-    Ab = A
+    rows, = JA[0][0].shape
+    V = np.zeros((rows,params['ZstrucNdesc']))
+    A = np.zeros((rows,params['ZstrucNdesc']))
+    Vb = np.zeros((rows,params['ZstrucNdesc']))
+    Ab = np.zeros((rows,params['ZstrucNdesc']))
+    nmax = params['nmax']
     #1 through 7 are oriented gradients, relative to maximum direction
-    k = 1
-    for n = 0:J.nmax:
-        for m = [rem(n,2):2:n]:
-            V(:,k) = abs(J.A(n+1,m+1).coef)
-            Vb(:,k) = abs(J.B(n+1,m+1).coef)
-            A(:,k) = angle(J.A(n+1,m+1).coef)
-            Ab(:,k) = angle(J.B(n+1,m+1).coef)
+    k = 0
+    for n in range(nmax+1):
+        for m in range(n%2,n+1,2):
+            V[:,k] = np.abs(JA[n][m])
+            Vb[:,k] = np.abs(JB[n][m])
+            A[:,k] = np.angle(JA[n][m])
+            Ab[:,k] = np.angle(JB[n][m])
             k = k+1
-    V = [V Vb]
-    A = [A Ab]
-    alpha = angle(J.A(2,2).coef)
-
+    V = np.hstack((V, Vb))
+    A = np.hstack((A, Ab))
+    alpha = np.angle(JA[1][1])
+    return V,alpha,A
+    
+    
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/'
 else:
@@ -403,4 +406,5 @@ P.generate_pyramid(gr1)
 F = feat_extract_p2(P,params['zrad'],params['Gi'])
 Ft = feat_thresh_sec(F,600,params['seci'],params['secj'],*gr1.shape)
 
-J = z_jet_p2(P,Ft,params)
+JA,JB = z_jet_p2(P,Ft,params)
+V,alpha,A = zinvariants4(JA, JB, params)
