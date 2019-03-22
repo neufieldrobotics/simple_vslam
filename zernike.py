@@ -373,8 +373,7 @@ class MultiHarrisZernike (cv2.Feature2D):
         Ft = self.feat_thresh_sec(F,*gr_img.shape)
         JA,JB = self.z_jet_p2(Ft)
         V,alpha,A = self.zinvariants4(JA, JB)
-        
-        kp = [cv2.KeyPoint(x,y,22,_angle=ang,_response=res,_octave=sc) 
+        kp = [cv2.KeyPoint(x,y,self.zrad*(sc+1)*2,_angle=ang,_response=res,_octave=sc) 
               for x,y,ang,res,sc in zip(Ft['jvec'], Ft['ivec'], np.rad2deg(alpha),
                                         Ft['evec'],Ft['svec'])]
 
@@ -390,31 +389,7 @@ img2 = cv2.imread(path+'data/time_lapse_5_cervino_800x600/G0057826.png',1) # isc
 gr1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
 gr2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
-'''
-params={}
-params['Nfeats']= 600    # number of features per image
-params['seci'] = 2       # number of vertical sectors 
-params['secj'] = 3       # number of horizontal sectors
-params['levels'] = 6     # pyramid levels
-params['ratio'] = 0.75   # scaling between levels
-params['sigi'] = 2.75    # integration scale 1.4.^[0:7];%1.2.^[0:10];
-params['sigd'] = 1;               # derivation scale
-params['Gi'] = fspecial_gauss(11,params['sigi'])
-params['zrad'] = np.ceil(params['sigi']*8).astype(int)   
-params['brad'] = np.ceil(0.5*params['zrad']).astype(int) # radius for secondary zernike disk
-params['nmax'] = 8                # zernike order
-params['ZstrucZ'],params['ZstrucNdesc']=zernike_generate(params['nmax'],params['zrad'],False)
-params['BstrucZ'],params['BstrucNdesc']=zernike_generate(params['nmax'],params['brad'],False)
-'''
-
-#P = ImagePyramid(params['levels'],params['ratio'],params['sigd'],params['sigi'])
-#P.generate_pyramid(gr1)
-#fig, ax1 = plt.subplots(1,1,dpi=200)
-#plt.axis("off")
-#plt.imshow(P.lpimages[1],cmap='gray')
-#plt.show()
-
-a = MultiHarrisZernike()
+a = MultiHarrisZernike(Nfeats=600)
 
 import time
 st = time.time()
@@ -422,8 +397,10 @@ for i in range(1):
     kp, des = a.detectAndCompute(gr1)
 print("elapsed: ",(time.time()-st)/1)
 
-#F = feat_extract_p2(P,params['zrad'],params['Gi'])
-#Ft = feat_thresh_sec(F,600,params['seci'],params['secj'],*gr1.shape)
-
-#JA,JB = z_jet_p2(P,Ft,params)
-#V,alpha,A = zinvariants4(JA, JB, params)
+outImage	 = cv2.drawKeypoints(gr1, kp, gr1,color=[255,255,0],
+                             flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)#cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
+fig, ax= plt.subplots(dpi=200)
+plt.title('Multiscale Harris with Zernike Angles')
+plt.axis("off")
+plt.imshow(outImage)
+plt.show()
