@@ -29,11 +29,9 @@ class MultiHarrisZernike (cv2.Feature2D):
         self.zrad   = np.ceil(self.sigi*8).astype(int) # radius for zernike disk  
         self.brad   = np.ceil(0.5*self.zrad).astype(int)    # radius for secondary zernike disk
         self.Gi     = MultiHarrisZernike.fspecial_gauss(11,self.sigi)
+        self.pyrlpf = MultiHarrisZernike.fspecial_gauss(int(np.ceil(7*self.sigd)),self.sigd)
         self.ZstrucZ, self.ZstrucNdesc = MultiHarrisZernike.zernike_generate(self.nmax, self.zrad)
         self.BstrucZ, self.BstrucNdesc = MultiHarrisZernike.zernike_generate(self.nmax, self.brad)
-        self.Pyramid_obj = MultiHarrisZernike.ImagePyramid(self.levels, self.ratio, self.sigd, self.sigi)
-        
-
         
     @staticmethod
     def fspecial_gauss(size, sigma):
@@ -104,27 +102,19 @@ class MultiHarrisZernike (cv2.Feature2D):
                     axes[n,m].imshow(np.real(Z[n][m]),cmap='gray')
                 axes[n,m].axis('off')
                 
-    class ImagePyramid:
-        def __init__ (self, levels, ratio, sigdec, sigint):
-            self.levels = levels
-            self.ratio = ratio
-            self.images = []
-            self.lpimages = []
-            self.sigd = [sigdec]
-            self.sigi = [sigint]
-            self.lpfilter = MultiHarrisZernike.fspecial_gauss(int(np.ceil(7*sigdec)),sigdec)
-            # Make a note of this 7x7 gaussian kernel, lowering will speed up computation
-            
-        def generate_pyramid(self,img):
-            self.images = [np.float64(img)]
-            self.lpimages = [convolve(self.images[0],self.lpfilter,mode='constant')]
-            for k in range(1,self.levels):
-                #self.images += [cv2.resize(self.images[-1], (0,0), fx=self.ratio,
-                #                          fy=self.ratio, interpolation=cv2.INTER_LINEAR_EXACT)]
-                self.images += [imresize(self.images[-1], self.ratio, method='bilinear')]
-                self.lpimages += [convolve(self.images[-1],self.lpfilter,mode='constant')]
-                self.sigd += [self.sigd[-1]/self.ratio] #equivalent sigdec at max res
-                self.sigi += [self.sigi[-1]/self.ratio] 
+    def generate_pyramid(self,img):
+        sigd_list = [self.sigd]
+        sigi_list = [self.sigi]
+        images = [np.float64(img)]
+        lpimages = [convolve(images[0],self.pyrlpf,mode='constant')]
+        for k in range(1,self.levels):
+            #self.images += [cv2.resize(self.images[-1], (0,0), fx=self.ratio,
+            #                          fy=self.ratio, interpolation=cv2.INTER_LINEAR_EXACT)]
+            images += [imresize(images[-1], self.ratio, method='bilinear')]
+            lpimages += [convolve(images[-1],self.pyrlpf,mode='constant')]
+            sigd_list += [sigd_list[-1]/self.ratio] #equivalent sigdec at max res
+            sigi_list += [sigi_list[-1]/self.ratio] 
+        return {'images':images, 'lpimages':lpimages, 'sigd':sigd_list, 'sigi':sigi_list}
     
     def eigen_image_p(self,lpf,scale):
         '''    
@@ -151,16 +141,17 @@ class MultiHarrisZernike (cv2.Feature2D):
         ef2 = scale**(-2)*0.5*(Tr - sqrterm)
         return ef2,nL     
 
-    def feat_extract_p2 (self):
+    def feat_extract_p2 (self,ImgPyramid):
         '''
-        Extract multiscaled features from a Pyramid of 
+        Extract multiscaled features from a Pyramid of images
         '''
         local_maxima_nhood=3
     
-        scales = self.Pyramid_obj.levels
-        ratio = self.Pyramid_obj.ratio
+        scales = self.levels
+        ratio = self.ratio
         border = self.zrad
-        [rows,cols] = self.Pyramid_obj.lpimages[0].shape
+        lpimages = ImgPyramid['lpimages']
+        [rows,cols] = lpimages[0].shape
     
         eig = [None] * scales
         nL = [None] * scales
@@ -170,7 +161,7 @@ class MultiHarrisZernike (cv2.Feature2D):
         jvec= [None] * scales
     
         for k in range(scales):
-            [eig[k], nL[k]] = self.eigen_image_p(self.Pyramid_obj.lpimages[k],ratio**(k))
+            [eig[k], nL[k]] = self.eigen_image_p(lpimages[k],ratio**(k))
             # extract regional max and block out borders (edge effect)
     
             # generate mask for border
@@ -294,21 +285,15 @@ class MultiHarrisZernike (cv2.Feature2D):
         #Fout['thresh'] = thresh
         return Fout
           
-    def z_jet_p2(self,F):
+    def z_jet_p2(self,ImgPyramid,F):
         '''
         Local jet of order three of interest points i,j
         '''  
-        feats = len(F['ivec'])
-        #zrad = z_parameters['zrad']
-        #nmax = z_parameters['nmax']
-        #ZstrucZ = z_parameters['ZstrucZ']
-        #BstrucZ = z_parameters['BstrucZ']
-        #Jndesc = z_parameters['ZstrucNdesc']
-        #Jnmax = nmax 
-        #brad = z_parameters['brad']
+        feats = len(F['ivec'])        
         Fsvec = F['svec']
         Fsivec = F['sivec']
         Fsjvec = F['sjvec']
+        images = ImgPyramid['images']
         
         JAcoeff=[[0 for x in range(self.nmax+1)] for y in range(self.nmax+1)]
         JBcoeff=[[0 for x in range(self.nmax+1)] for y in range(self.nmax+1)]
@@ -325,16 +310,16 @@ class MultiHarrisZernike (cv2.Feature2D):
             j_s = Fsjvec[k]
             # window size
             # [size(P(sk).im) is-zrad is+zrad js-zrad js+zrad]
-            W = self.Pyramid_obj.images[sk][i_s-self.zrad:i_s+self.zrad+1,
-                                            j_s-self.zrad:j_s+self.zrad+1]
+            W = images[sk][i_s-self.zrad:i_s+self.zrad+1,
+                           j_s-self.zrad:j_s+self.zrad+1]
             #print(W)
             #print("W shape:",W.shape)
                     
             Wh = W-np.mean(W)
             W = Wh/(np.sum(Wh**2)**0.5)
         
-            Wb = self.Pyramid_obj.images[sk][i_s-self.brad:i_s+self.brad+1,
-                                             j_s-self.brad:j_s+self.brad+1]
+            Wb = images[sk][i_s-self.brad:i_s+self.brad+1,
+                            j_s-self.brad:j_s+self.brad+1]
             Wbh = Wb-np.mean(Wb)
             Wb = Wbh/((np.sum(Wbh**2))**0.5)
                         
@@ -372,17 +357,17 @@ class MultiHarrisZernike (cv2.Feature2D):
     def detectAndCompute(self, gr_img, mask=None):
         if len(gr_img.shape)!=2:
             raise ValueError("Input image is not a 2D array, possibile non-grayscale")
-        self.Pyramid_obj.generate_pyramid(gr_img)
-        F = self.feat_extract_p2()
+        P = self.generate_pyramid(gr_img)
+        F = self.feat_extract_p2(P)
         Ft = self.feat_thresh_sec(F,*gr_img.shape)
-        JA,JB = self.z_jet_p2(Ft)
+        JA,JB = self.z_jet_p2(P,Ft)
         V,alpha,A = self.zinvariants4(JA, JB)
         kp = [cv2.KeyPoint(x,y,self.zrad*(sc+1)*2,_angle=ang,_response=res,_octave=sc) 
               for x,y,ang,res,sc in zip(Ft['jvec'], Ft['ivec'], np.rad2deg(alpha),
                                         Ft['evec'],Ft['svec'])]
         # Convert zernike descriptors to UINT by dividing with maxdes
-        des = np.hstack((np.round(V[:, :25]/self.maxdes[0]*255).astype(np.uint8),
-                         np.round(V[:,-25:]/self.maxdes[1]*255).astype(np.uint8)))
+        des = np.hstack((np.clip(np.round(V[:, :25]/self.maxdes[0]*255),0,255).astype(np.uint8),
+                         np.clip(np.round(V[:,-25:]/self.maxdes[1]*255),0,255).astype(np.uint8)))
         return kp, des#, F, Ft, JA, JB, alpha, A
     
 if sys.platform == 'darwin':
@@ -390,10 +375,10 @@ if sys.platform == 'darwin':
 else:
     path = '/home/vik748/'
 img1 = cv2.imread(path+'data/time_lapse_5_cervino_800x600/G0057821.png',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
-img2 = cv2.imread(path+'data/skerki_small/all/ESC.970622_023824.0546.tif',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
+#img2 = cv2.imread(path+'data/skerki_small/all/ESC.970622_023824.0546.tif',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
 #img2 = cv2.imread(path+'data/time_lapse_5_cervino_800x600/G0057826.png',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
 
-gr1 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+gr1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
 #gr2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
 a = MultiHarrisZernike(Nfeats=600)
