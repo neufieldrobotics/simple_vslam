@@ -20,6 +20,32 @@ class MultiHarrisZernike (cv2.Feature2D):
     along with Zernike parameters on 2 different radii discs as the feature detector
     A class as a child of cv2.Feature2D
     
+    Parameters
+    ----------
+    Nfeats : int, optional    
+        Number of features per image. Default is 600
+    seci : int, optional 
+        Number of vertical sectors (tiles) for keypoint thresholding. Default 
+        is 2
+    secj : int, optional 
+        Number of horizontal sectors (tiles) for keypoint thresholding. Default 
+        is 3
+    levels : int, optional
+        Number of levels in image pyramid. Default is 6
+    ratio : float, optional
+        Scaling ratio between levels, default is 0.75
+    sigi : float, optional
+        Integration scale, default is 1.0
+    sigd : float, optional
+        Derivation scale, default is 2.75
+    nmax : int, optional      
+        Zernike order
+    maxdes : tuple (float,float), optional
+        The factors used to convert the Float descriptors to UINT8. The first
+        value applied to the A Zernike disc and the 2nd applied to the B
+        Zernike disc.  Default is (12.0, 6.0)
+
+    ----------
     Example usage:
         img = cv2.imread('test.png',1)
         gr = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -37,7 +63,7 @@ class MultiHarrisZernike (cv2.Feature2D):
     
     '''
     def __init__(self,  Nfeats= 600, seci = 2, secj = 3, levels = 6,
-                 ratio = 0.75, sigi = 2.75, sigd = 1, nmax = 8, maxdes = (12.0,8.0)):       
+                 ratio = 0.75, sigi = 2.75, sigd = 1.0, nmax = 8, maxdes = (12.0,8.0)):       
         self.Nfeats = Nfeats    # number of features per image
         self.seci   = seci      # number of vertical sectors 
         self.secj   = secj      # number of horizontal sectors
