@@ -15,6 +15,27 @@ import cv2
 from matplotlib import pyplot as plt
 
 class MultiHarrisZernike (cv2.Feature2D):
+    '''
+    MultiHarrisZernike feature detector which uses multi-level harris corners
+    along with Zernike parameters on 2 different radii discs as the feature detector
+    A class as a child of cv2.Feature2D
+    
+    Example usage:
+        img = cv2.imread('test.png',1)
+        gr = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        
+        a = MultiHarrisZernike()
+        kp, des = a.detectAndCompute(gr)
+        
+        outImage	 = cv2.drawKeypoints(gr, kp, gr,color=[255,255,0],
+                            flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        fig, ax= plt.subplots(dpi=200)
+        plt.title('Multiscale Harris with Zernike Angles')
+        plt.axis("off")
+        plt.imshow(outImage)
+        plt.show()
+    
+    '''
     def __init__(self,  Nfeats= 600, seci = 2, secj = 3, levels = 6,
                  ratio = 0.75, sigi = 2.75, sigd = 1, nmax = 8, maxdes = (12.0,8.0)):       
         self.Nfeats = Nfeats    # number of features per image
@@ -90,6 +111,9 @@ class MultiHarrisZernike (cv2.Feature2D):
 
     @staticmethod    
     def plot_zernike(Z):
+        '''
+        Plot the generated zernike polynomials
+        '''
         nm=len(Z)
         f, axes = plt.subplots(nm, nm, sharey=True)
         #f.subplots_adjust(0,0,1,1)
@@ -103,6 +127,9 @@ class MultiHarrisZernike (cv2.Feature2D):
                 axes[n,m].axis('off')
                 
     def generate_pyramid(self,img):
+        '''
+        Generate image pyramid, based on settings in the MultiHarrisZernike object
+        '''
         sigd_list = [self.sigd]
         sigi_list = [self.sigi]
         images = [np.float64(img)]
@@ -118,11 +145,11 @@ class MultiHarrisZernike (cv2.Feature2D):
     
     def eigen_image_p(self,lpf,scale):
         '''    
-        %function [ef2,nL] = eigen_image_p(lpf,Gi)
-        %set up in pyramid scheme with detection scaled smoothed images
-        %ef2 is the interest point eigen image
-        %lpf smoothed by the detection scale gaussian
-        %Gi = fspecial('gaussian',ceil(7*sigi),sigi);
+        ef2,nL = eigen_image_p(lpf,scale)
+        set up in pyramid scheme with detection scaled smoothed images
+        ef2 is the interest point eigen image
+        lpf smoothed by the detection scale gaussian
+        Gi = fspecial('gaussian',ceil(7*sigi),sigi);
         '''
         [fy,fx] = np.gradient(lpf)
     
