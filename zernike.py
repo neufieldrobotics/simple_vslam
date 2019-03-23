@@ -10,9 +10,8 @@ from matlab_imresize.imresize import imresize
 np.set_printoptions(precision=5,suppress=True)
 from scipy.ndimage import convolve
 from scipy.ndimage.filters import maximum_filter
-import sys
 import cv2
-from matplotlib import pyplot as plt
+import time
 
 class MultiHarrisZernike (cv2.Feature2D):
     '''
@@ -40,10 +39,6 @@ class MultiHarrisZernike (cv2.Feature2D):
         Derivation scale, default is 2.75
     nmax : int, optional      
         Zernike order
-    maxdes : tuple (float,float), optional
-        The factors used to convert the Float descriptors to UINT8. The first
-        value applied to the A Zernike disc and the 2nd applied to the B
-        Zernike disc.  Default is (12.0, 6.0)
 
     ----------
     Example usage:
@@ -63,7 +58,7 @@ class MultiHarrisZernike (cv2.Feature2D):
     
     '''
     def __init__(self,  Nfeats= 600, seci = 2, secj = 3, levels = 6,
-                 ratio = 0.75, sigi = 2.75, sigd = 1.0, nmax = 8, maxdes = (12.0,8.0)):       
+                 ratio = 0.75, sigi = 2.75, sigd = 1.0, nmax = 8):       
         self.Nfeats = Nfeats    # number of features per image
         self.seci   = seci      # number of vertical sectors 
         self.secj   = secj      # number of horizontal sectors
@@ -72,7 +67,6 @@ class MultiHarrisZernike (cv2.Feature2D):
         self.sigi   = sigi      # integration scale 1.4.^[0:7];%1.2.^[0:10]
         self.sigd   = sigd      # derivation scale
         self.nmax   = nmax      # zernike order
-        self.maxdes = maxdes    # The factor used to convert the Float descriptors to UINT8
         self.zrad   = np.ceil(self.sigi*8).astype(int) # radius for zernike disk  
         self.brad   = np.ceil(0.5*self.zrad).astype(int)    # radius for secondary zernike disk
         self.Gi     = MultiHarrisZernike.fspecial_gauss(11,self.sigi)
@@ -113,7 +107,7 @@ class MultiHarrisZernike (cv2.Feature2D):
         '''
         xdim = 2*r+1
         ydim = 2*r+1
-        Z = np.zeros((xdim,ydim),dtype=complex)
+        Z = np.zeros((xdim,ydim),dtype=np.complex64)
         
         for y in range(-r,r+1):
             for x in range (-r,r+1):
@@ -158,7 +152,7 @@ class MultiHarrisZernike (cv2.Feature2D):
         '''
         sigd_list = [self.sigd]
         sigi_list = [self.sigi]
-        images = [np.float64(img)]
+        images = [np.float32(img)]
         lpimages = [convolve(images[0],self.pyrlpf,mode='constant')]
         for k in range(1,self.levels):
             #self.images += [cv2.resize(self.images[-1], (0,0), fx=self.ratio,
@@ -354,8 +348,8 @@ class MultiHarrisZernike (cv2.Feature2D):
         #initialize
         for n in range(self.nmax+1):
             for m in range(n%2,n+1,2):
-                JAcoeff[n][m] = np.zeros(feats,dtype=complex)
-                JBcoeff[n][m] = np.zeros(feats,dtype=complex)
+                JAcoeff[n][m] = np.zeros(feats,dtype=np.complex64)
+                JBcoeff[n][m] = np.zeros(feats,dtype=np.complex64)
         
         for k in range(feats): #(feats+1):
             sk = Fsvec[k] #scale of feature
@@ -389,10 +383,10 @@ class MultiHarrisZernike (cv2.Feature2D):
         invariance to affine changes in intensity
         '''
         rows, = JA[0][0].shape
-        V = np.zeros((rows, self.ZstrucNdesc))
-        A = np.zeros((rows, self.ZstrucNdesc))
-        Vb = np.zeros((rows, self.ZstrucNdesc))
-        Ab = np.zeros((rows, self.ZstrucNdesc))
+        V = np.zeros((rows, self.ZstrucNdesc),dtype=np.float32)
+        A = np.zeros((rows, self.ZstrucNdesc),dtype=np.float32)
+        Vb = np.zeros((rows, self.ZstrucNdesc),dtype=np.float32)
+        Ab = np.zeros((rows, self.ZstrucNdesc),dtype=np.float32)
         #1 through 7 are oriented gradients, relative to maximum direction
         k = 0
         for n in range(self.nmax+1):
@@ -418,34 +412,4 @@ class MultiHarrisZernike (cv2.Feature2D):
         kp = [cv2.KeyPoint(x,y,self.zrad*(sc+1)*2,_angle=ang,_response=res,_octave=sc) 
               for x,y,ang,res,sc in zip(Ft['jvec'], Ft['ivec'], np.rad2deg(alpha),
                                         Ft['evec'],Ft['svec'])]
-        # Convert zernike descriptors to UINT by dividing with maxdes
-        des = np.hstack((np.clip(np.round(V[:, :25]/self.maxdes[0]*255),0,255).astype(np.uint8),
-                         np.clip(np.round(V[:,-25:]/self.maxdes[1]*255),0,255).astype(np.uint8)))
-        return kp, des#, F, Ft, JA, JB, alpha, A
-    
-if sys.platform == 'darwin':
-    path = '/Users/vik748/Google Drive/'
-else:
-    path = '/home/vik748/'
-img1 = cv2.imread(path+'data/time_lapse_5_cervino_800x600/G0057821.png',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
-#img2 = cv2.imread(path+'data/skerki_small/all/ESC.970622_023824.0546.tif',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
-#img2 = cv2.imread(path+'data/time_lapse_5_cervino_800x600/G0057826.png',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
-
-gr1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
-#gr2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
-
-a = MultiHarrisZernike(Nfeats=600)
-
-import time
-st = time.time()
-for i in range(1):
-    kp, des = a.detectAndCompute(gr1)
-print("elapsed: ",(time.time()-st)/1)
-
-outImage	 = cv2.drawKeypoints(gr1, kp, gr1,color=[255,255,0],
-                             flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)#cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
-fig, ax= plt.subplots(dpi=200)
-plt.title('Multiscale Harris with Zernike Angles')
-plt.axis("off")
-plt.imshow(outImage)
-plt.show()
+        return kp, V#, F, Ft, JA, JB, alpha, A
