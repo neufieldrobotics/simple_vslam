@@ -16,7 +16,7 @@ from matplotlib import pyplot as plt
 
 class MultiHarrisZernike (cv2.Feature2D):
     def __init__(self,  Nfeats= 600, seci = 2, secj = 3, levels = 6,
-                 ratio = 0.75, sigi = 2.75, sigd = 1, nmax = 8):       
+                 ratio = 0.75, sigi = 2.75, sigd = 1, nmax = 8, maxdes = (12.0,8.0)):       
         self.Nfeats = Nfeats    # number of features per image
         self.seci   = seci      # number of vertical sectors 
         self.secj   = secj      # number of horizontal sectors
@@ -25,12 +25,14 @@ class MultiHarrisZernike (cv2.Feature2D):
         self.sigi   = sigi      # integration scale 1.4.^[0:7];%1.2.^[0:10]
         self.sigd   = sigd      # derivation scale
         self.nmax   = nmax      # zernike order
+        self.maxdes = maxdes    # The factor used to convert the Float descriptors to UINT8
         self.zrad   = np.ceil(self.sigi*8).astype(int) # radius for zernike disk  
         self.brad   = np.ceil(0.5*self.zrad).astype(int)    # radius for secondary zernike disk
         self.Gi     = MultiHarrisZernike.fspecial_gauss(11,self.sigi)
         self.ZstrucZ, self.ZstrucNdesc = MultiHarrisZernike.zernike_generate(self.nmax, self.zrad)
         self.BstrucZ, self.BstrucNdesc = MultiHarrisZernike.zernike_generate(self.nmax, self.brad)
         self.Pyramid_obj = MultiHarrisZernike.ImagePyramid(self.levels, self.ratio, self.sigd, self.sigi)
+        
 
         
     @staticmethod
@@ -178,7 +180,7 @@ class MultiHarrisZernike (cv2.Feature2D):
             regmask[k] = maximum_filter(eig[k],size=local_maxima_nhood)<=eig[k]
     
             regmask[k] = np.logical_and(regmask[k],border_mask[k])
-            print("K: ",k," - ",np.sum(regmask[k]))
+            #print("K: ",k," - ",np.sum(regmask[k]))
             #[ivec[k], jvec[k]] = np.nonzero(regmask[k]) #coordinates of 1s in regmask
             # Just to match matlab version, can be reverted to optimise
             [jvec[k], ivec[k]] = np.nonzero(regmask[k].T)
@@ -186,7 +188,7 @@ class MultiHarrisZernike (cv2.Feature2D):
         # INITIALIZE feature positions and scales at highest level
         # at highest resolution coordinates of features:
         Fivec = ivec[0]
-        print("len of Fivec:",len(ivec[0]))
+        #print("len of Fivec:",len(ivec[0]))
         Fjvec = jvec[0]
         Fsvec = np.zeros_like(Fivec) #initial scale 
         Fevec = eig[0][ivec[0],jvec[0]] #access the elements of eig at locations given by ivec,jvec
@@ -235,7 +237,7 @@ class MultiHarrisZernike (cv2.Feature2D):
             pivec = csivec[pend]
             pjvec = csjvec[pend]
             nLvec = nL[k][csivec[pend],csjvec[pend]]
-            print(np.sum(Fsvec==k))
+            #print(np.sum(Fsvec==k))
             k = k+1
             F = {'ivec':Fivec, 'jvec':Fjvec, 'svec':Fsvec,
                  'evec':Fevec, 'sivec':Fsivec, 'sjvec':Fsjvec}
@@ -368,6 +370,8 @@ class MultiHarrisZernike (cv2.Feature2D):
         return V,alpha,A
     
     def detectAndCompute(self, gr_img, mask=None):
+        if len(gr_img.shape)!=2:
+            raise ValueError("Input image is not a 2D array, possibile non-grayscale")
         self.Pyramid_obj.generate_pyramid(gr_img)
         F = self.feat_extract_p2()
         Ft = self.feat_thresh_sec(F,*gr_img.shape)
@@ -376,18 +380,21 @@ class MultiHarrisZernike (cv2.Feature2D):
         kp = [cv2.KeyPoint(x,y,self.zrad*(sc+1)*2,_angle=ang,_response=res,_octave=sc) 
               for x,y,ang,res,sc in zip(Ft['jvec'], Ft['ivec'], np.rad2deg(alpha),
                                         Ft['evec'],Ft['svec'])]
-
-        return kp, V#, F, Ft, JA, JB, alpha, A
+        # Convert zernike descriptors to UINT by dividing with maxdes
+        des = np.hstack((np.round(V[:, :25]/self.maxdes[0]*255).astype(np.uint8),
+                         np.round(V[:,-25:]/self.maxdes[1]*255).astype(np.uint8)))
+        return kp, des#, F, Ft, JA, JB, alpha, A
     
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/'
 else:
     path = '/home/vik748/'
 img1 = cv2.imread(path+'data/time_lapse_5_cervino_800x600/G0057821.png',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
-img2 = cv2.imread(path+'data/time_lapse_5_cervino_800x600/G0057826.png',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
+img2 = cv2.imread(path+'data/skerki_small/all/ESC.970622_023824.0546.tif',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
+#img2 = cv2.imread(path+'data/time_lapse_5_cervino_800x600/G0057826.png',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
 
-gr1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
-gr2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+gr1 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+#gr2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
 a = MultiHarrisZernike(Nfeats=600)
 
