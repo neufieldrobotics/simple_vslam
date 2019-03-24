@@ -58,19 +58,23 @@ class MultiHarrisZernike (cv2.Feature2D):
     
     '''
     def __init__(self,  Nfeats= 600, seci = 2, secj = 3, levels = 6,
-                 ratio = 0.75, sigi = 2.75, sigd = 1.0, nmax = 8):       
-        self.Nfeats = Nfeats    # number of features per image
-        self.seci   = seci      # number of vertical sectors 
-        self.secj   = secj      # number of horizontal sectors
-        self.levels = levels    # pyramid levels
-        self.ratio  = ratio     # scaling between levels
-        self.sigi   = sigi      # integration scale 1.4.^[0:7];%1.2.^[0:10]
-        self.sigd   = sigd      # derivation scale
-        self.nmax   = nmax      # zernike order
+                 ratio = 0.75, sigi = 2.75, sigd = 1.0, nmax = 8, like_matlab=False):       
+        self.Nfeats = Nfeats        # number of features per image
+        self.seci   = seci          # number of vertical sectors 
+        self.secj   = secj          # number of horizontal sectors
+        self.levels = levels        # pyramid levels
+        self.ratio  = ratio         # scaling between levels
+        self.sigi   = sigi          # integration scale 1.4.^[0:7];%1.2.^[0:10]
+        self.sigd   = sigd          # derivation scale
+        self.nmax   = nmax          # zernike order
+        self.exact  = like_matlab   # Flag to replicate Oscar's Matlab version (slower) 
         self.zrad   = np.ceil(self.sigi*8).astype(int) # radius for zernike disk  
         self.brad   = np.ceil(0.5*self.zrad).astype(int)    # radius for secondary zernike disk
-        self.Gi     = MultiHarrisZernike.fspecial_gauss(11,self.sigi)
-        self.pyrlpf = MultiHarrisZernike.fspecial_gauss(int(np.ceil(7*self.sigd)),self.sigd)
+
+        if self.exact:
+            self.Gi     = MultiHarrisZernike.fspecial_gauss(11,self.sigi)
+            self.pyrlpf = MultiHarrisZernike.fspecial_gauss(int(np.ceil(7*self.sigd)),self.sigd)
+
         self.ZstrucZ, self.ZstrucZ_rav, self.ZstrucNdesc = MultiHarrisZernike.zernike_generate(self.nmax, self.zrad)
         self.BstrucZ, self.BstrucZ_rav, self.BstrucNdesc = MultiHarrisZernike.zernike_generate(self.nmax, self.brad)
         
@@ -155,16 +159,23 @@ class MultiHarrisZernike (cv2.Feature2D):
         sigd_list = [self.sigd]
         sigi_list = [self.sigi]
         images = [np.float32(img)]
-        # convolve matches matlb version better, filter is 3 times faster
-        #lpimages = [convolve(images[0],self.pyrlpf,mode='constant')]
-        lpimages = [gaussian_filter(images[0],sigma=self.sigd,mode='constant',truncate=3.0)]
+        
+        # convolve matches matlab version better, filter is 3 times faster
+        if self.exact:
+            lpimages = [convolve(images[0],self.pyrlpf,mode='constant')]
+        else:
+            lpimages = [gaussian_filter(images[0],sigma=self.sigd,mode='constant',truncate=3.0)]
+
         for k in range(1,self.levels):
-            #images += [cv2.resize(self.images[-1], (0,0), fx=self.ratio,
+            #images += [cv2.resize(images[-1], (0,0), fx=self.ratio,
             #                          fy=self.ratio, interpolation=cv2.INTER_AREA)]
             images += [imresize(images[-1], self.ratio, method='bilinear')]
+
             # convolve matches matlb version better, filter is 3 times faster
-            #lpimages += [convolve(images[-1],self.pyrlpf,mode='constant')]
-            lpimages += [gaussian_filter(images[-1],sigma=self.sigd,mode='constant',truncate=3.0)]
+            if self.exact:
+                lpimages += [convolve(images[-1],self.pyrlpf,mode='constant')]
+            else:                
+                lpimages += [gaussian_filter(images[-1],sigma=self.sigd,mode='constant',truncate=3.0)]
 
             sigd_list += [sigd_list[-1]/self.ratio] #equivalent sigdec at max res
             sigi_list += [sigi_list[-1]/self.ratio] 
@@ -183,15 +194,17 @@ class MultiHarrisZernike (cv2.Feature2D):
         [fxy,fxx] = np.gradient(fx)
         [fyy,fyx] = np.gradient(fy)
         nL = scale**(-2)*np.abs(fxx+fyy)
-    
-        # Mfxx = convolve(np.square(fx),self.Gi,mode='constant')
-        # Mfxy = convolve(fx*fy,self.Gi,mode='constant')
-        # Mfyy = convolve(np.square(fy),self.Gi,mode='constant')
-        # Significantly Faster than convolve
-        Mfxx = gaussian_filter(np.square(fx),sigma=self.sigi,mode='constant',truncate=1.9)
-        Mfxy = gaussian_filter(fx*fy,sigma=self.sigi,mode='constant',truncate=1.9)
-        Mfyy = gaussian_filter(np.square(fy),sigma=self.sigi,mode='constant',truncate=1.9)
-    
+        
+        if self.exact:
+            Mfxx = convolve(np.square(fx),self.Gi,mode='constant')
+            Mfxy = convolve(fx*fy,self.Gi,mode='constant')
+            Mfyy = convolve(np.square(fy),self.Gi,mode='constant')
+        else: 
+            #Significantly Faster than convolve
+            Mfxx = gaussian_filter(np.square(fx),sigma=self.sigi,mode='constant',truncate=1.9)
+            Mfxy = gaussian_filter(fx*fy,sigma=self.sigi,mode='constant',truncate=1.9)
+            Mfyy = gaussian_filter(np.square(fy),sigma=self.sigi,mode='constant',truncate=1.9)
+        
         Tr = Mfxx+Mfyy
         Det = Mfxx*Mfyy-np.square(Mfxy)
         sqrterm = np.sqrt(np.square(Tr)-4*Det)
