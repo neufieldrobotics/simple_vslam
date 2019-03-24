@@ -9,7 +9,7 @@ import numpy as np
 from matlab_imresize.imresize import imresize
 np.set_printoptions(precision=5,suppress=True)
 from scipy.ndimage import convolve
-from scipy.ndimage.filters import maximum_filter
+from scipy.ndimage.filters import maximum_filter, gaussian_filter
 import cv2
 import time
 
@@ -71,8 +71,8 @@ class MultiHarrisZernike (cv2.Feature2D):
         self.brad   = np.ceil(0.5*self.zrad).astype(int)    # radius for secondary zernike disk
         self.Gi     = MultiHarrisZernike.fspecial_gauss(11,self.sigi)
         self.pyrlpf = MultiHarrisZernike.fspecial_gauss(int(np.ceil(7*self.sigd)),self.sigd)
-        self.ZstrucZ, self.ZstrucNdesc = MultiHarrisZernike.zernike_generate(self.nmax, self.zrad)
-        self.BstrucZ, self.BstrucNdesc = MultiHarrisZernike.zernike_generate(self.nmax, self.brad)
+        self.ZstrucZ, self.ZstrucZ_rav, self.ZstrucNdesc = MultiHarrisZernike.zernike_generate(self.nmax, self.zrad)
+        self.BstrucZ, self.BstrucZ_rav, self.BstrucNdesc = MultiHarrisZernike.zernike_generate(self.nmax, self.brad)
         
     @staticmethod
     def fspecial_gauss(size, sigma):
@@ -90,6 +90,7 @@ class MultiHarrisZernike (cv2.Feature2D):
         '''
         desc = 0
         Zfilt=[[0 for x in range(nmax+1)] for y in range(nmax+1)]
+        Zfilt_rav=[[0 for x in range(nmax+1)] for y in range(nmax+1)]
         
         for n in range(nmax+1):
             for m in range(n%2,n+1,2):
@@ -97,7 +98,8 @@ class MultiHarrisZernike (cv2.Feature2D):
                 if verbose: 
                     print([radius, n, m, desc])
                 Zfilt[n][m] = MultiHarrisZernike.zerfilt(n,m,radius)
-        return Zfilt,desc             
+                Zfilt_rav[n][m] = Zfilt[n][m].ravel()               
+        return Zfilt,Zfilt_rav,desc             
     
     @staticmethod
     def zerfilt(n,m,r):
@@ -153,12 +155,17 @@ class MultiHarrisZernike (cv2.Feature2D):
         sigd_list = [self.sigd]
         sigi_list = [self.sigi]
         images = [np.float32(img)]
-        lpimages = [convolve(images[0],self.pyrlpf,mode='constant')]
+        # convolve matches matlb version better, filter is 3 times faster
+        #lpimages = [convolve(images[0],self.pyrlpf,mode='constant')]
+        lpimages = [gaussian_filter(images[0],sigma=self.sigd,mode='constant',truncate=3.0)]
         for k in range(1,self.levels):
-            #self.images += [cv2.resize(self.images[-1], (0,0), fx=self.ratio,
-            #                          fy=self.ratio, interpolation=cv2.INTER_LINEAR_EXACT)]
+            #images += [cv2.resize(self.images[-1], (0,0), fx=self.ratio,
+            #                          fy=self.ratio, interpolation=cv2.INTER_AREA)]
             images += [imresize(images[-1], self.ratio, method='bilinear')]
-            lpimages += [convolve(images[-1],self.pyrlpf,mode='constant')]
+            # convolve matches matlb version better, filter is 3 times faster
+            #lpimages += [convolve(images[-1],self.pyrlpf,mode='constant')]
+            lpimages += [gaussian_filter(images[-1],sigma=self.sigd,mode='constant',truncate=3.0)]
+
             sigd_list += [sigd_list[-1]/self.ratio] #equivalent sigdec at max res
             sigi_list += [sigi_list[-1]/self.ratio] 
         return {'images':images, 'lpimages':lpimages, 'sigd':sigd_list, 'sigi':sigi_list}
@@ -177,9 +184,13 @@ class MultiHarrisZernike (cv2.Feature2D):
         [fyy,fyx] = np.gradient(fy)
         nL = scale**(-2)*np.abs(fxx+fyy)
     
-        Mfxx = convolve(np.square(fx),self.Gi,mode='constant')
-        Mfxy = convolve(fx*fy,self.Gi,mode='constant')
-        Mfyy = convolve(np.square(fy),self.Gi,mode='constant')
+        # Mfxx = convolve(np.square(fx),self.Gi,mode='constant')
+        # Mfxy = convolve(fx*fy,self.Gi,mode='constant')
+        # Mfyy = convolve(np.square(fy),self.Gi,mode='constant')
+        # Significantly Faster than convolve
+        Mfxx = gaussian_filter(np.square(fx),sigma=self.sigi,mode='constant',truncate=1.9)
+        Mfxy = gaussian_filter(fx*fy,sigma=self.sigi,mode='constant',truncate=1.9)
+        Mfyy = gaussian_filter(np.square(fy),sigma=self.sigi,mode='constant',truncate=1.9)
     
         Tr = Mfxx+Mfyy
         Det = Mfxx*Mfyy-np.square(Mfxy)
@@ -255,8 +266,8 @@ class MultiHarrisZernike (cv2.Feature2D):
             csjvec = np.copy(sjvec)
       
             for u in range(-1,2):  #account for motion of feature points between scales
+                sojvec = sjvec+u #next scale jvec
                 for v in range(-1,2):
-                    sojvec = sjvec+u #next scale jvec
                     soivec = sivec+v #next scale ivec
                     uvpend = regmask[k][soivec,sojvec] == 1
                     pendreg = np.logical_or(pendreg,uvpend)
@@ -349,7 +360,7 @@ class MultiHarrisZernike (cv2.Feature2D):
         for n in range(self.nmax+1):
             for m in range(n%2,n+1,2):
                 JAcoeff[n][m] = np.zeros(feats,dtype=np.complex64)
-                JBcoeff[n][m] = np.zeros(feats,dtype=np.complex64)
+                JBcoeff[n][m] = np.zeros(feats,dtype=np.complex64)            
         
         for k in range(feats): #(feats+1):
             sk = Fsvec[k] #scale of feature
@@ -358,22 +369,23 @@ class MultiHarrisZernike (cv2.Feature2D):
             # window size
             # [size(P(sk).im) is-zrad is+zrad js-zrad js+zrad]
             W = images[sk][i_s-self.zrad:i_s+self.zrad+1,
-                           j_s-self.zrad:j_s+self.zrad+1]
-            #print(W)
-            #print("W shape:",W.shape)
-                    
+                           j_s-self.zrad:j_s+self.zrad+1]                    
             Wh = W-np.mean(W)
             W = Wh/(np.sum(Wh**2)**0.5)
+            W_rav = W.ravel()
         
             Wb = images[sk][i_s-self.brad:i_s+self.brad+1,
                             j_s-self.brad:j_s+self.brad+1]
             Wbh = Wb-np.mean(Wb)
             Wb = Wbh/((np.sum(Wbh**2))**0.5)
-                        
+            Wb_rav = Wb.ravel()
+            
             for n in range(self.nmax+1):
                 for m in range(n%2,n+1,2):
-                    JAcoeff[n][m][k] = np.sum(W*self.ZstrucZ[n][m])
-                    JBcoeff[n][m][k] = np.sum(Wb*self.BstrucZ[n][m])
+                    #JAcoeff[n][m][k] = np.sum(W*self.ZstrucZ[n][m])
+                    #JBcoeff[n][m][k] = np.sum(Wb*self.BstrucZ[n][m])
+                    JAcoeff[n][m][k] = W_rav.dot(self.ZstrucZ_rav[n][m])
+                    JBcoeff[n][m][k] = Wb_rav.dot(self.BstrucZ_rav[n][m])
 
         return JAcoeff, JBcoeff
 
@@ -383,32 +395,38 @@ class MultiHarrisZernike (cv2.Feature2D):
         invariance to affine changes in intensity
         '''
         rows, = JA[0][0].shape
-        V = np.zeros((rows, self.ZstrucNdesc),dtype=np.float32)
-        A = np.zeros((rows, self.ZstrucNdesc),dtype=np.float32)
+        Va = np.zeros((rows, self.ZstrucNdesc),dtype=np.float32)
+        Aa = np.zeros((rows, self.ZstrucNdesc),dtype=np.float32)
         Vb = np.zeros((rows, self.ZstrucNdesc),dtype=np.float32)
         Ab = np.zeros((rows, self.ZstrucNdesc),dtype=np.float32)
         #1 through 7 are oriented gradients, relative to maximum direction
         k = 0
         for n in range(self.nmax+1):
             for m in range(n%2,n+1,2):
-                V[:,k] = np.abs(JA[n][m])
+                Va[:,k] = np.abs(JA[n][m])
                 Vb[:,k] = np.abs(JB[n][m])
-                A[:,k] = np.angle(JA[n][m])
+                Aa[:,k] = np.angle(JA[n][m])
                 Ab[:,k] = np.angle(JB[n][m])
                 k = k+1
-        V = np.hstack((V, Vb))
-        A = np.hstack((A, Ab))
+        V = np.hstack((Va, Vb))
+        A = np.hstack((Aa, Ab))
         alpha = np.angle(JA[1][1])
         return V,alpha,A
     
-    def detectAndCompute(self, gr_img, mask=None):
+    def detectAndCompute(self, gr_img, mask=None, timing=False):
         if len(gr_img.shape)!=2:
             raise ValueError("Input image is not a 2D array, possibile non-grayscale")
+        if timing: st=time.time()    
         P = self.generate_pyramid(gr_img)
+        if timing: print("Generate pyramid - ", time.time()-st); st=time.time()
         F = self.feat_extract_p2(P)
+        if timing: print("Extract features - ", time.time()-st); st=time.time()
         Ft = self.feat_thresh_sec(F,*gr_img.shape)
+        if timing: print("Feature Threshold - ", time.time()-st); st=time.time()
         JA,JB = self.z_jet_p2(P,Ft)
+        if timing: print("Feature jets - ", time.time()-st); st=time.time()
         V,alpha,A = self.zinvariants4(JA, JB)
+        if timing: print("Feature invariants - ", time.time()-st); st=time.time
         kp = [cv2.KeyPoint(x,y,self.zrad*(sc+1)*2,_angle=ang,_response=res,_octave=sc) 
               for x,y,ang,res,sc in zip(Ft['jvec'], Ft['ivec'], np.rad2deg(alpha),
                                         Ft['evec'],Ft['svec'])]

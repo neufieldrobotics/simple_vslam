@@ -23,13 +23,13 @@ img1 = cv2.imread(path+'data/time_lapse_5_cervino_800x600/G0057821.png',1) # isc
 gr1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
 #gr2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
-a = MultiHarrisZernike(Nfeats=50)
+a = MultiHarrisZernike(Nfeats=600)
 
 import time
 st = time.time()
-for i in range(1):
-    kp, des = a.detectAndCompute(gr1)
-print("elapsed: ",(time.time()-st)/1)
+for i in range(10):
+    kp, des = a.detectAndCompute(gr1,timing=True)
+print("elapsed: ",(time.time()-st)/10)
 
 outImage	 = cv2.drawKeypoints(gr1, kp, gr1,color=[255,255,0],
                              flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)#cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
