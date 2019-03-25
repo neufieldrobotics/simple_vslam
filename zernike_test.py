@@ -17,18 +17,19 @@ if sys.platform == 'darwin':
 else:
     path = '/home/vik748/'
 img1 = cv2.imread(path+'data/time_lapse_5_cervino_800x600/G0057821.png',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
-#img2 = cv2.imread(path+'data/skerki_small/all/ESC.970622_023824.0546.tif',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
+#img2 = cv2.imread(path+'data/skerki_small/all/ESC.970622_025513.0622.tif',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
 #img2 = cv2.imread(path+'data/time_lapse_5_cervino_800x600/G0057826.png',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
 
 gr1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
 #gr2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
-a = MultiHarrisZernike(Nfeats=600)
+a = MultiHarrisZernike(Nfeats=600,like_matlab=False)
+m1 = cv2.imread(path+'data/time_lapse_5_cervino_800x600_masks_out/G0057821_mask.png',cv2.IMREAD_GRAYSCALE)
 
 import time
 st = time.time()
 for i in range(10):
-    kp, des = a.detectAndCompute(gr1,timing=True)
+    kp, des = a.detectAndCompute(gr1, mask=m1, timing=True)
 print("elapsed: ",(time.time()-st)/10)
 
 outImage	 = cv2.drawKeypoints(gr1, kp, gr1,color=[255,255,0],

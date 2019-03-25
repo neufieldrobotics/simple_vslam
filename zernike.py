@@ -39,6 +39,11 @@ class MultiHarrisZernike (cv2.Feature2D):
         Derivation scale, default is 2.75
     nmax : int, optional      
         Zernike order
+    lmax_nd : int, optional
+        Feature neighborhood size for local maximum filter, default is 3
+    like_matlab : bool, optional
+        Flag to replicate Oscar's Matlab version (slower) when true. Default is
+        false
 
     ----------
     Example usage:
@@ -57,19 +62,20 @@ class MultiHarrisZernike (cv2.Feature2D):
         plt.show()
     
     '''
-    def __init__(self,  Nfeats= 600, seci = 2, secj = 3, levels = 6,
-                 ratio = 0.75, sigi = 2.75, sigd = 1.0, nmax = 8, like_matlab=False):       
-        self.Nfeats = Nfeats        # number of features per image
-        self.seci   = seci          # number of vertical sectors 
-        self.secj   = secj          # number of horizontal sectors
-        self.levels = levels        # pyramid levels
-        self.ratio  = ratio         # scaling between levels
-        self.sigi   = sigi          # integration scale 1.4.^[0:7];%1.2.^[0:10]
-        self.sigd   = sigd          # derivation scale
-        self.nmax   = nmax          # zernike order
-        self.exact  = like_matlab   # Flag to replicate Oscar's Matlab version (slower) 
-        self.zrad   = np.ceil(self.sigi*8).astype(int) # radius for zernike disk  
-        self.brad   = np.ceil(0.5*self.zrad).astype(int)    # radius for secondary zernike disk
+    def __init__(self,  Nfeats= 600, seci = 2, secj = 3, levels = 6, ratio = 0.75, 
+                 sigi = 2.75, sigd = 1.0, nmax = 8, like_matlab=False, lmax_nd = 3):       
+        self.Nfeats  = Nfeats        # number of features per image
+        self.seci    = seci          # number of vertical sectors 
+        self.secj    = secj          # number of horizontal sectors
+        self.levels  = levels        # pyramid levels
+        self.ratio   = ratio         # scaling between levels
+        self.sigi    = sigi          # integration scale 1.4.^[0:7];%1.2.^[0:10]
+        self.sigd    = sigd          # derivation scale
+        self.nmax    = nmax          # zernike order
+        self.exact   = like_matlab   # Flag to replicate Oscar's Matlab version (slower) 
+        self.lmax_nd = lmax_nd       # Feature neighborhood size for local maximum filter
+        self.zrad    = np.ceil(self.sigi*8).astype(int) # radius for zernike disk  
+        self.brad    = np.ceil(0.5*self.zrad).astype(int)    # radius for secondary zernike disk
 
         if self.exact:
             self.Gi     = MultiHarrisZernike.fspecial_gauss(11,self.sigi)
@@ -152,13 +158,18 @@ class MultiHarrisZernike (cv2.Feature2D):
                     axes[n,m].imshow(np.real(Z[n][m]),cmap='gray')
                 axes[n,m].axis('off')
                 
-    def generate_pyramid(self,img):
+    def generate_pyramid(self, img, mask=None):
         '''
         Generate image pyramid, based on settings in the MultiHarrisZernike object
         '''
         sigd_list = [self.sigd]
         sigi_list = [self.sigi]
         images = [np.float32(img)]
+        
+        if mask is not None:
+            masks = [mask]
+        else:
+            masks = None
         
         # convolve matches matlab version better, filter is 3 times faster
         if self.exact:
@@ -167,9 +178,15 @@ class MultiHarrisZernike (cv2.Feature2D):
             lpimages = [gaussian_filter(images[0],sigma=self.sigd,mode='constant',truncate=3.0)]
 
         for k in range(1,self.levels):
+            # CV2 version of imresize is faster but doesn't have antialiasing
+            # so results in fewer matches
             #images += [cv2.resize(images[-1], (0,0), fx=self.ratio,
             #                          fy=self.ratio, interpolation=cv2.INTER_AREA)]
             images += [imresize(images[-1], self.ratio, method='bilinear')]
+            
+            if mask is not None:
+                masks += [cv2.resize(masks[-1], images[-1].shape[::-1],
+                                     interpolation=cv2.INTER_NEAREST)]
 
             # convolve matches matlb version better, filter is 3 times faster
             if self.exact:
@@ -179,7 +196,8 @@ class MultiHarrisZernike (cv2.Feature2D):
 
             sigd_list += [sigd_list[-1]/self.ratio] #equivalent sigdec at max res
             sigi_list += [sigi_list[-1]/self.ratio] 
-        return {'images':images, 'lpimages':lpimages, 'sigd':sigd_list, 'sigi':sigi_list}
+        return {'images':images, 'lpimages':lpimages, 'sigd':sigd_list, 
+                'sigi':sigi_list, 'masks':masks}
     
     def eigen_image_p(self,lpf,scale):
         '''    
@@ -212,16 +230,15 @@ class MultiHarrisZernike (cv2.Feature2D):
         ef2 = scale**(-2)*0.5*(Tr - sqrterm)
         return ef2,nL     
 
-    def feat_extract_p2 (self,ImgPyramid):
+    def feat_extract_p2 (self, ImgPyramid):
         '''
         Extract multiscaled features from a Pyramid of images
-        '''
-        local_maxima_nhood=3
-    
+        '''    
         scales = self.levels
         ratio = self.ratio
         border = self.zrad
         lpimages = ImgPyramid['lpimages']
+        masks = ImgPyramid['masks']
         [rows,cols] = lpimages[0].shape
     
         eig = [None] * scales
@@ -239,9 +256,13 @@ class MultiHarrisZernike (cv2.Feature2D):
             border_mask[k] = np.zeros_like(eig[k],dtype=bool)
             border_mask[k][border:-border,border:-border]=True
     
-            regmask[k] = maximum_filter(eig[k],size=local_maxima_nhood)<=eig[k]
+            regmask[k] = maximum_filter(eig[k],size=self.lmax_nd)<=eig[k]
     
             regmask[k] = np.logical_and(regmask[k],border_mask[k])
+            
+            if masks is not None:
+                regmask[k] = np.logical_and(masks[k],regmask[k])
+            
             #print("K: ",k," - ",np.sum(regmask[k]))
             #[ivec[k], jvec[k]] = np.nonzero(regmask[k]) #coordinates of 1s in regmask
             # Just to match matlab version, can be reverted to optimise
@@ -332,21 +353,27 @@ class MultiHarrisZernike (cv2.Feature2D):
                 X = bin_centers[:-1] + np.diff(bin_centers)/2
             
                 C = np.cumsum(N[::-1])
+                
                 bins = X[::-1]
-                k = 0
-                while C[k] < Nfsec and k < 50:
-                    k = k+1
-    
-                thresh = bins[k]
-                selecte = evec > thresh
-      
-                while np.sum(selecte) > Nfsec:
-                    thresh = thresh*1.2
+                
+                if C[-1]<Nfsec:
+                    thresh = bins[-1]
+                    selecte=np.ones_like(evec,dtype=bool)
+                    
+                else:
+                    k = 0
+                    while C[k] < Nfsec and k < 50-1:
+                        k = k+1
+        
+                    thresh = bins[k]
                     selecte = evec > thresh
-            	
-                while np.sum(selecte) < Nfsec:
-                    thresh = thresh*0.9
-                    selecte = evec > thresh
+                    while np.sum(selecte) > Nfsec:
+                        thresh = thresh*1.2
+                        selecte = evec > thresh
+                	
+                    while np.sum(selecte) < Nfsec:
+                        thresh = thresh*0.9
+                        selecte = evec > thresh
                 
                 select = np.append(select, selindsec[selecte])
                     
@@ -427,10 +454,28 @@ class MultiHarrisZernike (cv2.Feature2D):
         return V,alpha,A
     
     def detectAndCompute(self, gr_img, mask=None, timing=False):
+        '''
+        cv2.Feature2D stype detectAndCompute.  Takes a grayscale image and
+        optionally a mask and returns OpenCV keypoints and descriptors
+        
+        Parameters
+        ----------
+        gr_img : 2D-array (image)    
+            The input grayscale image
+        mask : 2D-array, optional 
+            Image mask with 1s where keypoints are permissible
+        tilimg : bool, optional 
+            Display timing in various parts of algorithm
+    
+        ----------
+        Example usage:
+            kp, des = a.detectAndCompute(gr, mask=m1)
+            
+        '''
         if len(gr_img.shape)!=2:
             raise ValueError("Input image is not a 2D array, possibile non-grayscale")
         if timing: st=time.time()    
-        P = self.generate_pyramid(gr_img)
+        P = self.generate_pyramid(gr_img,mask=mask)
         if timing: print("Generate pyramid - ", time.time()-st); st=time.time()
         F = self.feat_extract_p2(P)
         if timing: print("Extract features - ", time.time()-st); st=time.time()
