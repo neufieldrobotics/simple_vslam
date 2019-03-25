@@ -15,6 +15,7 @@ import glob
 import re
 import argparse
 import traceback
+from zernike import MultiHarrisZernike
 np.set_printoptions(precision=3,suppress=True)
 import multiprocessing as mp
 from colorama import Fore, Style
