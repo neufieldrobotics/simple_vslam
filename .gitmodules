@@ -1,0 +1,3 @@
+[submodule "matlab_imresize"]
+	path = matlab_imresize
+	url = https://github.com/vik748/matlab_imresize.git
