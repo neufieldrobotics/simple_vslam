@@ -359,6 +359,7 @@ def draw_keypoints(vis, keypoints, color = (0, 255, 255)):
         cv2.circle(vis, (int(x), int(y)), 15, color)
     return vis
 
+'''
 def knn_match_and_filter(matcher, kp1, kp2, des1, des2,threshold=0.9):
     matches_knn = matcher.knnMatch(des1,des2, k=2)
     matches = []
@@ -377,6 +378,63 @@ def knn_match_and_filter(matcher, kp1, kp2, des1, des2,threshold=0.9):
             kp2_match.append(kp2[match[0].trainIdx].pt)
 
     return np.ascontiguousarray(kp1_match), np.ascontiguousarray(kp2_match), matches
+'''
+
+def knn_match_and_lowe_ratio_filter(matcher, des1, des2,threshold=0.9):
+    matches_knn = matcher.knnMatch(des1,des2, k=2)
+    matches = []
+    
+    for i,match in enumerate(matches_knn):
+        if len(match)>1:
+            if match[0].distance < threshold*match[1].distance:
+                matches.append(match[0])
+        elif len(match)==1:
+            matches.append(match[0])
+
+    return matches
+
+def track_keypoints(kp1, des1, kp2, des2, matches):
+    '''
+    track_keypoints accepts 2 list of keypoints and descriptors and a list of 
+    matches and returns, matched lists of keypoints and descriptors. Also returns
+    a set of candidate keypoints from 2 which didn't have matches in 1
+    
+    Parameters
+    ----------
+    kp1 : list of cv2.KeyPoint objects
+        Keypoints from frame 1
+    des1 : NxD array
+        NxD array of descriptors where N = len(kp1) and D is length of descriptor
+    kp2 : list of cv2.KeyPoint objects
+        Keypoints from frame 2
+    des2 : NxD array
+        NxD array of descriptors where N = len(kp2) and D is length of descriptor        
+    matches : list of cv2.DMatch objects
+        List of matches between 1 and 2. (single matches only not KNN)
+    '''
+    kp1_matched = []    
+    kp2_matched = []
+    des1_matched = np.zeros((len(matches),des1.shape[1]),des1.dtype)
+    des2_matched = np.zeros((len(matches),des2.shape[1]),des2.dtype)
+    matched_kp2_indx = []
+
+    # Go through matches and create subsets of kp1 and kp2 which matched
+    for i,m in enumerate(matches):
+        kp1_matched += [kp1[m.queryIdx]]
+        kp2_matched += [kp2[m.trainIdx]]
+        des1_matched[i,:] = des1[m.queryIdx,:]
+        des2_matched[i,:] = des2[m.trainIdx,:]
+        matched_kp2_indx += [m.trainIdx]
+
+    kp2_cand=[]
+    cand_indx = []
+    for i,k in enumerate(kp2):
+        if i not in matched_kp2_indx:
+            kp2_cand += [k]
+            cand_indx += [i]
+    des2_cand = des2[cand_indx,:]
+    
+    return kp1_matched, des1_matched, kp2_matched, des2_matched, kp2_cand, des2_cand
 
 def move_figure(position="top-right"):
     '''

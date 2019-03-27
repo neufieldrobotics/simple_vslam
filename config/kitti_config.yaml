@@ -13,18 +13,18 @@ D:
 
 tiling_non_max_tile_y: 17 
 tiling_non_max_tile_x: 8 
-use_tiling_non_max_supression: True
+use_tiling_non_max_supression: False
 
-radial_non_max: True
+radial_non_max: False
 radial_non_max_radius: 5
 
 image_folder: 'data/kitti/00/image_0'
 image_ext: 'png'
 chessboard: False
-init_image_indxs: [0, 3]
+init_image_indxs: [1, 3]
 image_step: 2
 use_masks: False
-use_clahe: True
+use_clahe: False
 
 CLAHE_settings:
  clipLimit: 10.0

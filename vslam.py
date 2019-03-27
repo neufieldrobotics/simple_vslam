@@ -20,10 +20,12 @@ np.set_printoptions(precision=3,suppress=True)
 import multiprocessing as mp
 from colorama import Fore, Style
 from itertools import cycle
-
+import logging
+import copy
 '''
 PROCESS FRAME
 '''
+logging.basicConfig(level=logging.DEBUG)
 frame_no = 3
 def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc, kp_prev_cand, lm_prev, T_prev):
     print ("len of lm_prev:",len(lm_prev))
@@ -221,10 +223,12 @@ def preprocess_frame(image_name, detector, mask_name=None, clahe_obj=None, tilin
         kp = radial_non_max(kp,rnm_radius)
         pbf += " > radial supression: "+str(len(kp))
     
+    logging.debug('kp in preprocess frame: '+str(kp[0].pt)+' ...kp10: '+str(kp[10].pt))
+    
     #kp_pts = np.expand_dims(np.array([o.pt for o in kp],dtype='float32'),1)
     
     print(pbf+"\nPre-processing time is", time.time()-pt)
-    return gr, mask, kp, des
+    return gr, mask, copy.deepcopy(kp), des
 
 def writer(imgnames, masknames, config_dict, queue):
     TILE_KP = config_dict['use_tiling_non_max_supression']
@@ -253,13 +257,17 @@ def writer(imgnames, masknames, config_dict, queue):
         for i in range(len(imgnames)):
             if queue.empty(): print(Fore.RED+"Queue empty, reading is slow..."+Style.RESET_ALL)
             while queue.full():
-                time.sleep(0.1)
+                time.sleep(0.2)
                 #print(Fore.GREEN+"Writer queue full, waiting..."+Style.RESET_ALL)
             if USE_MASKS:
                 queue.put(preprocess_frame(imgnames[i], detector, masknames[i], clahe, 
                                            tiling, RADIAL_NON_MAX_RADIUS))
-            else: queue.put(preprocess_frame(imgnames[i], detector, None, clahe, 
-                                           tiling, RADIAL_NON_MAX_RADIUS))
+            else: 
+                ppoutput = preprocess_frame(imgnames[i], detector, None, clahe, 
+                                            tiling, RADIAL_NON_MAX_RADIUS)
+                gr, mask, kp, des = ppoutput
+                logging.debug('kp in writer: '+str(kp[0].pt)+' ...kp10: '+str(kp[10].pt))
+                queue.put(ppoutput)
     except KeyboardInterrupt:
         print ("Keyboard interrupt from me")
         pass
@@ -343,25 +351,34 @@ if __name__ == '__main__':
     writer_p = mp.Process(target=writer, args=(images, masks, config_dict, mpqueue,))
     writer_p.daemon = True
     writer_p.start()        # Launch reader_proc() as a separate python process
-
+    
+    time.sleep(4)
     gr1, mask1, kp1, des1 = mpqueue.get()
     gr2, mask2, kp2, des2 = mpqueue.get()
+    logging.debug('kp1: '+str(kp1[0].pt)+' kp2: '+str(kp2[0].pt))
+    logging.debug('Length of kp1: '+str(len(kp1))+' Length of kp2: '+str(len(kp2)))
 
     matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
-
+    matches_12 = knn_match_and_lowe_ratio_filter(matcher, des1, des2)
+    logging.debug('Length of matches: '+str(len(matches_12)))
     #kp2_match_12, mask_klt, err = cv2.calcOpticalFlowPyrLK(gr1, gr2, kp1_match_12, None, **config_dict['KLT_settings'])
     #print ("KLT tracked: ",np.sum(mask_klt) ," of total ",len(kp1_match_12),"keypoints")
     
-    kp1_match_12 = kp1_match_12[mask_klt[:,0].astype(bool)]
-    kp2_match_12 = kp2_match_12[mask_klt[:,0].astype(bool)]
+    track_output = track_keypoints(kp1, des1, kp2, des2, matches_12)
+    kp1_matched, des1_matched, kp2_matched, des2_matched, kp2_cand, des2_cand = track_output
     
+    #kp1_match_12 = kp1_match_12[mask_klt[:,0].astype(bool)]
+    #kp2_match_12 = kp2_match_12[mask_klt[:,0].astype(bool)]
     
+    kp1_match_12 = np.expand_dims(np.array([o.pt for o in kp1_matched],dtype='float32'),1)
+    kp2_match_12 = np.expand_dims(np.array([o.pt for o in kp2_matched],dtype='float32'),1)
     
     kp1_match_12_ud = cv2.undistortPoints(kp1_match_12,K,D)
     kp2_match_12_ud = cv2.undistortPoints(kp2_match_12,K,D)
     
     E_12, mask_e_12 = cv2.findEssentialMat(kp1_match_12_ud, kp2_match_12_ud, focal=1.0, pp=(0., 0.), 
                                            method=cv2.RANSAC, prob=0.999, threshold=0.001)
+    sys.exit()
     print ("Essential matrix: used ",np.sum(mask_e_12) ," of total ",len(kp1_match_12),"matches")
     essen_mat_pts = np.sum(mask_e_12)
     points, R_21, t_21, mask_RP_12 = cv2.recoverPose(E_12, kp1_match_12_ud, kp2_match_12_ud,mask=mask_e_12)
