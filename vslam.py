@@ -210,7 +210,7 @@ def preprocess_frame(image_name, detector, mask_name=None, clahe_obj=None, tilin
 
     if clahe_obj is not None: gr = clahe_obj.apply(gr)
     
-    kp = detector.detect(gr,mask)
+    kp,des = detector.detectAndCompute(gr,mask)
     pbf = "New feature candidates detected: "+str(len(kp))
     
     if tiling is not None:
@@ -221,9 +221,10 @@ def preprocess_frame(image_name, detector, mask_name=None, clahe_obj=None, tilin
         kp = radial_non_max(kp,rnm_radius)
         pbf += " > radial supression: "+str(len(kp))
     
-    kp_pts = np.expand_dims(np.array([o.pt for o in kp],dtype='float32'),1)
+    #kp_pts = np.expand_dims(np.array([o.pt for o in kp],dtype='float32'),1)
+    
     print(pbf+"\nPre-processing time is", time.time()-pt)
-    return gr, mask, kp_pts
+    return gr, mask, kp, des
 
 def writer(imgnames, masknames, config_dict, queue):
     TILE_KP = config_dict['use_tiling_non_max_supression']
@@ -243,7 +244,8 @@ def writer(imgnames, masknames, config_dict, queue):
         RADIAL_NON_MAX_RADIUS = config_dict['radial_non_max_radius']
     else: RADIAL_NON_MAX_RADIUS = None
     
-    detector = cv2.ORB_create(**config_dict['ORB_settings'])  
+    #detector = cv2.ORB_create(**config_dict['ORB_settings'])
+    detector = MultiHarrisZernike(Nfeats=600,like_matlab=False)
     
     print('Starting writer process...', flush=True)
     
@@ -260,7 +262,7 @@ def writer(imgnames, masknames, config_dict, queue):
                                            tiling, RADIAL_NON_MAX_RADIUS))
     except KeyboardInterrupt:
         print ("Keyboard interrupt from me")
-        passqq
+        pass
     except:
         traceback.print_exc(file=sys.stdout)
     
@@ -342,15 +344,18 @@ if __name__ == '__main__':
     writer_p.daemon = True
     writer_p.start()        # Launch reader_proc() as a separate python process
 
-    gr1, mask1, kp1_match_12 = mpqueue.get()
-    gr2, mask2, kp2_pts = mpqueue.get()
+    gr1, mask1, kp1, des1 = mpqueue.get()
+    gr2, mask2, kp2, des2 = mpqueue.get()
 
+    matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
 
-    kp2_match_12, mask_klt, err = cv2.calcOpticalFlowPyrLK(gr1, gr2, kp1_match_12, None, **config_dict['KLT_settings'])
-    print ("KLT tracked: ",np.sum(mask_klt) ," of total ",len(kp1_match_12),"keypoints")
+    #kp2_match_12, mask_klt, err = cv2.calcOpticalFlowPyrLK(gr1, gr2, kp1_match_12, None, **config_dict['KLT_settings'])
+    #print ("KLT tracked: ",np.sum(mask_klt) ," of total ",len(kp1_match_12),"keypoints")
     
     kp1_match_12 = kp1_match_12[mask_klt[:,0].astype(bool)]
     kp2_match_12 = kp2_match_12[mask_klt[:,0].astype(bool)]
+    
+    
     
     kp1_match_12_ud = cv2.undistortPoints(kp1_match_12,K,D)
     kp2_match_12_ud = cv2.undistortPoints(kp2_match_12,K,D)
