@@ -21,7 +21,7 @@ import multiprocessing as mp
 from colorama import Fore, Style
 from itertools import cycle
 import logging
-import copyreg
+#import copyreg
 '''
 PROCESS FRAME
 '''
@@ -31,29 +31,37 @@ logging.basicConfig(level=logging.DEBUG)
 #vslog.setLevel(logging.DEBUG)
 frame_no = 3
 
+'''
 def _pickle_keypoints(point):
     return cv2.KeyPoint, (*point.pt, point.size, point.angle,
                           point.response, point.octave, point.class_id)
 
 copyreg.pickle(cv2.KeyPoint().__class__, _pickle_keypoints)
+'''
 
-def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, des_curr_cand, gr_prev, 
-                  kp_prev_matchpc, kp_prev_cand, des_prev_cand, lm_prev, T_prev):
+# j = current, i = previous frame
+def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i, 
+                  kp_i_cand, des_i_cand, lm_i, T_i):
     #vslog = logging.getLogger('VSLAM')
     global frame_no, cam_pose_trail, cam_trail_pts, cam_pose, new_lm_graph, vslog
-    vslog.warn("len of lm_prev: "+ str(len(lm_prev)))
-    vslog.warn("len of kp_prev_matchpc: " + str(len(kp_prev_matchpc)))
+    vslog.info("len of lm_i: {}".format(len(lm_i)))
+    vslog.info("len of kp_i: {}".format(len(kp_i)))
 
     time_start = time.time()
-
-    kp_curr_matchpc, mask_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
-                                    kp_prev_matchpc, None, **config_dict['KLT_settings'])
-
-    print ("KLT Tracked: ",np.sum(mask_klt)," of total ",len(kp_prev_matchpc),"keypoints")
-    kp_prev_matchpc = kp_prev_matchpc[mask_klt[:,0].astype(bool)]
-    kp_curr_matchpc = kp_curr_matchpc[mask_klt[:,0].astype(bool)]
-
     
+    #kp_prev_matchpc = np.expand_dims(kp_prev_matchpc,1)
+    matches_ij = knn_match_and_lowe_ratio_filter(matcher, des_i, des_j) 
+    vslog.info("Matched: {} of previous {} points ".format(len(matches_ij),len(kp_i)))
+    
+    track_output = track_kp_array(kp_i, des_i, kp_j, des_j, matches_ij, lm_i)
+    kp_i_m, des_i_m, kp_i_m, des_j_m, kp_j_cand, des_j_cand = track_output
+
+    #kp_curr_matchpc, mask_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
+    #                                kp_prev_matchpc, None, **config_dict['KLT_settings'])
+    
+#    kp_prev_matchpc = kp_prev_matchpc[mask_klt[:,0].astype(bool)]
+#    kp_curr_matchpc = kp_curr_matchpc[mask_klt[:,0].astype(bool)]
+    '''
     if len(kp_prev_cand)>0:
         kp_curr_cand_matchpc, mask_cand_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
                                                             kp_prev_cand, None, **config_dict['KLT_settings'])
@@ -63,21 +71,25 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, des_curr_cand, gr_prev,
     else: 
         kp_curr_cand_matchpc = np.zeros([0,1,2])
         print ("No New KLT Candidates Tracked. ")
-        
-    print("Time elapsed in optical flow: ",time.time()-time_start); time_start = time.time()
+    '''
+    
+    vslog.debug(" Time elapsed in matcher flow: {:.4f}".format(time.time()-time_start)); 
+    time_start = time.time()
 
     # Filter out points that are not tracked
     #print("kp_prev_cand: ",kp_prev_cand)
     #print("kp_curr_cand_matchpc: ",kp_curr_cand_matchpc)
 
-    lm_prev = lm_prev[mask_klt[:,0].astype(bool)]
+    #lm_prev = lm_prev[mask_klt[:,0].astype(bool)]
     
     # Merge tracked LM and candidate pts to filter together in findEssential
+    vslog.debug("shape of kp_prev_matchpc: {}, shape of kp_prev_cand: {}".format(kp_i_m.shape,kp_i_cand.shape))
+    
     kp_prev_all = np.vstack((kp_prev_matchpc, kp_prev_cand))
     kp_curr_all = np.vstack((kp_curr_matchpc, kp_curr_cand_matchpc))
     
-    kp_prev_all_ud = cv2.undistortPoints(kp_prev_all,K,D)
-    kp_curr_all_ud = cv2.undistortPoints(kp_curr_all,K,D)
+    kp_prev_all_ud = cv2.undistortPoints(np.expand_dims(kp_prev_all,1),K,D)[:,0,:]
+    kp_curr_all_ud = cv2.undistortPoints(np.expand_dims(kp_curr_all,1),K,D)[:,0,:]
 
     print("Time elapsed in undistort: ",time.time()-time_start); time_start = time.time()
 
@@ -114,7 +126,6 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, des_curr_cand, gr_prev,
     else: img_track_all = img_track_feat
     print("Time elapsed in drawing tracks: ",time.time()-time_start);time_start = time.time()
 
-
     #fig1_image.set_data(img_track_all)
     #fig1.canvas.draw_idle(); plt.pause(0.01)
     #if PAUSES: input("Press [enter] to continue.")
@@ -140,6 +151,7 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, des_curr_cand, gr_prev,
         kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_RP_cand[:,0].astype(bool)]    
     kp_prev_cand_ud = kp_prev_cand_ud[mask_RP_cand[:,0].astype(bool)]
     kp_curr_cand_ud = kp_curr_cand_ud[mask_RP_cand[:,0].astype(bool)]
+    
     
     lm_cand, mask_tri = triangulate(T_prev, T_cur, kp_prev_cand_ud, 
                                     kp_curr_cand_ud, None)
@@ -196,17 +208,20 @@ def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, des_curr_cand, gr_prev,
         print ("candidates points after radial supression: ",len(kp_curr_cand))
     
     kp_curr_cand_pts  = np.expand_dims(np.array([o.pt for o in kp_curr_cand],dtype='float32'),1)
-    '''     
+        
     kp_curr_cand_pts = remove_redundant_newkps(kp_curr_cand_pts, kp_curr_matchpc, RADIAL_NON_MAX_RADIUS)
+    ''' 
     
     print("Time elapsed in orb, filtering, radial: ",time.time()-time_start)
 
     print ("Candidate points after redudancy check against current kps: ",len(kp_curr_cand_pts))
-    img_cand_pts = draw_points(img_rej_pts,kp_curr_cand_pts[:,0,:], color=[255,255,0])
+    img_cand_pts = draw_points(img_rej_pts,kp_curr_cand_pts, color=[255,255,0])
     fig1_image.set_data(img_cand_pts)
     fig1.canvas.draw_idle(); plt.pause(0.05)
     
     frame_no += 1
+    
+    time.sleep(5)
     
     print ("FRAME deq "+str(frame_no)+" COMPLETE")
 
@@ -239,9 +254,10 @@ def preprocess_frame(image_name, detector, mask_name=None, clahe_obj=None, tilin
     vslog.debug('kp in preprocess frame: '+str(kp[0].pt)+' ...kp10: '+str(kp[10].pt))
     
     #kp_pts = np.expand_dims(np.array([o.pt for o in kp],dtype='float32'),1)
+    kp_pts = cv2.KeyPoint_convert(kp)
     
     print(pbf+"\nPre-processing time is", time.time()-pt)
-    return gr, mask, kp, des
+    return gr, mask, kp_pts, des
 
 def writer(imgnames, masknames, config_dict, queue):
     TILE_KP = config_dict['use_tiling_non_max_supression']
@@ -262,7 +278,7 @@ def writer(imgnames, masknames, config_dict, queue):
     else: RADIAL_NON_MAX_RADIUS = None
     
     #detector = cv2.ORB_create(**config_dict['ORB_settings'])
-    detector = MultiHarrisZernike(Nfeats=600,like_matlab=False)
+    detector = MultiHarrisZernike(Nfeats=1000,like_matlab=False)
     
     print('Starting writer process...', flush=True)
     
@@ -279,7 +295,7 @@ def writer(imgnames, masknames, config_dict, queue):
                 ppoutput = preprocess_frame(imgnames[i], detector, None, clahe, 
                                             tiling, RADIAL_NON_MAX_RADIUS)
                 gr, mask, kp, des = ppoutput
-                vslog.debug('kp in writer: '+str(kp[0].pt)+' ...kp10: '+str(kp[10].pt))
+                vslog.debug('kp in writer: '+str(kp[0,:])+' ...kp10: '+str(kp[10,:]))
                 queue.put(ppoutput)
     except KeyboardInterrupt:
         print ("Keyboard interrupt from me")
@@ -297,7 +313,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
      
     # Inputs, images and camera info
-    
     if sys.platform == 'darwin':
         path = '/Users/vik748/Google Drive/'
         window_xadj = 0
@@ -311,12 +326,7 @@ if __name__ == '__main__':
     K = np.array(config_dict['K'])
     D = np.array(config_dict['D'])
     CHESSBOARD = config_dict['chessboard']
- #   TILEY=config_dict['tiling_non_max_tile_y']; 
-#    TILEX=config_dict['tiling_non_max_tile_x']; 
-#    TILE_KP = config_dict['use_tiling_non_max_supression']
     USE_MASKS = config_dict['use_masks']
-#    USE_CLAHE = config_dict['use_clahe']
-#    RADIAL_NON_MAX = config_dict['radial_non_max']
     RADIAL_NON_MAX_RADIUS = config_dict['radial_non_max_radius']
     image_folder = config_dict['image_folder']
     image_ext = config_dict['image_ext']
@@ -335,7 +345,7 @@ if __name__ == '__main__':
     
     assert images is not None, "ERROR: No images read"
     
-    print(K,D)
+    vslog.info("\nK: {} \nD: {}".format(K,D))
             
     if USE_MASKS:
         masks_folder = config_dict['masks_folder']
@@ -347,9 +357,6 @@ if __name__ == '__main__':
     else:
         masks = None     
     
-    #def onClick(event):
-    #    print("Click")
-    
     def onKey(event):
         global paused, cue_to_exit
         #print('you pressed', event.key, event.xdata, event.ydata)
@@ -358,49 +365,43 @@ if __name__ == '__main__':
         if event.key=="q":
             cue_to_exit = True
     
-                
+    # Launch the pre-processing thread                
     mp.set_start_method('spawn')
     mpqueue = mp.Queue(5) # writer() writes to pqueue from _this_ process
     writer_p = mp.Process(target=writer, args=(images, masks, config_dict, mpqueue,))
     writer_p.daemon = True
     writer_p.start()        # Launch reader_proc() as a separate python process
     
-    time.sleep(4)
+    # Process first 2 frames
     gr1, mask1, kp1, des1 = mpqueue.get()
     gr2, mask2, kp2, des2 = mpqueue.get()
-    vslog.debug('kp1: '+str(kp1[0].pt)+' kp2: '+str(kp2[0].pt))
-    vslog.debug('Length of kp1: '+str(len(kp1))+' Length of kp2: '+str(len(kp2)))
+    #vslog.debug(' kp1: '+str(kp1[0,:])+' kp2: '+str(kp2[0,:]))
+    vslog.debug(' Length of kp1: {}  Length of kp2: {}'.format(len(kp1),len(kp2)))
 
     matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
     matches_12 = knn_match_and_lowe_ratio_filter(matcher, des1, des2)
-    vslog.debug('Length of matches: '+str(len(matches_12)))
-    #kp2_match_12, mask_klt, err = cv2.calcOpticalFlowPyrLK(gr1, gr2, kp1_match_12, None, **config_dict['KLT_settings'])
-    #print ("KLT tracked: ",np.sum(mask_klt) ," of total ",len(kp1_match_12),"keypoints")
+    vslog.debug(' Length of matches: '+str(len(matches_12)))
     
-    track_output = track_keypoints(kp1, des1, kp2, des2, matches_12)
-    kp1_matched, des1_matched, kp2_matched, des2_matched, kp2_cand, des2_cand = track_output
+    track_output = track_kp_array(kp1, des1, kp2, des2, matches_12)
+    kp1_match_12, des1_m, kp2_match_12, des2_m, kp2_cand_pts, des2_cand = track_output
     
-    #kp1_match_12 = kp1_match_12[mask_klt[:,0].astype(bool)]
-    #kp2_match_12 = kp2_match_12[mask_klt[:,0].astype(bool)]
+    #kp1_match_12 = np.expand_dims(kp1_matched,1)
+    #kp2_match_12 = np.expand_dims(kp2_matched,1)
     
-    kp1_match_12 = np.expand_dims(cv2.KeyPoint_convert(kp1_matched),1)
-    kp2_match_12 = np.expand_dims(cv2.KeyPoint_convert(kp2_matched),1)
-    
-    kp1_match_12_ud = cv2.undistortPoints(kp1_match_12,K,D)
-    kp2_match_12_ud = cv2.undistortPoints(kp2_match_12,K,D)
+    kp1_match_12_ud = cv2.undistortPoints(np.expand_dims(kp1_match_12,1),K,D)[:,0,:]
+    kp2_match_12_ud = cv2.undistortPoints(np.expand_dims(kp2_match_12,1),K,D)[:,0,:]
     
     E_12, mask_e_12 = cv2.findEssentialMat(kp1_match_12_ud, kp2_match_12_ud, focal=1.0, pp=(0., 0.), 
                                            method=cv2.RANSAC, prob=0.999, threshold=0.001)
-    print ("Essential matrix: used ",np.sum(mask_e_12) ," of total ",len(kp1_match_12),"matches")
+    vslog.info(" Essential matrix: used {} of total {} matches".format(np.sum(mask_e_12),len(kp1_match_12),))
     essen_mat_pts = np.sum(mask_e_12)
     points, R_21, t_21, mask_RP_12 = cv2.recoverPose(E_12, kp1_match_12_ud, kp2_match_12_ud,mask=mask_e_12)
-    print ("Recover pose used ",np.sum(mask_RP_12) ," of total ",essen_mat_pts," matches in Essential matrix")
+    vslog.info(" Recover pose used {} of total matches in Essential matrix".format(np.sum(mask_RP_12),essen_mat_pts))
     T_2_1 = compose_T(R_21,t_21)
     T_1_2 = T_inv(T_2_1)
-    print("R:",R_21)
-    print("t:",t_21.T)
-    
-    img12 = draw_point_tracks(kp1_match_12,gr2,kp2_match_12,mask_RP_12, False)
+    vslog.info("\nR: {} \t t:".format(R_21,t_21.T))
+        
+    img12 = draw_point_tracks(kp1_match_12,gr2,kp2_match_12,mask_RP_12, True)
     
     fig1 = plt.figure(1)
     plt.get_current_fig_manager().window.setGeometry(window_xadj,window_yadj,640,338)
@@ -417,6 +418,7 @@ if __name__ == '__main__':
     # Trim the tracked key pts
     kp1_match_12 = kp1_match_12[mask_RP_12[:,0].astype(bool)]
     kp2_match_12 = kp2_match_12[mask_RP_12[:,0].astype(bool)]
+    des2_m = des2_m[mask_RP_12[:,0].astype(bool)]
     
     kp1_match_12_ud = kp1_match_12_ud[mask_RP_12[:,0].astype(bool)]
     kp2_match_12_ud = kp2_match_12_ud[mask_RP_12[:,0].astype(bool)]
@@ -441,6 +443,7 @@ if __name__ == '__main__':
         graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='C0')
     
     kp2_match_12 = kp2_match_12[mask_tri_12[:,0].astype(bool)]
+    des2_m = des2_m[mask_tri_12[:,0].astype(bool)]
             
     cam_pose_0 = plot_pose3_on_axes(ax2,np.eye(4), axis_length=0.5)
     cam_pose = plot_pose3_on_axes(ax2, T_1_2, axis_length=1.0)
@@ -456,8 +459,8 @@ if __name__ == '__main__':
        
     #kp2_pts = remove_redundant_newkps(kp2_pts, kp2_match_12, 5)
     
-    print ("Length of candidate pts: ",len(kp2_cand))
-    kp2_cand_pts = cv2.KeyPoint_convert(kp2_cand)
+    print ("Length of candidate pts: ",len(kp2_cand_pts))
+    #kp2_cand_pts = kp2_cand
     
     img12_newpts = draw_points(img12,kp2_cand_pts, color=[255,255,0])
     fig1_image.set_data(img12_newpts)
@@ -466,8 +469,8 @@ if __name__ == '__main__':
     
     print ("\n \n FRAME 2 COMPLETE \n \n")
 
-    out = process_frame(*mpqueue.get(), gr2, kp2_match_12, 
-                        kp2_cand, des2_cand, landmarks_12, T_1_2)
+    out = process_frame(*mpqueue.get(), gr2, kp2_match_12, des2_m,
+                        kp2_cand_pts, des2_cand, landmarks_12, T_1_2)
         
     print ("\n \n FRAME 3 COMPLETE \n \n")
     

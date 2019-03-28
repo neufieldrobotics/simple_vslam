@@ -31,12 +31,14 @@ def T_inv(T_in):
     t_out = -np.matmul(R_out,t_in)
     return np.vstack((np.hstack((R_out,t_out)),np.array([0, 0, 0, 1])))
 
-def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask):
+def triangulate(T_w_1, T_w_2, pts_1_2d, pts_2_2d, mask):
     '''
     This function accepts two homogeneous transforms (poses) of 2 cameras in world coordinates,
     along with corresponding matching points and returns the 3D coordinates in world coordinates
     Mask must be a dimensionless array or n, array
     '''
+    pts_1 = np.expand_dims(pts_1_2d,1)
+    pts_2 = np.expand_dims(pts_2_2d,1)
     T_origin = np.eye(4)
     P_origin = T_origin[:3]
     # calculate the transform of 1 in 2's frame
@@ -166,9 +168,10 @@ def draw_point_tracks(kp1,img_right,kp2, mask, display_invalid=False, color=(0, 
     (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
     The mask should be the same length as matches
     '''
-    bool_mask = mask.astype(bool)
-    valid_left_matches = kp1[bool_mask]
-    valid_right_matches = kp2[bool_mask]
+    print("kp1 shape{} , mask shape: {}".format(kp1.shape,mask.shape))
+    bool_mask = mask[:,0].astype(bool)
+    valid_left_matches = kp1[bool_mask,:]
+    valid_right_matches = kp2[bool_mask,:]
     #img_right_out = draw_points(img_right, valid_right_matches)
     img_right_out = draw_arrows(img_right, valid_left_matches, valid_right_matches, color=color)
     
@@ -392,9 +395,9 @@ def knn_match_and_lowe_ratio_filter(matcher, des1, des2,threshold=0.9):
             matches.append(match[0])
 
     return matches
-
+'''
 def track_keypoints(kp1, des1, kp2, des2, matches):
-    '''
+    
     track_keypoints accepts 2 list of keypoints and descriptors and a list of 
     matches and returns, matched lists of keypoints and descriptors. Also returns
     a set of candidate keypoints from 2 which didn't have matches in 1
@@ -411,7 +414,7 @@ def track_keypoints(kp1, des1, kp2, des2, matches):
         NxD array of descriptors where N = len(kp2) and D is length of descriptor        
     matches : list of cv2.DMatch objects
         List of matches between 1 and 2. (single matches only not KNN)
-    '''
+    
     kp1_matched = []    
     kp2_matched = []
     des1_matched = np.zeros((len(matches),des1.shape[1]),des1.dtype)
@@ -435,6 +438,52 @@ def track_keypoints(kp1, des1, kp2, des2, matches):
     des2_cand = des2[cand_indx,:]
     
     return kp1_matched, des1_matched, kp2_matched, des2_matched, kp2_cand, des2_cand
+'''
+def track_kp_array(kp1_pts, des1, kp2_pts, des2, matches, lm1=None):
+    '''
+    track_keypoints accepts 2 arrays of keypoint coordinates and descriptors and a list of 
+    matches and returns, matched arrays of keypoints and descriptors. Also returns
+    a set of candidate keypoints coords from 2 which didn't have matches in 1
+    
+    Parameters
+    ----------
+    kp1 : N1x2 array 
+        KeyPoint coordinates from frame 1
+    des1 : N1xD array
+        N1xD array of descriptors where N1 number of keypoints and D is length of descriptor
+    kp2 : N2x2 array
+        Keypoint coordinates from frame 2
+    des2 : N2xD array
+        N2xD array of descriptors where N2 number of keypoints and D is length of descriptor        
+    matches : list of cv2.DMatch objects
+        List of matches between 1 and 2. (single matches only not KNN)
+    '''
+    kp1_matched_inds = []    
+    kp2_matched_inds = []
+    matched_kp2_indx = []
+
+    # Go through matches and create list of indices of kp1 and kp2 which matched
+    for i,m in enumerate(matches):
+        kp1_matched_inds += [m.queryIdx]
+        kp2_matched_inds += [m.trainIdx]
+    
+    kp1_match_pts = kp1_pts[kp1_matched_inds,:]
+    des1_matched  = des1[kp1_matched_inds,:]
+    if lm1 is not None:
+        lm1_matched   = lm1[kp1_matched_inds,:]
+    kp2_match_pts = kp2_pts[kp2_matched_inds,:]
+    des2_matched  = des2[kp2_matched_inds,:]
+    
+    kp2_cand=[]
+    cand_indx = []
+    for i in range(kp2_match_pts.shape[0]):
+        if i not in matched_kp2_indx:
+            #kp2_cand += [k]
+            cand_indx += [i]
+    kp2_cand_pts = kp2_pts[cand_indx,:]
+    des2_cand = des2[cand_indx,:]
+    
+    return kp1_match_pts, des1_matched, kp2_match_pts, des2_matched, kp2_cand_pts, des2_cand
 
 def move_figure(position="top-right"):
     '''
