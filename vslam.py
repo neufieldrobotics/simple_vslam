@@ -21,16 +21,29 @@ import multiprocessing as mp
 from colorama import Fore, Style
 from itertools import cycle
 import logging
-import copy
+import copyreg
 '''
 PROCESS FRAME
 '''
+global vslog
+vslog = logging.getLogger('VSLAM')
 logging.basicConfig(level=logging.DEBUG)
+#vslog.setLevel(logging.DEBUG)
 frame_no = 3
-def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, gr_prev, kp_prev_matchpc, kp_prev_cand, lm_prev, T_prev):
-    print ("len of lm_prev:",len(lm_prev))
-    print ("len of kp_prev_matchpc:",len(kp_prev_matchpc))
-    global frame_no, cam_pose_trail, cam_trail_pts, cam_pose, new_lm_graph
+
+def _pickle_keypoints(point):
+    return cv2.KeyPoint, (*point.pt, point.size, point.angle,
+                          point.response, point.octave, point.class_id)
+
+copyreg.pickle(cv2.KeyPoint().__class__, _pickle_keypoints)
+
+def process_frame(gr_curr, mask_curr, kp_curr_cand_pts, des_curr_cand, gr_prev, 
+                  kp_prev_matchpc, kp_prev_cand, des_prev_cand, lm_prev, T_prev):
+    #vslog = logging.getLogger('VSLAM')
+    global frame_no, cam_pose_trail, cam_trail_pts, cam_pose, new_lm_graph, vslog
+    vslog.warn("len of lm_prev: "+ str(len(lm_prev)))
+    vslog.warn("len of kp_prev_matchpc: " + str(len(kp_prev_matchpc)))
+
     time_start = time.time()
 
     kp_curr_matchpc, mask_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
@@ -223,12 +236,12 @@ def preprocess_frame(image_name, detector, mask_name=None, clahe_obj=None, tilin
         kp = radial_non_max(kp,rnm_radius)
         pbf += " > radial supression: "+str(len(kp))
     
-    logging.debug('kp in preprocess frame: '+str(kp[0].pt)+' ...kp10: '+str(kp[10].pt))
+    vslog.debug('kp in preprocess frame: '+str(kp[0].pt)+' ...kp10: '+str(kp[10].pt))
     
     #kp_pts = np.expand_dims(np.array([o.pt for o in kp],dtype='float32'),1)
     
     print(pbf+"\nPre-processing time is", time.time()-pt)
-    return gr, mask, copy.deepcopy(kp), des
+    return gr, mask, kp, des
 
 def writer(imgnames, masknames, config_dict, queue):
     TILE_KP = config_dict['use_tiling_non_max_supression']
@@ -266,7 +279,7 @@ def writer(imgnames, masknames, config_dict, queue):
                 ppoutput = preprocess_frame(imgnames[i], detector, None, clahe, 
                                             tiling, RADIAL_NON_MAX_RADIUS)
                 gr, mask, kp, des = ppoutput
-                logging.debug('kp in writer: '+str(kp[0].pt)+' ...kp10: '+str(kp[10].pt))
+                vslog.debug('kp in writer: '+str(kp[0].pt)+' ...kp10: '+str(kp[10].pt))
                 queue.put(ppoutput)
     except KeyboardInterrupt:
         print ("Keyboard interrupt from me")
@@ -355,12 +368,12 @@ if __name__ == '__main__':
     time.sleep(4)
     gr1, mask1, kp1, des1 = mpqueue.get()
     gr2, mask2, kp2, des2 = mpqueue.get()
-    logging.debug('kp1: '+str(kp1[0].pt)+' kp2: '+str(kp2[0].pt))
-    logging.debug('Length of kp1: '+str(len(kp1))+' Length of kp2: '+str(len(kp2)))
+    vslog.debug('kp1: '+str(kp1[0].pt)+' kp2: '+str(kp2[0].pt))
+    vslog.debug('Length of kp1: '+str(len(kp1))+' Length of kp2: '+str(len(kp2)))
 
     matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
     matches_12 = knn_match_and_lowe_ratio_filter(matcher, des1, des2)
-    logging.debug('Length of matches: '+str(len(matches_12)))
+    vslog.debug('Length of matches: '+str(len(matches_12)))
     #kp2_match_12, mask_klt, err = cv2.calcOpticalFlowPyrLK(gr1, gr2, kp1_match_12, None, **config_dict['KLT_settings'])
     #print ("KLT tracked: ",np.sum(mask_klt) ," of total ",len(kp1_match_12),"keypoints")
     
@@ -370,15 +383,14 @@ if __name__ == '__main__':
     #kp1_match_12 = kp1_match_12[mask_klt[:,0].astype(bool)]
     #kp2_match_12 = kp2_match_12[mask_klt[:,0].astype(bool)]
     
-    kp1_match_12 = np.expand_dims(np.array([o.pt for o in kp1_matched],dtype='float32'),1)
-    kp2_match_12 = np.expand_dims(np.array([o.pt for o in kp2_matched],dtype='float32'),1)
+    kp1_match_12 = np.expand_dims(cv2.KeyPoint_convert(kp1_matched),1)
+    kp2_match_12 = np.expand_dims(cv2.KeyPoint_convert(kp2_matched),1)
     
     kp1_match_12_ud = cv2.undistortPoints(kp1_match_12,K,D)
     kp2_match_12_ud = cv2.undistortPoints(kp2_match_12,K,D)
     
     E_12, mask_e_12 = cv2.findEssentialMat(kp1_match_12_ud, kp2_match_12_ud, focal=1.0, pp=(0., 0.), 
                                            method=cv2.RANSAC, prob=0.999, threshold=0.001)
-    sys.exit()
     print ("Essential matrix: used ",np.sum(mask_e_12) ," of total ",len(kp1_match_12),"matches")
     essen_mat_pts = np.sum(mask_e_12)
     points, R_21, t_21, mask_RP_12 = cv2.recoverPose(E_12, kp1_match_12_ud, kp2_match_12_ud,mask=mask_e_12)
@@ -429,8 +441,7 @@ if __name__ == '__main__':
         graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='C0')
     
     kp2_match_12 = kp2_match_12[mask_tri_12[:,0].astype(bool)]
-    
-        
+            
     cam_pose_0 = plot_pose3_on_axes(ax2,np.eye(4), axis_length=0.5)
     cam_pose = plot_pose3_on_axes(ax2, T_1_2, axis_length=1.0)
     
@@ -443,11 +454,12 @@ if __name__ == '__main__':
     plt.pause(.01)
     input("Press [enter] to continue.")
        
-    kp2_pts = remove_redundant_newkps(kp2_pts, kp2_match_12, 5)
+    #kp2_pts = remove_redundant_newkps(kp2_pts, kp2_match_12, 5)
     
-    print ("Points after redudancy check with current kps: ",len(kp2_pts))
+    print ("Length of candidate pts: ",len(kp2_cand))
+    kp2_cand_pts = cv2.KeyPoint_convert(kp2_cand)
     
-    img12_newpts = draw_points(img12,kp2_pts[:,0,:], color=[255,255,0])
+    img12_newpts = draw_points(img12,kp2_cand_pts, color=[255,255,0])
     fig1_image.set_data(img12_newpts)
     fig1.canvas.draw_idle(); plt.pause(0.01)
     if PAUSES: input("Press [enter] to continue.")
@@ -455,7 +467,7 @@ if __name__ == '__main__':
     print ("\n \n FRAME 2 COMPLETE \n \n")
 
     out = process_frame(*mpqueue.get(), gr2, kp2_match_12, 
-                        kp2_pts, landmarks_12, T_1_2)
+                        kp2_cand, des2_cand, landmarks_12, T_1_2)
         
     print ("\n \n FRAME 3 COMPLETE \n \n")
     
