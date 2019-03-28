@@ -42,7 +42,7 @@ class MultiHarrisZernike (cv2.Feature2D):
     lmax_nd : int, optional
         Feature neighborhood size for local maximum filter, default is 3
     like_matlab : bool, optional
-        Flag to replicate Oscar's Matlab version (slower) when true. Default is
+        Flag to replicate Oscar's Matlab version (slr) when true. Default is
         false
 
     ----------
