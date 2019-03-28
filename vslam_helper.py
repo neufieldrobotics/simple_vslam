@@ -228,7 +228,7 @@ def plot_pose2_on_axes(axes, pose, axis_length=0.1):
     line = np.append(origin[np.newaxis], y_axis[np.newaxis], axis=0)
     axes.plot(line[:, 0], line[:, 1], 'g-')
 
-def plot_pose3_on_axes(axes, T, axis_length=0.1, center_plot=False):
+def plot_pose3_on_axes(axes, T, axis_length=0.1, center_plot=False, line_obj_list=None):
     """Plot a 3D pose 4x4 homogenous transform  on given axis 'axes' with given 'axis_length'."""
     return plot_pose3RT_on_axes(axes, *decompose_T(T), axis_length, center_plot, line_obj_list)
 
