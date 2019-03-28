@@ -71,37 +71,48 @@ a,b,matches = knn_match_and_filter(matcher, kp1, kp2, des1, des2,threshold=0.9)
 
 
 
-def track_keypoints(kp1,kp2, matches):
-    m_qid = {}
-    m_qid_vals = []
-    mask = np.zeros((len(kp1),1),dtype='uint8')
-    # Create dictionary of kp1 to kp2 indexes and list of matched kp2 indexes
-    for i,m in enumerate(matches):
-        m_qid[m.queryIdx]=m.trainIdx
-        m_qid_vals += [m.trainIdx]
-        
+def track_keypoints(kp1, des1, kp2, des2, matches):
+    '''
+    track_keypoints accepts 2 list of keypoints and descriptors and a list of 
+    matches and returns, matched lists of keypoints and descriptors. Also returns
+    a set of candidate keypoints from 2 which didn't have matches in 1
+    
+    Parameters
+    ----------
+    kp1 : list of cv2.KeyPoint objects
+        Keypoints from frame 1
+    des1 : NxD array
+        NxD array of descriptors where N = len(kp1) and D is length of descriptor
+    kp2 : list of cv2.KeyPoint objects
+        Keypoints from frame 2
+    des2 : NxD array
+        NxD array of descriptors where N = len(kp2) and D is length of descriptor        
+    matches : list of cv2.DMatch objects
+        List of matches between 1 and 2. (single matches only not KNN)
+    '''
+    kp1_matched = []    
     kp2_matched = []
-    mask = np.zeros((len(kp1),1),dtype='uint8')
-    # Go through kp1 and find correspoding kp2 objects, kp2_matched is same length
-    # as kp1 and contains None if there is no match
+    des1_matched = np.zeros((len(kp1),des1.shape[1]),des1.dtype)
+    des2_matched = np.zeros((len(kp2),des2.shape[1]),des2.dtype)
+    matched_kp2_indx = []
 
-    for i,k1 in enumerate(kp1):
-        k2 = m_qid.get(i)
-        #kp2_matched += kp2[k2]
-        if k2 :
-            kp2_matched += [kp2[k2]]
-            mask[i] = 1
-        else: 
-            kp2_matched += [None]
+    # Go through matches and create subsets of kp1 and kp2 which matched
+    for i,m in enumerate(matches):
+        kp1_matched += [kp1[m.queryIdx]]
+        kp2_matched += [kp2[m.trainIdx]]
+        des1_matched[i,:] = des1[m.queryIdx,:]
+        des2_matched[i,:] = des2[m.trainIdx,:]
+        matched_kp2_indx += [m.trainIdx]
 
     kp2_cand=[]
-    for i,v in enumerate(kp2):
-        if i not in m_qid_vals:
-            kp2_cand += [v]
+    cand_indx = []
+    for i,k in enumerate(kp2):
+        if i not in matched_kp2_indx:
+            kp2_cand += [k]
+            cand_indx += [i]
+    des2_cand = des2[cand_indx,:]
     
-    #kp_pts = np.expand_dims(np.array([o.pt for o in kp],dtype='float32'),1)
-    
-    return kp1, kp2_matched, kp2_cand
+    return kp1_matched, des1_matched, kp2_matched, des2_matched, kp2_cand, des2_cand
 
 def track_matched_kp_and_filter_cand(kp1,kp2, matches):
     m_qid_vals = []
@@ -113,10 +124,11 @@ def track_matched_kp_and_filter_cand(kp1,kp2, matches):
         kp2_pts[i,1,:] = kp2[m.trainIdx].pt
         m_qid_vals += [m.trainIdx]
         
-    kp2_cand=[]
+    kp2_cand=[]    
     for i,v in enumerate(kp2):
         if i not in m_qid_vals:
             kp2_cand += [v]
+            
     
     #kp_pts = np.expand_dims(np.array([o.pt for o in kp],dtype='float32'),1)
     
