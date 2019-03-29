@@ -50,14 +50,14 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
     time_start = time.time()
     
     #kp_prev_matchpc = np.expand_dims(kp_prev_matchpc,1)
-    matches_ij = knn_match_and_lowe_ratio_filter(matcher, des_i, des_j) 
-    vslog.info("Matched: {} of previous {} points ".format(len(matches_ij),len(kp_i)))
+#    matches_ij = knn_match_and_lowe_ratio_filter(matcher, des_i, des_j)    
+    #vslog.info("Matched: {} of previous {} points ".format(len(matches_ij),len(kp_i)))
     
-    track_output = track_kp_array(kp_i, des_i, kp_j, des_j, matches_ij, lm_i)
-    kp_i_m, des_i_m, kp_i_m, des_j_m, kp_j_cand, des_j_cand = track_output
+    prop_out = propogate_kp(matcher, kp_i, des_i, kp_i_cand, des_i_cand, lm_i, kp_j, des_j)
+    kpil_match, kpic_match, kpjl_match, desjl_match, kpjn_match, desjn_match, kp_j_cand, des_j_cand, lm_if = prop_out
 
-    #kp_curr_matchpc, mask_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
-    #                                kp_prev_matchpc, None, **config_dict['KLT_settings'])
+#    track_output = track_kp_array(kp_i, des_i, kp_j, des_j, matches_ij, lm_i)
+#    kp_i_m, des_i_m, kp_i_m, des_j_m, kp_j_cand, des_j_cand = track_output
     
 #    kp_prev_matchpc = kp_prev_matchpc[mask_klt[:,0].astype(bool)]
 #    kp_curr_matchpc = kp_curr_matchpc[mask_klt[:,0].astype(bool)]
@@ -83,23 +83,23 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
     #lm_prev = lm_prev[mask_klt[:,0].astype(bool)]
     
     # Merge tracked LM and candidate pts to filter together in findEssential
-    vslog.debug("shape of kp_prev_matchpc: {}, shape of kp_prev_cand: {}".format(kp_i_m.shape,kp_i_cand.shape))
+    #vslog.debug("shape of kp_prev_matchpc: {}, shape of kp_prev_cand: {}".format(kp_i_m.shape,kp_i_cand.shape))
+
+    kp_i_all = np.vstack((kpil_match, kpic_match))
+    kp_j_all = np.vstack((kpjl_match, kpjn_match))
     
-    kp_prev_all = np.vstack((kp_prev_matchpc, kp_prev_cand))
-    kp_curr_all = np.vstack((kp_curr_matchpc, kp_curr_cand_matchpc))
-    
-    kp_prev_all_ud = cv2.undistortPoints(np.expand_dims(kp_prev_all,1),K,D)[:,0,:]
-    kp_curr_all_ud = cv2.undistortPoints(np.expand_dims(kp_curr_all,1),K,D)[:,0,:]
+    kp_i_ud = cv2.undistortPoints(np.expand_dims(kp_i_all,1),K,D)[:,0,:]
+    kp_j_ud = cv2.undistortPoints(np.expand_dims(kp_j_all,1),K,D)[:,0,:]
 
     print("Time elapsed in undistort: ",time.time()-time_start); time_start = time.time()
 
-    E, mask_e_all = cv2.findEssentialMat(kp_prev_all_ud, kp_curr_all_ud, focal=1.0, pp=(0., 0.), 
+    E, mask_e_all = cv2.findEssentialMat(kp_i_ud, kp_j_ud, focal=1.0, pp=(0., 0.), 
                                    method=cv2.RANSAC, prob=0.999, threshold=0.001)
     essen_mat_pts = np.sum(mask_e_all)  
     print("Time elapsed in find E: ",time.time()-time_start); time_start = time.time()
 
     
-    print ("Essential matrix: used ",essen_mat_pts ," of total ",len(kp_curr_all),"matches")
+    print ("Essential matrix: used ",essen_mat_pts ," of total ",len(kp_j_all),"matches")
     
     if FILTER_RP:
         # Recover Pose filtering is breaking under certain conditions. Leave out for now.
@@ -109,60 +109,61 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
         mask_RP_all = mask_e_all
     
     # Split the combined mask to lm features and candidates
-    mask_RP_feat = mask_RP_all[:len(kp_prev_matchpc)]
-    mask_RP_cand = mask_RP_all[-len(kp_prev_cand):]
+    mask_RP_lm = mask_RP_all[:len(kpil_match)]
+    mask_RP_cand = mask_RP_all[-len(kpic_match):]
     
     # Display translucent mask on image.
-    if mask_curr is not None:
-        gr_curr_masked = cv2.addWeighted(mask_curr, 0.2, gr_curr, 1 - 0.2, 0)
-    else: gr_curr_masked = gr_curr
+    if mask_j is not None:
+        gr_j_masked = cv2.addWeighted(mask_j, 0.2, gr_j, 1 - 0.2, 0)
+    else: gr_j_masked = gr_j
     
-    img_track_feat = draw_point_tracks(kp_prev_matchpc,gr_curr_masked,
-                                       kp_curr_matchpc,mask_RP_feat, False)
-    if len(kp_curr_cand_matchpc)>0:
-        img_track_all = draw_point_tracks(kp_prev_cand,img_track_feat,
-                                          kp_curr_cand_matchpc,mask_RP_cand, False, 
-                                          color=[255,255,0])
-    else: img_track_all = img_track_feat
+    img_track_lm = draw_point_tracks(kpil_match,gr_j_masked,
+                                       kpjl_match,mask_RP_lm, False)
+    #if len(kp_curr_cand_matchpc)>0:
+    img_track_all = draw_point_tracks(kpic_match,img_track_lm,
+                                       kpjn_match,mask_RP_cand, False, color=[255,255,0])
+    #else: img_track_all = img_track_feat
     print("Time elapsed in drawing tracks: ",time.time()-time_start);time_start = time.time()
 
     #fig1_image.set_data(img_track_all)
     #fig1.canvas.draw_idle(); plt.pause(0.01)
     #if PAUSES: input("Press [enter] to continue.")
+    vslog.debug('shape of mask_RP_lm: {}, shape of lm_if'.format(mask_RP_lm.shape,lm_i.shape))
 
-    lm_updated = lm_prev[mask_RP_feat[:,0].astype(bool)]
-    print("LM prev was: ",len(lm_prev), " LM updated after Ess mat filter is :",len(lm_updated))
-    kp_curr_matchpc = kp_curr_matchpc[mask_RP_feat[:,0].astype(bool)]
+    lm_if_up = lm_if[mask_RP_lm[:,0].astype(bool)]
+
+    print("LM prev was: ",len(lm_if), " LM updated after Ess mat filter is :",len(lm_if_up))
+    kpjl_match = kpjl_match[mask_RP_lm[:,0].astype(bool)]
+    desjl_match = desjl_match[mask_RP_lm[:,0].astype(bool)]
            
-    success, T_cur, inliers = T_from_PNP(lm_updated, kp_curr_matchpc, K, D)
+    success, T_j, inliers = T_from_PNP(lm_if_up, kpjl_match, K, D)
     print("Time elapsed in PNP: ",time.time()-time_start)
 
-    print("PNP inliers: ",len(inliers), " of ",len(lm_updated))
+    print("PNP inliers: ",len(inliers), " of ",len(lm_if_up))
     if not success:
         print ("PNP faile in frame ",frame_no," Exiting...")
         exit()
-                       
+                           
+    kpic_ud = kp_i_ud[-len(kpic_match):]
+    kpjn_ud = kp_j_ud[-len(kpjn_match):]
     
-    kp_prev_cand_ud = kp_prev_all_ud[-len(kp_prev_cand):]
-    kp_curr_cand_ud = kp_curr_all_ud[-len(kp_prev_cand):]
-    
-    if len(kp_prev_cand)>0:
-        kp_prev_cand = kp_prev_cand[mask_RP_cand[:,0].astype(bool)]    
-        kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_RP_cand[:,0].astype(bool)]    
-    kp_prev_cand_ud = kp_prev_cand_ud[mask_RP_cand[:,0].astype(bool)]
-    kp_curr_cand_ud = kp_curr_cand_ud[mask_RP_cand[:,0].astype(bool)]
+    #if len(kp_prev_cand)>0:
+    kpic_match = kpic_match[mask_RP_cand[:,0].astype(bool)]    
+    kpjn_match = kpjn_match[mask_RP_cand[:,0].astype(bool)]
+    desjn_match = desjn_match[mask_RP_cand[:,0].astype(bool)]   
+    kpic_ud = kpic_ud[mask_RP_cand[:,0].astype(bool)]
+    kpjn_ud = kpjn_ud[mask_RP_cand[:,0].astype(bool)]
     
     
-    lm_cand, mask_tri = triangulate(T_prev, T_cur, kp_prev_cand_ud, 
-                                    kp_curr_cand_ud, None)
+    lm_j, mask_tri = triangulate(T_i, T_j, kpic_ud, kpjn_ud, None)
     print("Time elapsed in triangulate: ",time.time()-time_start); time_start = time.time()
 
     print("Point after rejection in triangulation: ", np.sum(mask_tri)," out of length: ", len(mask_tri))
     
-    if len(kp_prev_cand)>0:
-        img_rej_pts = draw_point_tracks(kp_prev_cand, img_track_all, 
-                                        kp_curr_cand_matchpc, 1-mask_tri, False, color=[255,0,0])
-    else: img_rej_pts = img_track_all
+    #if len(kp_prev_cand)>0:
+    img_rej_pts = draw_point_tracks(kpic_match, img_track_all, kpjn_match, 
+                                    1-mask_tri, False, color=[255,0,0])
+    #else: img_rej_pts = img_track_all
     print("Time elapsed in draw pt tracks: ",time.time()-time_start); time_start = time.time()
 
     #fig1_image.set_data(img_rej_pts)
@@ -170,29 +171,31 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
     #print("Time elapsed in draw pt track SET DATA: ",time.time()-time_start)
 
     #lm_updated = lm_prev[mask_RP_feat[:,0]==1]
-    kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_tri[:,0].astype(bool)]
+    kpjn_match = kpjn_match[mask_tri[:,0].astype(bool)]
+    desjn_match = desjn_match[mask_tri[:,0].astype(bool)]
     
     try:    
         new_lm_graph.remove()
     except NameError:
         pass
-    new_lm_graph = plot_3d_points(ax2, lm_cand, linestyle="", color='r', marker=".", markersize=2)
-    plot_pose3_on_axes(ax2, T_cur, axis_length=2.0, center_plot=True, line_obj_list=cam_pose)
+    new_lm_graph = plot_3d_points(ax2, lm_j, linestyle="", color='r', marker=".", markersize=2)
+    plot_pose3_on_axes(ax2, T_j, axis_length=2.0, center_plot=True, line_obj_list=cam_pose)
     
-    cam_trail_pts = np.append(cam_trail_pts,T_cur[:3,[-1]].T,axis=0)
+    cam_trail_pts = np.append(cam_trail_pts,T_j[:3,[-1]].T,axis=0)
     cam_pose_trail = plot_3d_points(ax2,cam_trail_pts , line_obj=cam_pose_trail, linestyle="", color='g', marker=".", markersize=2)
     fig2.canvas.draw_idle(); #plt.pause(0.01)
     if PAUSES: input("Press [enter] to continue.")
 
     # Remove pose lines and landmarks to speed plotting
     if PLOT_LANDMARKS:
-        graph_newlm = plot_3d_points(ax2, lm_cand, linestyle="", color='C0', marker=".", markersize=2)    
+        graph_newlm = plot_3d_points(ax2, lm_j, linestyle="", color='C0', marker=".", markersize=2)    
         fig2.canvas.draw_idle(); #plt.pause(0.01)
     
-    print("len of lm updated ", len(lm_updated))
-    lm_updated = np.concatenate((lm_updated,lm_cand))
-    print("len of lm updated again ", len(lm_updated))
-    kp_curr_matchpc = np.concatenate((kp_curr_matchpc,kp_curr_cand_matchpc))
+    print("len of lm_if_up ", len(lm_if_up))
+    lm_j_up = np.concatenate((lm_if_up,lm_j))
+    print("len of lm_j_up ", len(lm_j_up))
+    kpjl = np.concatenate((kpjl_match,kpjn_match))
+    desjl = np.concatenate((desjl_match,desjn_match))
     
     print("Time elapsed in beofre orb: ",time.time()-time_start)
     '''
@@ -214,18 +217,19 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
     
     print("Time elapsed in orb, filtering, radial: ",time.time()-time_start)
 
-    print ("Candidate points after redudancy check against current kps: ",len(kp_curr_cand_pts))
-    img_cand_pts = draw_points(img_rej_pts,kp_curr_cand_pts, color=[255,255,0])
+    print ("Candidate points: ",len(kp_j_cand))
+    img_cand_pts = draw_points(img_rej_pts,kp_j_cand, color=[255,255,0])
     fig1_image.set_data(img_cand_pts)
     fig1.canvas.draw_idle(); plt.pause(0.05)
     
     frame_no += 1
     
-    time.sleep(5)
+    #time.sleep(5)
     
     print ("FRAME deq "+str(frame_no)+" COMPLETE")
 
-    return gr_curr, kp_curr_matchpc,  kp_curr_cand_pts, lm_updated, T_cur
+    return gr_j, kpjl, desjl, kp_j_cand, des_j_cand, lm_j_up, T_j
+#gr_i, kp_i, des_i, kp_i_cand, des_i_cand, lm_i, T_i)
 
 def preprocess_frame(image_name, detector, mask_name=None, clahe_obj=None, tiling=None, rnm_radius=None):
     print("Pre-processing image: "+image_name)
@@ -286,7 +290,7 @@ def writer(imgnames, masknames, config_dict, queue):
         for i in range(len(imgnames)):
             if queue.empty(): print(Fore.RED+"Queue empty, reading is slow..."+Style.RESET_ALL)
             while queue.full():
-                time.sleep(0.2)
+                time.sleep(0.01)
                 #print(Fore.GREEN+"Writer queue full, waiting..."+Style.RESET_ALL)
             if USE_MASKS:
                 queue.put(preprocess_frame(imgnames[i], detector, masknames[i], clahe, 
@@ -424,7 +428,7 @@ if __name__ == '__main__':
     kp2_match_12_ud = kp2_match_12_ud[mask_RP_12[:,0].astype(bool)]
     
     landmarks_12, mask_tri_12 = triangulate(np.eye(4), T_1_2, kp1_match_12_ud, 
-                                           kp2_match_12_ud, None)
+                                            kp2_match_12_ud, None)
     
     fig2 = plt.figure(2)
     ax2 = fig2.add_subplot(111, projection='3d')
@@ -480,28 +484,30 @@ if __name__ == '__main__':
     #for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
     spinner = cycle(['|', '/', '-', '\\'])
     i = 0
-    while not mpqueue.empty():
-        while(paused):   
-            print('\b'+next(spinner), end='', flush=True)
-            plt.pause(0.1)
-            if cue_to_exit: break
-        if cue_to_exit: print("EXITING!!!"); raise SystemExit(0)
-        
-        ft = time.time()
-        
-        ppd = mpqueue.get()
-        print(Fore.RED+"Time for ppd: "+str(time.time()-ft)+Style.RESET_ALL)
-        
-        out = process_frame(*ppd, *out)
-
-        print(Fore.RED+"Time to process last frame: "+str(time.time()-st)+Style.RESET_ALL)
-        print(Fore.RED+"Time in the function: "+str(time.time()-ft)+Style.RESET_ALL)
-
-        st = time.time()
-
-        plt.pause(0.001)
-        print ("\n \n FRAME seq ", i ," COMPLETE \n \n")
-        i+= 1
+    while True:
+        if not mpqueue.empty():
+            while(paused):   
+                print('\b'+next(spinner), end='', flush=True)
+                plt.pause(0.1)
+                if cue_to_exit: break
+            if cue_to_exit: print("EXITING!!!"); raise SystemExit(0)
+            
+            ft = time.time()
+            
+            ppd = mpqueue.get()
+            print(Fore.RED+"Time for ppd: "+str(time.time()-ft)+Style.RESET_ALL)
+            
+            out = process_frame(*ppd, *out)
+    
+            print(Fore.RED+"Time to process last frame: "+str(time.time()-st)+Style.RESET_ALL)
+            print(Fore.RED+"Time in the function: "+str(time.time()-ft)+Style.RESET_ALL)
+    
+            st = time.time()
+    
+            plt.pause(0.001)
+            print ("\n \n FRAME seq ", i ," COMPLETE \n \n")
+            i+= 1
+        else: time.sleep(0.2)            
     
     writer_p.join()
     while(True):   

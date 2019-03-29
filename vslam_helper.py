@@ -9,6 +9,7 @@ import numpy as np
 import cv2
 from matplotlib import pyplot as plt
 from scipy import spatial
+import logging
 
 def R2d_from_theta(theta):  
     return np.array([[np.cos(theta), np.sin(theta)],[-np.sin(theta), np.cos(theta)]])
@@ -460,7 +461,7 @@ def track_kp_array(kp1_pts, des1, kp2_pts, des2, matches, lm1=None):
     '''
     kp1_matched_inds = []    
     kp2_matched_inds = []
-    matched_kp2_indx = []
+    #matched_kp2_indx = []
 
     # Go through matches and create list of indices of kp1 and kp2 which matched
     for i,m in enumerate(matches):
@@ -477,13 +478,101 @@ def track_kp_array(kp1_pts, des1, kp2_pts, des2, matches, lm1=None):
     kp2_cand=[]
     cand_indx = []
     for i in range(kp2_match_pts.shape[0]):
-        if i not in matched_kp2_indx:
+        if i not in kp2_matched_inds:
             #kp2_cand += [k]
             cand_indx += [i]
     kp2_cand_pts = kp2_pts[cand_indx,:]
     des2_cand = des2[cand_indx,:]
     
     return kp1_match_pts, des1_matched, kp2_match_pts, des2_matched, kp2_cand_pts, des2_cand
+
+def propogate_kp(matcher, kp1l, des1l, kp1c, des1c, lm1, kp2, des2):
+    '''
+    track_keypoints accepts 2 arrays of keypoint coordinates and descriptors and a list of 
+    matches and returns, matched arrays of keypoints and descriptors. Also returns
+    a set of candidate keypoints coords from 2 which didn't have matches in 1
+    
+    Parameters
+    ----------
+    matcher : cv2.BFMatcher object
+        Matcher to be used for matching keypoint descriptors
+    kp1l : Nx2 array 
+        KeyPoint coordinates from frame 1 which has associated landmarks in lm1
+    des1l : NxD array
+        NxD array of descriptors of length D associated with keypoints in kp1l
+    kp1c : Nx2 array 
+        Candidate KeyPoint coordinates from frame 1 which are not associated with landmarks
+    des1c : NxD array
+        NxD array of descriptors of length D associated with keypoints in kp1c        
+    kp2 : N2x2 array
+        Keypoint coordinates from frame 2
+    des2 : N2xD array
+        N2xD array of descriptors where N2 number of keypoints and D is length of descriptor        
+    '''
+    vslog = logging.getLogger(__name__)
+    if len(kp1l) != len(des1l):
+        raise ValueError('Length of kp1l:{} doesn''t match length of des1l:'.format(len(kp1l),len(des1l)))
+
+    if len(kp1l) != len(lm1):
+        raise ValueError('Length of kp1l:{} doesn''t match length of lm1:'.format(len(kp1l),len(lm1)))
+
+    if len(kp1c) != len(des1c):
+        raise ValueError('Length of kp1c:{} doesn''t match length of des1c:'.format(len(kp1c),len(des1c)))
+
+    if len(kp2) != len(des2):
+        raise ValueError('Length of kp2:{} doesn''t match length of des2:'.format(len(kp2),len(des2)))
+
+    #matches for features which were previously tracked and had landmarks
+    matches_l = knn_match_and_lowe_ratio_filter(matcher, des1l, des2) 
+    vslog.debug("Found {} matches for existing landmarks out of {}".format(len(matches_l),len(lm1)))
+        
+    kp1l_matched_inds = []    
+    kp2l_matched_inds = []
+
+    # Go through matches and create list of indices of kp1 and kp2 which matched
+    for i,m in enumerate(matches_l):
+        kp1l_matched_inds += [m.queryIdx]
+        kp2l_matched_inds += [m.trainIdx]
+    
+    kp1l_match = kp1l[kp1l_matched_inds,:]
+    des1l_match  = des1l[kp1l_matched_inds,:]
+    if lm1 is not None:
+        lm1_match   = lm1[kp1l_matched_inds,:]
+    kp2l_match = kp2[kp2l_matched_inds,:]
+    des2l_match  = des2[kp2l_matched_inds,:]
+    
+    #matches for features which are candidates from previous image and 
+    #not associated with landmarks
+    matches_c = knn_match_and_lowe_ratio_filter(matcher, des1c, des2)
+    vslog.debug("Found {} matches out of {} prev candidates".format(len(matches_c),len(des1c)))
+        
+    kp1c_matched_inds = []    
+    kp2n_matched_inds = [] # n for new features
+
+    # Go through matches and create list of indices of kp1 and kp2 which matched
+    for i,m in enumerate(matches_c):
+        kp1c_matched_inds += [m.queryIdx]
+        kp2n_matched_inds += [m.trainIdx]
+    
+    kp1c_match = kp1c[kp1c_matched_inds,:]
+    des1c_match  = des1c[kp1c_matched_inds,:]
+    kp2n_match = kp2[kp2n_matched_inds,:]
+    des2n_match  = des2[kp2n_matched_inds,:]
+    
+    # Separate out kp2 points which are not matched with either kp1l or kp1c
+    kp2c_indx = []
+    for i in range(kp2.shape[0]):
+        if not (i in kp2l_matched_inds or i in kp2n_matched_inds):
+            kp2c_indx += [i]
+    kp2c = kp2[kp2c_indx,:]
+    des2c = des2[kp2c_indx,:]
+    vslog.debug("Number of unmatched candidates: {}".format(len(kp2c)))
+    
+    vslog.debug("No of kp1l_match: {}, kp1c_match: {}, kp2l_match: {}, kp2n_match: {}, kp2c: {}, des2c: {}".format(
+                len(kp1l_match),len(kp1c_match),len(kp2l_match),len(kp2n_match),len(kp2c),len(des2c)))
+
+
+    return kp1l_match, kp1c_match, kp2l_match, des2l_match, kp2n_match, des2n_match, kp2c, des2c, lm1_match
 
 def move_figure(position="top-right"):
     '''
