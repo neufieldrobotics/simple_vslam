@@ -11,26 +11,44 @@ K:
 D: 
 - [-2.78089511e-01,  1.30037134e-01, -1.17555797e-04, -1.55337290e-04, -4.34486330e-02]
 
-tiling_non_max_tile_y: 8 
-tiling_non_max_tile_x: 6 
-use_tiling_non_max_supression: True
-
-radial_non_max: True
-radial_non_max_radius: 5
-
 image_folder: 'data/time_lapse_5_cervino_800x600'
 image_ext: 'png'
 chessboard: False
-init_image_indxs: [1025, 1035]
-image_step: 2
-use_clahe: False
+init_image_indxs: [1054, 1064]
+image_step: 3
 use_masks: True
+plot_landmarks: True
 masks_folder: 'data/time_lapse_5_cervino_800x600_masks_out'
 masks_ext: 'png'
+lowe_ratio_test_threshold: 0.95
 
+use_tiling_non_max_supression: False
+tiling_non_max_tile_y: 17 
+tiling_non_max_tile_x: 8 
+
+radial_non_max: False
+radial_non_max_radius: 5
+
+use_clahe: False
 CLAHE_settings:
  clipLimit: 10.0
  tileGridSize: !!python/tuple [8,6]
+
+findEssential_settings:
+ prob: 0.9999
+ threshold: 0.01
+
+ZERNIKE_settings:
+ Nfeats: 600
+ seci: 4 
+ secj: 3
+ levels: 6
+ ratio: 0.75
+ sigi: 2.75
+ sigd: 1.0
+ nmax: 8
+ like_matlab: False
+ lmax_nd: 3
 
 ORB_settings:
  WTA_K: 2
