@@ -38,6 +38,7 @@ def triangulate(T_w_1, T_w_2, pts_1_2d, pts_2_2d, mask):
     along with corresponding matching points and returns the 3D coordinates in world coordinates
     Mask must be a dimensionless array or n, array
     '''
+    vslog = logging.getLogger('VSLAM')
     pts_1 = np.expand_dims(pts_1_2d,1)
     pts_2 = np.expand_dims(pts_2_2d,1)
     T_origin = np.eye(4)
@@ -46,10 +47,10 @@ def triangulate(T_w_1, T_w_2, pts_1_2d, pts_2_2d, mask):
     T_2_w = T_inv(T_w_2)
     T_2_1 = T_2_w @ T_w_1
     P_2_1 = T_2_1[:3]
-    print ("P_2_1: ", P_2_1)
+    vslog.info("P_2_1:\t"+str(P_2_1).replace('\n','\n\t\t'))
     
     t_2_1 = T_2_1[:3,-1]
-    print("pts_1: ",pts_1.shape)
+    vslog.debug("No of points in pts_1: {}".format(pts_1.shape))
     # Calculate points in 0,0,0 frame
     if mask is None:
         pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1, pts_2).T
@@ -169,7 +170,6 @@ def draw_point_tracks(kp1,img_right,kp2, mask, display_invalid=False, color=(0, 
     (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
     The mask should be the same length as matches
     '''
-    print("kp1 shape{} , mask shape: {}".format(kp1.shape,mask.shape))
     bool_mask = mask[:,0].astype(bool)
     valid_left_matches = kp1[bool_mask,:]
     valid_right_matches = kp2[bool_mask,:]
@@ -486,7 +486,7 @@ def track_kp_array(kp1_pts, des1, kp2_pts, des2, matches, lm1=None):
     
     return kp1_match_pts, des1_matched, kp2_match_pts, des2_matched, kp2_cand_pts, des2_cand
 
-def propogate_kp(matcher, kp1l, des1l, kp1c, des1c, lm1, kp2, des2):
+def propogate_kp(matcher, kp1l, des1l, kp1c, des1c, lm1, kp2, des2, threshold=0.9):
     '''
     track_keypoints accepts 2 arrays of keypoint coordinates and descriptors and a list of 
     matches and returns, matched arrays of keypoints and descriptors. Also returns
@@ -523,7 +523,7 @@ def propogate_kp(matcher, kp1l, des1l, kp1c, des1c, lm1, kp2, des2):
         raise ValueError('Length of kp2:{} doesn''t match length of des2:'.format(len(kp2),len(des2)))
 
     #matches for features which were previously tracked and had landmarks
-    matches_l = knn_match_and_lowe_ratio_filter(matcher, des1l, des2) 
+    matches_l = knn_match_and_lowe_ratio_filter(matcher, des1l, des2, threshold) 
     vslog.debug("Found {} matches for existing landmarks out of {}".format(len(matches_l),len(lm1)))
         
     kp1l_matched_inds = []    
