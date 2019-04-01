@@ -18,7 +18,8 @@ use_tiling_non_max_supression: False
 radial_non_max: False
 radial_non_max_radius: 5
 
-image_folder: 'data/kitti/00/image_0'
+osx_image_folder: '/Users/vik748/Google Drive/data/kitti/00/image_0'
+linux_image_folder: '/home/vik748/data/kitti/00/image_0'
 image_ext: 'png'
 chessboard: False
 init_image_indxs: [450, 452]
