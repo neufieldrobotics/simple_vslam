@@ -47,7 +47,7 @@ def triangulate(T_w_1, T_w_2, pts_1_2d, pts_2_2d, mask):
     T_2_w = T_inv(T_w_2)
     T_2_1 = T_2_w @ T_w_1
     P_2_1 = T_2_1[:3]
-    vslog.info("P_2_1:\t"+str(P_2_1).replace('\n','\n\t\t'))
+    vslog.info("P_2_1:\t"+str(P_2_1).replace('\n','\n\t\t\t'))
     
     t_2_1 = T_2_1[:3,-1]
     vslog.debug("No of points in pts_1: {}".format(pts_1.shape))
@@ -164,13 +164,13 @@ def draw_feature_tracks(img_left,kp1,img_right,kp2, matches, mask, display_inval
     
     return img_right_out
 
-def draw_point_tracks(kp1,img_right,kp2, mask, display_invalid=False, color=(0, 255, 0)):
+def draw_point_tracks(kp1,img_right,kp2, bool_mask, display_invalid=False, color=(0, 255, 0)):
     '''
     This function extracts takes a 2 images, set of keypoints and a mask of valid
     (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
     The mask should be the same length as matches
     '''
-    bool_mask = mask[:,0].astype(bool)
+    #bool_mask = mask[:,0].astype(bool)
     valid_left_matches = kp1[bool_mask,:]
     valid_right_matches = kp2[bool_mask,:]
     #img_right_out = draw_points(img_right, valid_right_matches)
@@ -573,6 +573,83 @@ def propogate_kp(matcher, kp1l, des1l, kp1c, des1c, lm1, kp2, des2, threshold=0.
 
 
     return kp1l_match, kp1c_match, kp2l_match, des2l_match, kp2n_match, des2n_match, kp2c, des2c, lm1_match
+
+def combine_and_filter(kp_i_lm, kp_i_cand, kp_j_lm, kp_j_new, K, D, findEssential_set,FILTER_RP=False):
+    '''
+    Take 2 sets of potentially matching keypoints for landmarks (which have a 3d landmark)
+    and candidates (which don't have an associated landmark), stack them into one set
+    and run them through a "Esstentially matrix" filter and optionlly "Recover Pose" filter.
+    
+    Parameters
+    ----------
+    kp_i_lm : Nx2 array 
+        KeyPoint coordinates from frame i which has associated landmarks in lmi
+    kp_i_cand : Nx2 array
+        Candidate KeyPoint coordinates from frame i
+    kp_j_lm : Nx2 array 
+        KeyPoint coordinates from frame j which has associated landmarks in lmj
+    kp_j_new : Nx2 array
+        Candidate KeyPoint coordinates from frame j
+    K: 3,3 array
+        Camera matrix 3x3
+    D: Nx1 array
+        Camera distortion coefficients in Opencv format
+    findEssential_set: Dict    
+        Dictionary of settings for findEssential
+    
+    Returns
+    ----------
+    mask_RP_lm : (N,) 1-d numpy boolean array
+        Boolean array showing inliners in the landmark points
+    mask_RP_cand : (N,) 1-d numpy boolean array
+        Boolean array showing inlines in the candidate points
+    kp_i_cand_ud: Nx2 array 
+        Array of undistorted coordinates of filtered candidate pts in i
+    kp_j_new_ud: Nx2 array
+        Array of undistorted coordinates of filtered candidate pts in j
+
+    '''    
+    vslog = logging.getLogger('vslam')
+    if len(kp_i_lm) != len(kp_j_lm):
+        raise ValueError('Length of kp_i_lm:{} doesn''t match length of kp_j_lm:'.format(len(kp_i_lm),len(kp_j_lm)))
+    else:
+        no_landmarks = len(kp_i_lm)
+        
+    if len(kp_i_cand) != len(kp_j_new):
+        raise ValueError('Length of kp_i_cand:{} doesn''t match length of kp_j_new:'.format(len(kp_i_cand),len(kp_j_new)))
+    else:
+        no_cand = len(kp_i_cand)
+    
+    kp_i_all = np.vstack((kp_i_lm, kp_i_cand))
+    kp_j_all = np.vstack((kp_j_lm, kp_j_new))
+    
+    kp_i_ud = cv2.undistortPoints(np.expand_dims(kp_i_all,1),K,D)[:,0,:]
+    kp_j_ud = cv2.undistortPoints(np.expand_dims(kp_j_all,1),K,D)[:,0,:]
+
+    E, mask_e_all = cv2.findEssentialMat(kp_i_ud, kp_j_ud, focal=1.0, pp=(0., 0.), 
+                                   method=cv2.RANSAC, **findEssential_set)
+    essen_mat_pts = np.sum(mask_e_all)  
+    
+    vslog.debug("Essential matrix: used {} of total {} matches".format(essen_mat_pts,len(kp_j_all)))
+    
+    if FILTER_RP:
+        # Recover Pose filtering is breaking under certain conditions. Leave out for now.
+        _, _, _, mask_RP_all = cv2.recoverPose(E, kp_i_ud, kp_j_ud, mask=mask_e_all)
+        vslog.info("Recover pose: used {} of total {} matches".format(np.sum(mask_RP_all),essen_mat_pts))
+    else: 
+        mask_RP_all = mask_e_all
+    
+    # Split the combined mask to lm features and candidates
+    mask_RP_lm = mask_RP_all[:no_landmarks,0].astype(bool)
+    mask_RP_cand = mask_RP_all[-no_cand:,0].astype(bool)
+    
+    kp_i_cand_ud = kp_i_ud[-no_cand:]
+    kp_j_new_ud  = kp_j_ud[-no_cand:]
+    
+    kp_i_cand_ud = kp_i_cand_ud[mask_RP_cand]
+    kp_j_new_ud  = kp_j_new_ud[mask_RP_cand]
+    
+    return mask_RP_lm, mask_RP_cand, kp_i_cand_ud, kp_j_new_ud
 
 def move_figure(position="top-right"):
     '''

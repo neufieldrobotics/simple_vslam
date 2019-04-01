@@ -44,7 +44,7 @@ frame_no = 3
 # j = current, i = previous frame
 def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i, 
                   kp_i_cand, des_i_cand, lm_i, T_i):
-    global frame_no, cam_pose_trail, cam_trail_pts, cam_pose, new_lm_graph, vslog
+    global frame_no, cam_pose_trail, cam_trail_pts, cam_pose, new_lm_graph, findEssential_set
     vslog = logging.getLogger('VSLAM')
     vslog.info("len of lm_i: {}".format(len(lm_i)))
     vslog.info("len of kp_i: {}".format(len(kp_i)))
@@ -55,49 +55,9 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
                             kp_j, des_j,threshold=config_dict['lowe_ratio_test_threshold'])
     kpil_match, kpic_match, kpjl_match, desjl_match, kpjn_match, desjn_match, kp_j_cand, des_j_cand, lm_if = prop_out
 
-    '''
-    if len(kp_prev_cand)>0:
-        kp_curr_cand_matchpc, mask_cand_klt, _ = cv2.calcOpticalFlowPyrLK(gr_prev, gr_curr, 
-                                                            kp_prev_cand, None, **config_dict['KLT_settings'])
-        print ("KLT Candidates Tracked: ",np.sum(mask_cand_klt)," of total ",len(kp_prev_cand),"keypoints")
-        kp_prev_cand = kp_prev_cand[mask_cand_klt[:,0].astype(bool)]
-        kp_curr_cand_matchpc = kp_curr_cand_matchpc[mask_cand_klt[:,0].astype(bool)]
-    else: 
-        kp_curr_cand_matchpc = np.zeros([0,1,2])
-        print ("No New KLT Candidates Tracked. ")
-    '''
-    
-    vslog.debug("Time elapsed in matcher flow: {:.4f}".format(time.time()-time_start)); 
-    time_start = time.time()
-
-    kp_i_all = np.vstack((kpil_match, kpic_match))
-    kp_j_all = np.vstack((kpjl_match, kpjn_match))
-    
-    kp_i_ud = cv2.undistortPoints(np.expand_dims(kp_i_all,1),K,D)[:,0,:]
-    kp_j_ud = cv2.undistortPoints(np.expand_dims(kp_j_all,1),K,D)[:,0,:]
-
-    vslog.debug("Time elapsed in undistort: {:.4f}".format(time.time()-time_start))
-    time_start = time.time()
-
-    E, mask_e_all = cv2.findEssentialMat(kp_i_ud, kp_j_ud, focal=1.0, pp=(0., 0.), 
-                                   method=cv2.RANSAC, **config_dict['findEssential_settings'])
-    essen_mat_pts = np.sum(mask_e_all)  
-    vslog.debug("Time elapsed in find E: {:.4f}".format(time.time()-time_start)) 
-    time_start = time.time()
-    
-    vslog.debug("Essential matrix: used {} of total {} matches".format(essen_mat_pts,len(kp_j_all)))
-    
-    if FILTER_RP:
-        # Recover Pose filtering is breaking under certain conditions. Leave out for now.
-        _, _, _, mask_RP_all = cv2.recoverPose(E, kp_i_ud, kp_j_ud, mask=mask_e_all)
-        vslog.info("Recover pose: used {} of total {} matches".format(np.sum(mask_RP_all),essen_mat_pts))
-    else: 
-        mask_RP_all = mask_e_all
-    
-    # Split the combined mask to lm features and candidates
-    mask_RP_lm = mask_RP_all[:len(kpil_match)]
-    mask_RP_cand = mask_RP_all[-len(kpic_match):]
-    
+    mask_RP_lm, mask_RP_cand, kpic_ud, kpjn_ud = combine_and_filter(kpil_match, kpic_match, 
+                                                                    kpjl_match, kpjn_match, 
+                                                                    K, D, findEssential_set, FILTER_RP)
     # Display translucent mask on image.
     if mask_j is not None:
         gr_j_masked = cv2.addWeighted(mask_j, 0.2, gr_j, 1 - 0.2, 0)
@@ -113,11 +73,11 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
 
     vslog.debug('shape of mask_RP_lm: {}, shape of lm_if'.format(mask_RP_lm.shape,lm_i.shape))
 
-    lm_if_up = lm_if[mask_RP_lm[:,0].astype(bool)]
+    lm_if_up = lm_if[mask_RP_lm]
 
     vslog.info("LM prev(i) was: {}. LM(i) updated after Ess mat filter is: {}".format(len(lm_if),len(lm_if_up)))
-    kpjl_match = kpjl_match[mask_RP_lm[:,0].astype(bool)]
-    desjl_match = desjl_match[mask_RP_lm[:,0].astype(bool)]
+    kpjl_match = kpjl_match[mask_RP_lm]
+    desjl_match = desjl_match[mask_RP_lm]
            
     success, T_j, inliers = T_from_PNP(lm_if_up, kpjl_match, K, D)
     vslog.debug("Time elapsed in PNP: {:.4f}".format(time.time()-time_start))
@@ -128,16 +88,10 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
         exit()
         
     vslog.info("PNP inliers: {}  of {}".format(len(inliers),len(lm_if_up)))
-
                            
-    kpic_ud = kp_i_ud[-len(kpic_match):]
-    kpjn_ud = kp_j_ud[-len(kpjn_match):]
-    
-    kpic_match = kpic_match[mask_RP_cand[:,0].astype(bool)]    
-    kpjn_match = kpjn_match[mask_RP_cand[:,0].astype(bool)]
-    desjn_match = desjn_match[mask_RP_cand[:,0].astype(bool)]   
-    kpic_ud = kpic_ud[mask_RP_cand[:,0].astype(bool)]
-    kpjn_ud = kpjn_ud[mask_RP_cand[:,0].astype(bool)]
+    kpic_match = kpic_match[mask_RP_cand]    
+    kpjn_match = kpjn_match[mask_RP_cand]
+    desjn_match = desjn_match[mask_RP_cand]   
        
     lm_j, mask_tri = triangulate(T_i, T_j, kpic_ud, kpjn_ud, None)
     vslog.debug("Time elapsed in triangulate: {:.4f}".format(time.time()-time_start)) 
@@ -147,7 +101,7 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
     
     #if len(kp_prev_cand)>0:
     img_rej_pts = draw_point_tracks(kpic_match, img_track_all, kpjn_match, 
-                                    1-mask_tri, False, color=[255,0,0])
+                                    (1-mask_tri)[:,0].astype(bool), False, color=[255,0,0])
     #else: img_rej_pts = img_track_all
     vslog.debug("Time elapsed in draw pt tracks: {:.4f} ".format(time.time()-time_start)) 
     time_start = time.time()
@@ -282,6 +236,7 @@ if __name__ == '__main__':
     init_imgs_indx = config_dict['init_image_indxs']
     img_step = config_dict['image_step']
     PLOT_LANDMARKS = config_dict['plot_landmarks']
+    findEssential_set = config_dict['findEssential_settings']
     
     if sys.platform == 'darwin':
         image_folder = config_dict['osx_image_folder']
@@ -367,7 +322,7 @@ if __name__ == '__main__':
     vslog.info("R:\t"+str(R_21).replace('\n','\n\t\t'))
     vslog.info("t:\t"+str(t_21.T))
         
-    img12 = draw_point_tracks(kp1_match_12,gr2,kp2_match_12,mask_RP_12, True)
+    img12 = draw_point_tracks(kp1_match_12,gr2,kp2_match_12,mask_RP_12[:,0].astype(bool), True)
     
     fig1 = plt.figure(1)
     plt.get_current_fig_manager().window.setGeometry(window_xadj,window_yadj,640,338)
