@@ -44,8 +44,8 @@ frame_no = 3
 # j = current, i = previous frame
 def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i, 
                   kp_i_cand, des_i_cand, lm_i, T_i):
-    vslog = logging.getLogger('VSLAM')
     global frame_no, cam_pose_trail, cam_trail_pts, cam_pose, new_lm_graph, vslog
+    vslog = logging.getLogger('VSLAM')
     vslog.info("len of lm_i: {}".format(len(lm_i)))
     vslog.info("len of kp_i: {}".format(len(kp_i)))
 
@@ -67,7 +67,7 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
         print ("No New KLT Candidates Tracked. ")
     '''
     
-    vslog.debug(" Time elapsed in matcher flow: {:.4f}".format(time.time()-time_start)); 
+    vslog.debug("Time elapsed in matcher flow: {:.4f}".format(time.time()-time_start)); 
     time_start = time.time()
 
     kp_i_all = np.vstack((kpil_match, kpic_match))
@@ -212,7 +212,6 @@ def preprocess_frame(image_name, detector, mask_name=None, clahe_obj=None, tilin
         kp = radial_non_max(kp,rnm_radius)
         pbf += " > radial supression: "+str(len(kp))
         
-    #kp_pts = np.expand_dims(np.array([o.pt for o in kp],dtype='float32'),1)
     kp_pts = cv2.KeyPoint_convert(kp)
     
     vslog.debug(pbf)
@@ -272,14 +271,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
      
     # Inputs, images and camera info
-    if sys.platform == 'darwin':
-        path = '/Users/vik748/Google Drive/'
-        window_xadj = 0
-        window_yadj = 45
-    else:
-        path = '/home/vik748/'
-        window_xadj = 65
-        window_yadj = 430
         
     config_dict = yaml.load(open(args.config))
     K = np.array(config_dict['K'])
@@ -287,18 +278,30 @@ if __name__ == '__main__':
     CHESSBOARD = config_dict['chessboard']
     USE_MASKS = config_dict['use_masks']
     #RADIAL_NON_MAX_RADIUS = config_dict['radial_non_max_radius']
-    image_folder = config_dict['image_folder']
     image_ext = config_dict['image_ext']
     init_imgs_indx = config_dict['init_image_indxs']
     img_step = config_dict['image_step']
     PLOT_LANDMARKS = config_dict['plot_landmarks']
+    
+    if sys.platform == 'darwin':
+        image_folder = config_dict['osx_image_folder']
+        if USE_MASKS: masks_folder = config_dict['osx_masks_folder']
+
+        window_xadj = 0
+        window_yadj = 45
+    else:
+        image_folder = config_dict['linux_image_folder']
+        if USE_MASKS: masks_folder = config_dict['linux_masks_folder']
+        window_xadj = 65
+        window_yadj = 430
+
 
     PAUSES = False
     FILTER_RP = False
     paused = False
     cue_to_exit = False
     
-    images_full = sorted([f for f in glob.glob(path+image_folder+'/*') 
+    images_full = sorted([f for f in glob.glob(image_folder+'/*') 
                      if re.match('^.*\.'+image_ext+'$', f, flags=re.IGNORECASE)])
     
     images = [images_full[init_imgs_indx[0]]]+images_full[init_imgs_indx[1]::img_step]
@@ -310,9 +313,8 @@ if __name__ == '__main__':
 
             
     if USE_MASKS:
-        masks_folder = config_dict['masks_folder']
         masks_ext = config_dict['masks_ext']
-        masks_full = sorted([f for f in glob.glob(path+masks_folder+'/*') 
+        masks_full = sorted([f for f in glob.glob(masks_folder+'/*') 
                         if re.match('^.*\.'+masks_ext+'$', f, flags=re.IGNORECASE)])
         masks = [masks_full[init_imgs_indx[0]]]+masks_full[init_imgs_indx[1]::img_step]
         assert len(masks)==len(images), "ERROR: Number of masks not equal to number of images"
