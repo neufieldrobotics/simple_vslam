@@ -38,7 +38,7 @@ CLAHE_settings:
  tileGridSize: !!python/tuple [8,6]
 
 ZERNIKE_settings:
- Nfeats: 1200
+ Nfeats: 600
  seci: 2 
  secj: 3
  levels: 6

@@ -297,7 +297,7 @@ if __name__ == '__main__':
 
 
     PAUSES = False
-    FILTER_RP = True
+    FILTER_RP = False
     paused = False
     cue_to_exit = False
     
