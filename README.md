@@ -17,7 +17,7 @@ conda activate simple_vslam_env
 ```
 ## Installation
 ```sh
-git clone --recurse-submodules https://gitlab.com/vik748/simple_vslam.git
+git clone --recurse-submodules https://gitlab.com/neu-mit-lfi/simple_vslam.git
 cd simple_vslam
 git checkout zernike
 ```
