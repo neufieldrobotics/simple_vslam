@@ -27,7 +27,7 @@ PROCESS FRAME
 global vslog
 vslog = logging.getLogger('VSLAM')
 logging.basicConfig(level=logging.DEBUG,
-                    format='%(levelname)6s  %(message)s')
+                    format='%(levelname)8s  %(message)s')
 mpl_logger = logging.getLogger('matplotlib') 
 mpl_logger.setLevel(logging.WARNING) 
 
@@ -89,7 +89,7 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
     
     if FILTER_RP:
         # Recover Pose filtering is breaking under certain conditions. Leave out for now.
-        _, _, _, mask_RP_all = cv2.recoverPose(E, kp_prev_all_ud, kp_curr_all_ud, np.eye(3), 100.0, mask=mask_e_all)
+        _, _, _, mask_RP_all = cv2.recoverPose(E, kp_i_ud, kp_j_ud, mask=mask_e_all)
         vslog.info("Recover pose: used {} of total {} matches".format(np.sum(mask_RP_all),essen_mat_pts))
     else: 
         mask_RP_all = mask_e_all
@@ -297,7 +297,7 @@ if __name__ == '__main__':
 
 
     PAUSES = False
-    FILTER_RP = False
+    FILTER_RP = True
     paused = False
     cue_to_exit = False
     
