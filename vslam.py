@@ -79,16 +79,20 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
     kpjl_match = kpjl_match[mask_RP_lm]
     desjl_match = desjl_match[mask_RP_lm]
            
-    success, T_j, inliers = T_from_PNP(lm_if_up, kpjl_match, K, D)
-    vslog.debug("Time elapsed in PNP: {:.4f}".format(time.time()-time_start))
-    time_start = time.time()
-
+    success, T_j, mask_PNP = T_from_PNP(lm_if_up, kpjl_match, K, D)
     if not success:
         vslog.critical("PNP failed in frame {}. Exiting...".format(frame_no+1))
         exit()
         
-    vslog.info("PNP inliers: {}  of {}".format(len(inliers),len(lm_if_up)))
-                           
+    vslog.info("PNP inliers: {}  of {}".format(np.sum(mask_PNP),len(lm_if_up)))
+
+    lm_if_up = lm_if_up[mask_PNP] 
+    kpjl_match = kpjl_match[mask_PNP]
+    desjl_match = desjl_match[mask_PNP]
+    
+    vslog.debug("Time elapsed in PNP: {:.4f}".format(time.time()-time_start))
+    time_start = time.time()
+
     kpic_match = kpic_match[mask_RP_cand]    
     kpjn_match = kpjn_match[mask_RP_cand]
     desjn_match = desjn_match[mask_RP_cand]   
@@ -101,7 +105,7 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
     
     #if len(kp_prev_cand)>0:
     img_rej_pts = draw_point_tracks(kpic_match, img_track_all, kpjn_match, 
-                                    (1-mask_tri)[:,0].astype(bool), False, color=[255,0,0])
+                                    (1-mask_tri)[:,0].astype(bool), True, color=[255,0,0])
     #else: img_rej_pts = img_track_all
     vslog.debug("Time elapsed in draw pt tracks: {:.4f} ".format(time.time()-time_start)) 
     time_start = time.time()
@@ -400,7 +404,7 @@ if __name__ == '__main__':
 
     #for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
     spinner = cycle(['|', '/', '-', '\\'])
-    i = 0
+    i = 4
     while True:
         if not mpqueue.empty():
             while(paused):   

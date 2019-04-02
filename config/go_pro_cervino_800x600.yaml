@@ -15,14 +15,14 @@ osx_image_folder: '/Users/vik748/Google Drive/data/time_lapse_5_cervino_800x600'
 linux_image_folder: '/home/vik748/data/time_lapse_5_cervino_800x600'
 image_ext: 'png'
 chessboard: False
-init_image_indxs: [1054, 1064]
-image_step: 3
+init_image_indxs: [1054, 1064] #[1204, 1214] [1054, 1064]
+image_step: 6
 use_masks: True
 plot_landmarks: True
 osx_masks_folder: '/Users/vik748/Google Drive/data/time_lapse_5_cervino_800x600_masks_out'
 linux_masks_folder: '/home/vik748/data/time_lapse_5_cervino_800x600_masks_out'
 masks_ext: 'png'
-lowe_ratio_test_threshold: 0.95
+lowe_ratio_test_threshold: 0.85
 
 use_tiling_non_max_supression: False
 tiling_non_max_tile_y: 17 
@@ -41,7 +41,7 @@ findEssential_settings:
  threshold: 0.01
 
 ZERNIKE_settings:
- Nfeats: 600
+ Nfeats: 1200
  seci: 4 
  secj: 3
  levels: 6

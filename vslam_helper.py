@@ -91,11 +91,16 @@ def triangulate(T_w_1, T_w_2, pts_1_2d, pts_2_2d, mask):
     return pts_3d_w, mask
 
 def T_from_PNP(coord_3d, img_pts, K, D):
-    success, rvec_to_obj, tvecs_to_obj, inliers = cv2.solvePnPRansac(coord_3d, img_pts, K, D)
+    success, rvec_to_obj, tvecs_to_obj, inliers = cv2.solvePnPRansac(coord_3d, img_pts, 
+                                                   K, D, iterationsCount=250, reprojectionError=4.0,
+                                                   confidence=0.9999)
 
     if success:    
         R_to_obj, _ = cv2.Rodrigues(rvec_to_obj)
-        return success, compose_T(*pose_inv(R_to_obj, tvecs_to_obj)), inliers
+        mask = np.zeros(len(img_pts)).astype('bool')
+        mask[inliers[:,0]]=True
+
+        return success, compose_T(*pose_inv(R_to_obj, tvecs_to_obj)), mask#, coord_3d[inliers], img_pts[inliers]
     else: 
         return success, None, None
 

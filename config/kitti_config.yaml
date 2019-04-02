@@ -22,8 +22,8 @@ osx_image_folder: '/Users/vik748/Google Drive/data/kitti/00/image_0'
 linux_image_folder: '/home/vik748/data/kitti/00/image_0'
 image_ext: 'png'
 chessboard: False
-init_image_indxs: [600, 602]
-image_step: 2
+init_image_indxs: [1, 3]
+image_step: 1
 plot_landmarks: False
 use_masks: False
 use_clahe: False
@@ -38,7 +38,7 @@ CLAHE_settings:
  tileGridSize: !!python/tuple [8,6]
 
 ZERNIKE_settings:
- Nfeats: 600
+ Nfeats: 1200
  seci: 2 
  secj: 3
  levels: 6
