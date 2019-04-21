@@ -1,162 +1,196 @@
 """
-GTSAM Copyright 2010, Georgia Tech Research Corporation,
-Atlanta, Georgia 30332-0415
-All Rights Reserved
-Authors: Frank Dellaert, et al. (see THANKS for the full author list)
-
-See LICENSE for the license information
-
-A structure-from-motion problem on a simulated dataset
+Wrappers for GTSAM cython for seamless implementation with python/numpy
 """
 from __future__ import print_function
 
 import gtsam
 import numpy as np
-import SFMdata
+#import SFMdata
 from gtsam.gtsam import (Cal3_S2, Cal3DS2, DoglegOptimizer,
                          GenericProjectionFactorCal3_S2, NonlinearFactorGraph,
                          Point3, Pose3, PriorFactorPoint3, PriorFactorPose3,
                          Rot3, SimpleCamera, Values, symbolChr, symbolIndex, RangeFactorPose3)
-from gtsam.utils import plot
+import gtsam.utils.plot as gtsam_plot
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W0611
 from matplotlib import pyplot as plt
 
-class GraphOptimization():
-    def __init__(self):
+class iSAM2Wrapper():
+    def __init__(self,pose0=np.eye(4),pose0_to_pose1_range = 1.0,
+                 relinearizeThreshold=0.1,relinearizeSkip=1):
         self.graph = NonlinearFactorGraph()
 
         # Add a prior on pose x0. This indirectly specifies where the origin is.
         # 0.3 rad std on roll,pitch,yaw and 0.1m on x,y,z
 
         pose_noise = gtsam.noiseModel_Diagonal.Sigmas(np.array([0.3, 0.3, 0.3, 0.1, 0.1, 0.1]))
-        x0factor = PriorFactorPose3(symbol('x', 0), poses[0], pose_noise)
+        x0factor = PriorFactorPose3(iSAM2Wrapper.get_key('x', 0), gtsam.gtsam.Pose3(pose0), pose_noise)
         self.graph.push_back(x0factor)
         
+        # Set scale between pose 0 and pose 1 to Unity 
         x0x1_noise = gtsam.noiseModel_Isotropic.Sigma(1, 0.1)
-        x1factor = RangeFactorPose3(symbol('x', 0),symbol('x', 1), 15.0,x0x1_noise)
-        graph.push_back(x1factor)
+        x1factor = RangeFactorPose3(iSAM2Wrapper.get_key('x', 0),iSAM2Wrapper.get_key('x', 1), pose0_to_pose1_range,x0x1_noise)
+        self.graph.push_back(x1factor)
 
-
-        self.opt_params = gtsam.DoglegParams()
-        self.opt_params.setVerbosity('Error')
-        self.opt_params.setErrorTol(0.1)
+        iS2params = gtsam.ISAM2Params()
+        iS2params.setRelinearizeThreshold(relinearizeThreshold)
+        iS2params.setRelinearizeSkip(relinearizeSkip)
+        self.isam2 = gtsam.ISAM2(iS2params)
+        #self.opt_params = gtsam.DoglegParams()
+        #self.opt_params.setVerbosity('Error')
+        #self.opt_params.setErrorTol(0.1)
        
+        self.initial_estimate = gtsam.Values()
 
-    def optimize(self, max_iterations=20):
-        self.optimizer = DoglegOptimizer(self.graph, self.initial_estimate, self.opt_params)
-        print('Optimizing:')
-        self.result = self/optimizer.optimizeSafely()
+    def set_Projection_noise(self, noise_val=1.0): # one pixel in u and v
+        '''
+        Set noise model for the Projecttion factors in pixels
+        '''
+        self.projection_noise = gtsam.noiseModel_Isotropic.Sigma(2, noise_val)  
+        
+    def set_Camera_matrix(self, K=np.eye(3)):
+        '''
+        Set camera Matrix for the 
+        '''            
+        self.K = gtsam.Cal3_S2(iSAM2Wrapper.CameraMatrix_to_Cal3_S2(K))
 
-    def add_vertex(self, id, pose, fixed=False):
-        v_se2 = g2o.VertexSE2()
-        v_se2.set_id(id)
-        v_se2.set_estimate(pose)
-        v_se2.set_fixed(fixed)
-        super().add_vertex(v_se2)
-
-    def add_edge(self, vertices, measurement, 
-            information=np.identity(3),
-            robust_kernel=None):
-
-        edge = g2o.EdgeSE2()
-        for i, v in enumerate(vertices):
-            if isinstance(v, int):
-                v = self.vertex(v)
-            edge.set_vertex(i, v)
-
-        edge.set_measurement(measurement)  # relative pose
-        edge.set_information(information)
-        if robust_kernel is not None:
-            edge.set_robust_kernel(robust_kernel)
-        super().add_edge(edge)
-
-    def get_pose(self, id):
-        return self.vertex(id).estimate()
-
-def pt_dist(pt1, pt2):
-    return ( (pt1.x()-pt2.x())*(pt1.x()-pt2.x()) + (pt1.y()-pt2.y())*(pt1.y()-pt2.y()) + (pt1.z()-pt2.z())*(pt1.z()-pt2.z()) )**.5
-
-def symbol(name: str, index: int) -> int:
-    """ helper for creating a symbol without explicitly casting 'name' from str to int """
-    return gtsam.symbol(ord(name), index)
-
-def key_label(key_id):
-    return str(chr(symbolChr(key_id))), symbolIndex(key_id)
-
-def plot_line_on_axes(axes, point1, point2, linespec):
-    """Plot a 3D point on given axis 'axes' with given 'linespec'."""
-    xs = np.array([point1.x(), point2.x()])
-    ys = np.array([point1.y(), point2.y()])
-    zs = np.array([point1.z(), point2.z()])
+    def add_GenericProjectionFactorCal3_S2_factor(self, pt_uv, X_id, L_id):
+        fact = gtsam.GenericProjectionFactorCal3_S2(gtsam.gtsam.Point2(*pt_uv), 
+                                                    self.projection_noise, 
+                                                    self.get_key('x', X_id), 
+                                                    self.get_key('l', L_id), 
+                                                    self.K)    
+        self.graph.push_back(fact)
+        
+    def add_PoseEstimate(self, X_id, T):    
+        self.initial_estimate.insert(iSAM2Wrapper.get_key('x',X_id), 
+                                     gtsam.gtsam.Pose3(T))
     
-    axes.plot(xs, ys, zs, linespec)
+    def add_LandmarkEstimate(self, L_id, P):
+        self.initial_estimate.insert(iSAM2Wrapper.get_key('l',L_id), 
+                                     gtsam.Point3(*P))
+        
+    def update(self,iterations = 1):
+        self.isam2.update(self.graph, self.initial_estimate)
+        # Perform additional iterations as specified
+        for i in range(2,iterations+1):
+            self.isam2.update()
+        self.current_estimate = self.isam2.calculateEstimate()
+        self.graph.resize(0)
+        self.initial_estimate.clear()
 
-def plot_line(fignum, point1, point2, linespec):
-    """Plot a 3D point on given figure with given 'linespec'."""
-    fig = plt.figure(fignum)
-    axes = fig.gca(projection='3d')
-    plot_line_on_axes(axes, point1, point2, linespec)
+    def get_Estimate(self):    
+        return self.isam2.calculateEstimate()
+    
+    def plot_estimate(self,fignum = 0):
+        """
+        VisualISAMPlot plots current state of ISAM2 object
+        Author: Ellon Paiva
+        Based on MATLAB version by: Duy Nguyen Ta and Frank Dellaert
+        """
+        fig = plt.figure(fignum)
+        axes = fig.gca(projection='3d')
+        plt.cla()
+    
+        # Plot points
+        # Can't use data because current frame might not see all points
+        # marginals = Marginals(isam.getFactorsUnsafe(), isam.calculateEstimate())
+        # gtsam.plot_3d_points(result, [], marginals)
+        gtsam_plot.plot_3d_points(fignum, self.current_estimate, 'rx')
+    
+        # Plot cameras
+        i = 0
+        while self.current_estimate.exists(iSAM2Wrapper.get_key('x',i)):
+            pose_i = self.current_estimate.atPose3(iSAM2Wrapper.get_key('x',i))
+            gtsam_plot.plot_pose3(fignum, pose_i, 10)
+            i += 1
+    
+        # draw
+        axes.set_xlim3d(-40, 40)
+        axes.set_ylim3d(-40, 40)
+        axes.set_zlim3d(-40, 40)
+        axes.view_init(90, 0)
+        plt.pause(.01)
+    
+    @staticmethod
+    def pt_dist(pt1, pt2):
+        return ( (pt1.x()-pt2.x())*(pt1.x()-pt2.x()) + (pt1.y()-pt2.y())*(pt1.y()-pt2.y()) + (pt1.z()-pt2.z())*(pt1.z()-pt2.z()) )**.5
 
-def draw_graph(graph,values,fig_num=1):
-    for i in range(graph.size()):
-        factor = graph.at(i)
-        fkeys = factor.keys()
-        if fkeys.size() == 2:
-            x = values.atPose3(fkeys.at(0)).translation()
-            if key_label(fkeys.at(1))[0] is 'x':
-                l = values.atPose3(fkeys.at(1)).translation()
-            else:
-                l = values.atPoint3(fkeys.at(1))
-            plot_line(fig_num,x,l,'b')
-    poses = gtsam.allPose3s(values)
-    for i in range(poses.size()):
-        plot.plot_pose3(fig_num, poses.atPose3(poses.keys().at(i)),axis_length=2.0)
+    @staticmethod
+    def symbol(name: str, index: int) -> int:
+        """ helper for creating a symbol without explicitly casting 'name' from str to int """
+        return gtsam.symbol(ord(name), index)
+    
+    @staticmethod
+    def key_label(key_id):
+        return str(chr(symbolChr(key_id))), symbolIndex(key_id)
 
-def Point2arr(pt):
-    if type(pt) is gtsam.gtsam.Point2 :
-        return np.array([pt.x(), pt.y()])
-    elif type(pt) is gtsam.gtsam.Point3 :
-        return np.array([pt.x(), pt.y(), pt.z()])
-    else:
-        raise ValueError("Point supplied is neither gtsam.Point2 or gtsam.Point3")
+    @staticmethod
+    def plot_line_on_axes(axes, point1, point2, linespec):
+        """Plot a 3D point on given axis 'axes' with given 'linespec'."""
+        xs = np.array([point1.x(), point2.x()])
+        ys = np.array([point1.y(), point2.y()])
+        zs = np.array([point1.z(), point2.z()])
+        
+        axes.plot(xs, ys, zs, linespec)
 
-def arr2Point(pt):
-    if len(pt) == 2 :
-        return gtsam.gtsam.Point2(pt)
-    elif len(pt) ==3 :
-        return gtsam.gtsam.Point3(pt)
-    else:
-        raise ValueError("Length of Array supplied is neither 2 or 3")
+    @staticmethod
+    def plot_line(fignum, point1, point2, linespec):
+        """Plot a 3D point on given figure with given 'linespec'."""
+        fig = plt.figure(fignum)
+        axes = fig.gca(projection='3d')
+        plot_line_on_axes(axes, point1, point2, linespec)
 
-def main():
-    """
-    Camera observations of landmarks (i.e. pixel coordinates) will be stored as Point2 (x, y).
+    @staticmethod
+    def draw_graph(graph,values,fig_num=1):
+        for i in range(graph.size()):
+            factor = graph.at(i)
+            fkeys = factor.keys()
+            if fkeys.size() == 2:
+                x = values.atPose3(fkeys.at(0)).translation()
+                if key_label(fkeys.at(1))[0] is 'x':
+                    l = values.atPose3(fkeys.at(1)).translation()
+                else:
+                    l = values.atPoint3(fkeys.at(1))
+                plot_line(fig_num,x,l,'b')
+        poses = gtsam.allPose3s(values)
+        for i in range(poses.size()):
+            plot.plot_pose3(fig_num, poses.atPose3(poses.keys().at(i)),axis_length=2.0)
 
-    Each variable in the system (poses and landmarks) must be identified with a unique key.
-    We can either use simple integer keys (1, 2, 3, ...) or symbols (X1, X2, L1).
-    Here we will use Symbols
+    @staticmethod
+    def Point2arr(pt):
+        if type(pt) is gtsam.gtsam.Point2 :
+            return np.array([pt.x(), pt.y()])
+        elif type(pt) is gtsam.gtsam.Point3 :
+            return np.array([pt.x(), pt.y(), pt.z()])
+        else:
+            raise ValueError("Point supplied is neither gtsam.Point2 or gtsam.Point3")
+    @staticmethod
+    def arr2Point(pt):
+        if len(pt) == 2 :
+            return gtsam.gtsam.Point2(pt)
+        elif len(pt) ==3 :
+            return gtsam.gtsam.Point3(pt)
+        else:
+            raise ValueError("Length of Array supplied is neither 2 or 3")
+            
+    @staticmethod
+    def get_key(letter,number):
+        """Create key for pose id number."""
+        return int(gtsam.symbol(ord(letter), number))
 
-    In GTSAM, measurement functions are represented as 'factors'. Several common factors
-    have been provided with the library for solving robotics/SLAM/Bundle Adjustment problems.
-    Here we will use Projection factors to model the camera's landmark observations.
-    Also, we will initialize the robot at some location using a Prior factor.
-
-    When the factors are created, we will add them to a Factor Graph. As the factors we are using
-    are nonlinear factors, we will need a Nonlinear Factor Graph.
-
-    Finally, once all of the factors have been added to our factor graph, we will want to
-    solve/optimize to graph to find the best (Maximum A Posteriori) set of variable values.
-    GTSAM includes several nonlinear optimizers to perform this step. Here we will use a
-    trust-region method known as Powell's Degleg
-
-    The nonlinear solvers within GTSAM are iterative solvers, meaning they linearize the
-    nonlinear functions around an initial linearization point, then solve the linear system
-    to update the linearization point. This happens repeatedly until the solver converges
-    to a consistent set of variable values. This requires us to specify an initial guess
-    for each variable, held in a Values container.
-    """
+    @staticmethod
+    def CameraMatrix_to_Cal3_S2(K):
+        '''
+        Convert 3x3 camera matrix to 5 length vector for Cal3_S2 given as 
+        Cal3_S2 (double fx, double fy, double s, double u0, double v0)
+        '''
+        if not np.allclose(K, np.triu(K)):
+            raise ValueError('K matrix not upper triangular, might be incorrrect')
+        fx,fy,s,u0,v0 = K[0,0],K[1,1],K[0,1],K[0,2],K[1,2]
+        return np.array([fx,fy,s,u0,v0])
 
 
+'''
 if __name__ == '__main__':
     #main()
         # Define the camera calibration parameters
@@ -239,4 +273,4 @@ if __name__ == '__main__':
     
 
     draw_graph(graph,result,2)
-        
+ '''      
