@@ -9,13 +9,13 @@ from mpl_toolkits.mplot3d import Axes3D
 import time
 import sys
 from vslam_helper import *
-from ssc import *
+from utils.ssc import *
 import yaml
 import glob
 import re
 import argparse
 import traceback
-from zernike import MultiHarrisZernike
+from zernike.zernike import MultiHarrisZernike
 np.set_printoptions(precision=3,suppress=True)
 import multiprocessing as mp
 from colorama import Fore, Style
