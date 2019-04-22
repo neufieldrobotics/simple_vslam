@@ -16,6 +16,7 @@ import re
 import argparse
 import traceback
 from zernike.zernike import MultiHarrisZernike
+from helper_functions.frame import Frame
 np.set_printoptions(precision=3,suppress=True)
 import multiprocessing as mp
 from colorama import Fore, Style
@@ -79,7 +80,10 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
     kpjl_match = kpjl_match[mask_RP_lm]
     desjl_match = desjl_match[mask_RP_lm]
            
-    success, T_j, mask_PNP = T_from_PNP(lm_if_up, kpjl_match, K, D)
+    #success, T_j, mask_PNP = T_from_PNP(lm_if_up, kpjl_match, K, D)
+    kpjl_match_ud = cv2.undistortPoints(np.expand_dims(kpjl_match,1),K,D)[:,0,:]
+    success, T_j, mask_PNP = T_from_PNP_norm(lm_if_up, kpjl_match_ud, repErr = ceil2MSD(1/gr_j.shape[1]))
+
     if not success:
         vslog.critical("PNP failed in frame {}. Exiting...".format(frame_no+1))
         exit()
@@ -174,7 +178,9 @@ def preprocess_frame(image_name, detector, mask_name=None, clahe_obj=None, tilin
     
     vslog.debug(pbf)
     vslog.debug("Image Pre-processing time is {:.4f}".format(time.time()-pt))
+    fr = Frame(gr,mask,kp_pts,des)
     return gr, mask, kp_pts, des
+    #return fr
 
 def writer(imgnames, masknames, config_dict, queue):
     TILE_KP = config_dict['use_tiling_non_max_supression']
@@ -211,7 +217,7 @@ def writer(imgnames, masknames, config_dict, queue):
             else: 
                 ppoutput = preprocess_frame(imgnames[i], detector, None, clahe, 
                                             tiling, RADIAL_NON_MAX_RADIUS)
-                gr, mask, kp, des = ppoutput
+                #gr, mask, kp, des = ppoutput
                 queue.put(ppoutput)
     except KeyboardInterrupt:
         vslog.critical("Keyboard interrupt from me")
@@ -316,7 +322,7 @@ if __name__ == '__main__':
     kp2_match_12_ud = cv2.undistortPoints(np.expand_dims(kp2_match_12,1),K,D)[:,0,:]
     
     E_12, mask_e_12 = cv2.findEssentialMat(kp1_match_12_ud, kp2_match_12_ud, focal=1.0, pp=(0., 0.), 
-                                           method=cv2.RANSAC, **config_dict['findEssential_settings'])
+                                           method=cv2.RANSAC, **findEssential_set)
     vslog.info("Essential matrix: used {} of total {} matches".format(np.sum(mask_e_12),len(kp1_match_12),))
     essen_mat_pts = np.sum(mask_e_12)
     points, R_21, t_21, mask_RP_12 = cv2.recoverPose(E_12, kp1_match_12_ud, kp2_match_12_ud,mask=mask_e_12)
@@ -341,16 +347,22 @@ if __name__ == '__main__':
     input("Press [enter] to continue.\n")
     
     # Trim the tracked key pts
+    '''
     kp1_match_12 = kp1_match_12[mask_RP_12[:,0].astype(bool)]
     kp2_match_12 = kp2_match_12[mask_RP_12[:,0].astype(bool)]
     des2_m = des2_m[mask_RP_12[:,0].astype(bool)]
     
     kp1_match_12_ud = kp1_match_12_ud[mask_RP_12[:,0].astype(bool)]
     kp2_match_12_ud = kp2_match_12_ud[mask_RP_12[:,0].astype(bool)]
+    '''
+    kp1_match_12, kp2_match_12, des2_m, kp1_match_12_ud, kp2_match_12_ud = trim_using_mask(mask_RP_12,kp1_match_12, 
+                                                               kp2_match_12, des2_m, kp1_match_12_ud, 
+                                                               kp2_match_12_ud)
     
     landmarks_12, mask_tri_12 = triangulate(np.eye(4), T_1_2, kp1_match_12_ud, 
                                             kp2_match_12_ud, None)
-    
+    vslog.info("Triangulation used {} of total matches {} matches".format(np.sum(mask_tri_12),len(mask_tri_12)))
+
     fig2 = plt.figure(2)
     ax2 = fig2.add_subplot(111, projection='3d')
     fig2.subplots_adjust(0,0,1,1)
@@ -366,10 +378,11 @@ if __name__ == '__main__':
     
     if PLOT_LANDMARKS:
         graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='C0')
-    
+    '''
     kp2_match_12 = kp2_match_12[mask_tri_12[:,0].astype(bool)]
     des2_m = des2_m[mask_tri_12[:,0].astype(bool)]
-            
+    '''
+    kp2_match_12, des2_m = trim_using_mask(mask_tri_12, kp2_match_12, des2_m)
     cam_pose_0 = plot_pose3_on_axes(ax2,np.eye(4), axis_length=0.5)
     cam_pose = plot_pose3_on_axes(ax2, T_1_2, axis_length=1.0)
     

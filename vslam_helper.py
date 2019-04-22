@@ -10,6 +10,7 @@ import cv2
 from matplotlib import pyplot as plt
 from scipy import spatial
 import logging
+import math
 
 def R2d_from_theta(theta):  
     return np.array([[np.cos(theta), np.sin(theta)],[-np.sin(theta), np.cos(theta)]])
@@ -62,8 +63,7 @@ def triangulate(T_w_1, T_w_2, pts_1_2d, pts_2_2d, mask):
     
     pt_iter = 0
     rows_to_del = []
-    ANGLE_THRESHOLD = np.radians(.5)
-    
+    ANGLE_THRESHOLD = np.radians(.5)    
     
     for i,v in enumerate(mask):
         if v==1:
@@ -92,9 +92,8 @@ def triangulate(T_w_1, T_w_2, pts_1_2d, pts_2_2d, mask):
 
 def T_from_PNP(coord_3d, img_pts, K, D):
     success, rvec_to_obj, tvecs_to_obj, inliers = cv2.solvePnPRansac(coord_3d, img_pts, 
-                                                   K, D, iterationsCount=250, reprojectionError=4.0,
+                                                   K, D, iterationsCount=250, reprojectionError=0.002,
                                                    confidence=0.9999)
-
     if success:    
         R_to_obj, _ = cv2.Rodrigues(rvec_to_obj)
         mask = np.zeros(len(img_pts)).astype('bool')
@@ -103,6 +102,23 @@ def T_from_PNP(coord_3d, img_pts, K, D):
         return success, compose_T(*pose_inv(R_to_obj, tvecs_to_obj)), mask#, coord_3d[inliers], img_pts[inliers]
     else: 
         return success, None, None
+
+def T_from_PNP_norm(coord_3d, img_pts, repErr=0.002):
+    success, rvec_to_obj, tvecs_to_obj, inliers = cv2.solvePnPRansac(coord_3d, img_pts, 
+                                                   np.eye(3), None, iterationsCount=250, reprojectionError=repErr,
+                                                   confidence=0.9999)
+    if success:    
+        R_to_obj, _ = cv2.Rodrigues(rvec_to_obj)
+        mask = np.zeros(len(img_pts)).astype('bool')
+        mask[inliers[:,0]]=True
+
+        return success, compose_T(*pose_inv(R_to_obj, tvecs_to_obj)), mask#, coord_3d[inliers], img_pts[inliers]
+    else: 
+        return success, None, None
+
+def ceil2MSD(x):
+    mlp = 10**math.floor(math.log10(x))
+    return float("%.0e" % (math.ceil(x / mlp ) * mlp)) 
 
 def undistortKeyPoints(kps, K, D):
     '''
@@ -655,6 +671,12 @@ def combine_and_filter(kp_i_lm, kp_i_cand, kp_j_lm, kp_j_new, K, D, findEssentia
     kp_j_new_ud  = kp_j_new_ud[mask_RP_cand]
     
     return mask_RP_lm, mask_RP_cand, kp_i_cand_ud, kp_j_new_ud
+
+def trim_using_mask(mask, *argv):
+    trimmed_arr = []
+    for arr in argv: 
+        trimmed_arr.append(arr[mask[:,0].astype(bool)])
+    return trimmed_arr
 
 def move_figure(position="top-right"):
     '''
