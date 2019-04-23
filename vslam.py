@@ -284,6 +284,7 @@ if __name__ == '__main__':
     # Show image
     Frame.initialize_figures(window_xadj, window_yadj)
     Frame.fig1.canvas.mpl_connect('key_press_event', onKey)
+    Frame.fig2.canvas.mpl_connect('key_press_event', onKey)
 
     matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
     Frame.initialize_VSLAM(fr1, fr2, matcher,config_dict)

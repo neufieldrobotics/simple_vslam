@@ -33,12 +33,13 @@ def T_inv(T_in):
     t_out = -np.matmul(R_out,t_in)
     return np.vstack((np.hstack((R_out,t_out)),np.array([0, 0, 0, 1])))
 
+'''
 def triangulate(T_w_1, T_w_2, pts_1_2d, pts_2_2d, mask):
-    '''
+    '/''
     This function accepts two homogeneous transforms (poses) of 2 cameras in world coordinates,
     along with corresponding matching points and returns the 3D coordinates in world coordinates
     Mask must be a dimensionless array or n, array
-    '''
+    '/''
     vslog = logging.getLogger('VSLAM')
     pts_1 = np.expand_dims(pts_1_2d,1)
     pts_2 = np.expand_dims(pts_2_2d,1)
@@ -89,6 +90,7 @@ def triangulate(T_w_1, T_w_2, pts_1_2d, pts_2_2d, mask):
     pts_3d_w_hom = pts_3d_frame1_hom_norm @ T_w_1.T
     pts_3d_w = pts_3d_w_hom[:, :3]
     return pts_3d_w, mask
+'''
 
 def T_from_PNP(coord_3d, img_pts, K, D):
     success, rvec_to_obj, tvecs_to_obj, inliers = cv2.solvePnPRansac(coord_3d, img_pts, 
@@ -406,6 +408,24 @@ def knn_match_and_filter(matcher, kp1, kp2, des1, des2,threshold=0.9):
 '''
 
 def knn_match_and_lowe_ratio_filter(matcher, des1, des2,threshold=0.9):
+    # First match 2 against 1
+    matches_knn = matcher.knnMatch(des2,des1, k=2)
+    
+    matches = []
+    # Run lowes filter and filter with difference higher than threshold this might
+    # sill leave multiple matches into 1 (train descriptors)
+    # Create mask of size des1 x des2 for permissible matches
+    mask = np.zeros((des1.shape[0],des2.shape[0]),dtype='uint8')
+    for match in matches_knn:
+        if len(match)==1 or (len(match)>1 and match[0].distance < threshold*match[1].distance):
+                matches.append(match[0])
+                mask[match[0].trainIdx,match[0].queryIdx] = 1
+    
+    # run matches again using mask but from 1 to 2 which should remove duplicates            
+    matches_cross = matcher.match(des1,des2,mask=mask)
+    
+    return matches_cross
+    '''
     matches_knn = matcher.knnMatch(des1,des2, k=2)
     matches = []
     
@@ -415,8 +435,11 @@ def knn_match_and_lowe_ratio_filter(matcher, des1, des2,threshold=0.9):
                 matches.append(match[0])
         elif len(match)==1:
             matches.append(match[0])
-
+            
     return matches
+    '''
+
+
 '''
 def track_keypoints(kp1, des1, kp2, des2, matches):
     

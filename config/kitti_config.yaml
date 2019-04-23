@@ -31,7 +31,7 @@ lowe_ratio_test_threshold: 0.9
 
 findEssential_settings:
  prob: 0.9999
- threshold: 0.01
+ threshold: 0.0005
 
 CLAHE_settings:
  clipLimit: 10.0
