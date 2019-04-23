@@ -22,6 +22,9 @@ import multiprocessing as mp
 from colorama import Fore, Style
 from itertools import cycle
 import logging
+
+from helper_functions.frame import Frame
+
 '''
 PROCESS FRAME
 '''
@@ -149,49 +152,25 @@ def process_frame(gr_j, mask_j, kp_j, des_j, gr_i, kp_i, des_i,
 
     return gr_j, kpjl, desjl, kp_j_cand, des_j_cand, lm_j_up, T_j
 
-def preprocess_frame(image_name, detector, mask_name=None, clahe_obj=None, tiling=None, rnm_radius=None):
-    vslog = logging.getLogger('VSLAM')
-    vslog.debug("Pre-processing image: "+image_name)
-
-    pt = time.time()
-    img = cv2.imread(image_name)
-    gr = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-
-    if mask_name is not None:
-        mask = cv2.imread(mask_name,cv2.IMREAD_GRAYSCALE)
-    else: mask= None
-
-    if clahe_obj is not None: gr = clahe_obj.apply(gr)
-    
-    kp,des = detector.detectAndCompute(gr,mask)
-    pbf = "New feature candidates detected: "+str(len(kp))
-    
-    if tiling is not None:
-        kp = tiled_features(kp, gr.shape, *tiling)
-        pbf += " > tiling supression: "+str(len(kp))
-    
-    if rnm_radius is not None:
-        kp = radial_non_max(kp,rnm_radius)
-        pbf += " > radial supression: "+str(len(kp))
-        
-    kp_pts = cv2.KeyPoint_convert(kp)
-    
-    vslog.debug(pbf)
-    vslog.debug("Image Pre-processing time is {:.4f}".format(time.time()-pt))
-    fr = Frame(gr,mask,kp_pts,des)
-    return gr, mask, kp_pts, des
-    #return fr
-
 def writer(imgnames, masknames, config_dict, queue):
-    TILE_KP = config_dict['use_tiling_non_max_supression']
+    #TILE_KP = config_dict['use_tiling_non_max_supression']
     USE_MASKS = config_dict['use_masks']
     USE_CLAHE = config_dict['use_clahe']
-    RADIAL_NON_MAX = config_dict['radial_non_max']
-         
-    if USE_CLAHE:
-        clahe = cv2.createCLAHE(**config_dict['CLAHE_settings'])
-    else: clahe = None
+    #RADIAL_NON_MAX = config_dict['radial_non_max']
     
+    #detector = cv2.ORB_create(**config_dict['ORB_settings'])
+    Frame.detector = MultiHarrisZernike(**config_dict['ZERNIKE_settings'])
+    
+   
+    vslog.info("K: \t"+str(Frame.K).replace('\n','\n\t\t'))
+    vslog.info("D: \t"+str(Frame.D))
+        
+    if USE_CLAHE:
+        Frame.clahe_obj = cv2.createCLAHE(**config_dict['CLAHE_settings'])
+    
+    Frame.is_config_set = True
+ 
+    '''
     if TILE_KP:
         tiling=[config_dict['tiling_non_max_tile_y'], config_dict['tiling_non_max_tile_x']]
     else: tiling = None
@@ -199,9 +178,7 @@ def writer(imgnames, masknames, config_dict, queue):
     if RADIAL_NON_MAX:
         RADIAL_NON_MAX_RADIUS = config_dict['radial_non_max_radius']
     else: RADIAL_NON_MAX_RADIUS = None
-    
-    #detector = cv2.ORB_create(**config_dict['ORB_settings'])
-    detector = MultiHarrisZernike(**config_dict['ZERNIKE_settings'])
+    '''
     
     vslog.info('Starting writer process...')
     
@@ -212,13 +189,11 @@ def writer(imgnames, masknames, config_dict, queue):
                 time.sleep(0.01)
                 #print(Fore.GREEN+"Writer queue full, waiting..."+Style.RESET_ALL)
             if USE_MASKS:
-                queue.put(preprocess_frame(imgnames[i], detector, masknames[i], clahe, 
-                                           tiling, RADIAL_NON_MAX_RADIUS))
+                fr = Frame(imgnames[i],mask_name=masknames[i])
             else: 
-                ppoutput = preprocess_frame(imgnames[i], detector, None, clahe, 
-                                            tiling, RADIAL_NON_MAX_RADIUS)
+                fr = Frame(imgnames[i])
                 #gr, mask, kp, des = ppoutput
-                queue.put(ppoutput)
+            queue.put(fr)
     except KeyboardInterrupt:
         vslog.critical("Keyboard interrupt from me")
         pass
@@ -237,8 +212,6 @@ if __name__ == '__main__':
     # Inputs, images and camera info
         
     config_dict = yaml.load(open(args.config))
-    K = np.array(config_dict['K'])
-    D = np.array(config_dict['D'])
     CHESSBOARD = config_dict['chessboard']
     USE_MASKS = config_dict['use_masks']
     #RADIAL_NON_MAX_RADIUS = config_dict['radial_non_max_radius']
@@ -273,9 +246,6 @@ if __name__ == '__main__':
     
     assert images is not None, "ERROR: No images read"
     
-    vslog.info("K: \t"+str(K).replace('\n','\n\t\t'))
-    vslog.info("D: \t"+str(D))
-
             
     if USE_MASKS:
         masks_ext = config_dict['masks_ext']
@@ -294,20 +264,31 @@ if __name__ == '__main__':
         if event.key=="q":
             cue_to_exit = True
     
+    # 
+    Frame.K = np.array(config_dict['K'])
+    Frame.D = np.array(config_dict['D'])
+    #Frame.fig_frame_image = 
     # Launch the pre-processing thread                
-    mp.set_start_method('spawn')
+    mp.set_start_method('spawn',force=True)
     mpqueue = mp.Queue(5) # writer() writes to pqueue from _this_ process
     writer_p = mp.Process(target=writer, args=(images, masks, config_dict, mpqueue,))
     writer_p.daemon = True
     writer_p.start()        # Launch reader_proc() as a separate python process
     
     # Process first 2 frames
-    gr1, mask1, kp1, des1 = mpqueue.get()
-    gr2, mask2, kp2, des2 = mpqueue.get()
-    #vslog.debug(' kp1: '+str(kp1[0,:])+' kp2: '+str(kp2[0,:]))
-    vslog.debug('Length of kp1: {}  Length of kp2: {}'.format(len(kp1),len(kp2)))
+    fr1 = mpqueue.get()
+    #gr1, mask1, kp1, des1 = fr1.gr,fr1.mask,fr1.kp,fr1.des
+    fr2 = mpqueue.get()
+    #gr2, mask2, kp2, des2 = fr2.gr,fr2.mask,fr2.kp,fr2.des
+    
+    # Show image
+    Frame.initialize_figures(window_xadj, window_yadj)
+    Frame.fig1.canvas.mpl_connect('key_press_event', onKey)
 
     matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
+    Frame.initialize_VSLAM(fr1, fr2, matcher,config_dict)
+
+    '''    
     matches_12 = knn_match_and_lowe_ratio_filter(matcher, des1, des2, 
                                                  threshold=config_dict['lowe_ratio_test_threshold'])
     vslog.debug('Length of matches: '+str(len(matches_12)))
@@ -334,16 +315,7 @@ if __name__ == '__main__':
         
     img12 = draw_point_tracks(kp1_match_12,gr2,kp2_match_12,mask_RP_12[:,0].astype(bool), True)
     
-    fig1 = plt.figure(1)
-    plt.get_current_fig_manager().window.setGeometry(window_xadj,window_yadj,640,338)
     
-    fig1_image = plt.imshow(img12)
-    plt.title('Image 1 to 2 matches')
-    plt.axis("off")
-    fig1.subplots_adjust(0,0,1,1)
-    plt.draw()
-    plt.pause(0.001)
-    fig1.canvas.mpl_connect('key_press_event', onKey)
     input("Press [enter] to continue.\n")
     
     # Trim the tracked key pts
@@ -369,7 +341,7 @@ if __name__ == '__main__':
     plt.get_current_fig_manager().window.setGeometry(640+window_xadj,window_yadj,640,676) #(864, 430, 800, 900)
     ax2.set_aspect('equal')         # important!
     fig2.suptitle('Image 1 to 2 after triangulation')
-    
+
     graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='r')
     set_axes_equal(ax2)
     ax2.view_init(0, -90)
@@ -378,10 +350,10 @@ if __name__ == '__main__':
     
     if PLOT_LANDMARKS:
         graph = plot_3d_points(ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='C0')
-    '''
+    
     kp2_match_12 = kp2_match_12[mask_tri_12[:,0].astype(bool)]
     des2_m = des2_m[mask_tri_12[:,0].astype(bool)]
-    '''
+    
     kp2_match_12, des2_m = trim_using_mask(mask_tri_12, kp2_match_12, des2_m)
     cam_pose_0 = plot_pose3_on_axes(ax2,np.eye(4), axis_length=0.5)
     cam_pose = plot_pose3_on_axes(ax2, T_1_2, axis_length=1.0)
@@ -449,3 +421,4 @@ if __name__ == '__main__':
         plt.pause(0.5)
         if cue_to_exit: break
     plt.close(fig='all')
+    '''
