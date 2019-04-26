@@ -52,23 +52,44 @@ class Frame ():
         '''
         Frame objects initializer
         '''
+        # Popultated during initilization
         Frame.last_id += 1  
-        self.frameid = Frame.last_id
+        self.frame_id = Frame.last_id
         self.mask    = None             # mask for the image
+        self.kp_obj = None              # List of keypoint objects calc by Feature Extractor
+        self.kp = None                  # Keypoint coordinates as N x 2 array  (flat32)
+        self.des = None                 # Feature descriptor array of N x (des_length) (Float32) 
+
+        # Variables forwarded to the next frame
         self.kp_lm_ind = []             # Indices of keypoints that already have landmarks
         self.kp_cand_ind = []           # Indices of candidate keypoints that dont have landmarks associated
-        self.kp_cand_pt = np.array([])  # 
         self.lm_ind = []                # Index of landmarks which match kp_lm_ind
         self.T_pnp = np.zeros([4,4])    # Pose in world frame computed from PNP
         self.T_gtsam = np.zeros([4,4])  # Pose in world frame after iSAM2 optimization
-        self.kp_m_prev_ind = []
-        self.kp_m_next_ind = []
+
+        # Temoporary variables used in processing frames
+        self.kp_cand_pt = np.array([])  # 
+        self.kp_m_prev_ind = None
+        self.kp_m_next_ind = None    
         self.kp_m_next_pt = None         # Keypoints matched with next frame
         self.kp_m_prev_pt = None         # Keypoints matched with prev frame
         self.kp_m_next_pt_ud = None      # Undistorted Keypoints matched with next frame
         self.kp_m_prev_pt_ud = None      # Undistorted Keypoints matched with prev frame
         self.kp_m_prev_lm_ind = None
         self.kp_m_prev_cand_ind = None
+        
+        ''''
+        kp_j_new_ud  = kp_j_all_ud[-num_cand:]
+        
+        kp_i_cand_ud = kp_i_cand_ud[mask_RP_cand]
+        kp_j_new_ud  = kp_j_new_ud[mask_RP_cand]
+        
+        lm_if_up = lm_if[mask_RP_lm]
+        kpic_match = kpic_match[mask_RP_cand]    
+        kpjn_match = kpjn_match[mask_RP_cand]
+        desjn_match = desjn_match[mask_RP_cand]
+        '''
+    
 
         if not Frame.is_config_set:
             raise ValueError('All required class config not set')
@@ -193,21 +214,21 @@ class Frame ():
         fr2.kp_m_prev_pt_ud = fr2.kp_m_prev_pt_ud[mask]
         
     @staticmethod
-    def triangulate(T_w_1, T_w_2, fr1, fr2, mask):
+    def triangulate(T_w_1, T_w_2,  pts_1_2d, pts_2_2d, mask):
         '''
         This function accepts two homogeneous transforms (poses) of 2 cameras in world coordinates,
         along with corresponding matching points and returns the 3D coordinates in world coordinates
         Mask must be a dimensionless array or n, array
         '''
-        pts_1 = np.expand_dims(fr1.kp_m_next_pt_ud,1)
-        pts_2 = np.expand_dims(fr2.kp_m_prev_pt_ud,1)
+        pts_1 = np.expand_dims(pts_1_2d,1)
+        pts_2 = np.expand_dims(pts_2_2d,1)
         T_origin = np.eye(4)
         P_origin = T_origin[:3]
         # calculate the transform of 1 in 2's frame
         T_2_w = T_inv(T_w_2)
         T_2_1 = T_2_w @ T_w_1
         P_2_1 = T_2_1[:3]
-        Frame.frlog.info("P_2_1:\t"+str(P_2_1).replace('\n','\n\t\t\t'))
+        #Frame.frlog.info("P_2_1:\t"+str(P_2_1).replace('\n','\n\t\t\t'))
         
         t_2_1 = T_2_1[:3,-1]
         Frame.frlog.debug("No of points in pts_1: {}".format(pts_1.shape))
@@ -315,7 +336,7 @@ class Frame ():
         fr_i.kp_lm_ind = fr_i.kp_lm_ind[l_i]   # l_i_1 is index of matched lm keypoints into fr_i.kp
                                                # this has to be done this way since des_i_lm is a subset of fr1.des
         fr_i.lm_ind = fr_i.lm_ind[l_i]
-        fr_j.kp_m_prev_lm_ind = l_j            # fr_j.des is the full list, so m.train gives us index into fr_j.kp
+        fr_j.kp_m_prev_lm_ind = np.array(l_j)      # fr_j.des is the full list, so m.train gives us index into fr_j.kp
         
         #matches for features which are candidates from previous image and 
         #not associated with landmarks
@@ -331,7 +352,7 @@ class Frame ():
             l_j += [m.trainIdx]
         
         fr_i.kp_cand_ind = fr_i.kp_cand_ind[l_i]
-        fr_j.kp_m_prev_cand_ind = l_j  
+        fr_j.kp_m_prev_cand_ind = np.array(l_j)
         
         Frame.frlog.debug("No of fr_i.kp_lm_ind: {}, fr_i.lm_ind: {}, fr_j.kp_m_prev_lm_ind: {}, fr_i.kp_cand_ind: {}, fr_j.kp_m_prev_cand_ind: {}".format(
                     len(fr_i.kp_lm_ind),len(fr_i.lm_ind),len(fr_j.kp_m_prev_lm_ind),
@@ -357,8 +378,8 @@ class Frame ():
         num_cand = len(fr_j.kp_m_prev_cand_ind)
         
         # COmbine index list of landmarks and candidates
-        kp_i_all_ind = np.vstack((fr_i.kp_lm_ind, fr_i.kp_cand_ind))
-        kp_j_all_ind = np.vstack((fr_j.kp_m_prev_lm_ind, fr_j.kp_m_prev_cand_ind))
+        kp_i_all_ind = np.concatenate((fr_i.kp_lm_ind, fr_i.kp_cand_ind))
+        kp_j_all_ind = np.concatenate((fr_j.kp_m_prev_lm_ind, fr_j.kp_m_prev_cand_ind))
         
 #        kp_i_lm_ud = cv2.undistortPoints(np.expand_dims(fr_i.kp[fr_i.kp_lm_ind],1),Frame.K,Frame.D)[:,0,:]
 #        kp_j_prev_lm_ud = cv2.undistortPoints(np.expand_dims(fr_j.kp[fr_i.kp_m_prev_lm_ind],1),Frame.K,Frame.D)[:,0,:]
@@ -370,35 +391,37 @@ class Frame ():
         
         # getting the first mask for filter using essential matrix method
         E, mask_e_all = cv2.findEssentialMat(kp_i_all_ud, kp_j_all_ud, 
-                                             focal=1.0, 
-                                             pp=(0., 0.), 
-                                              method=cv2.RANSAC, 
-                                               **Frame.config_dict['findEssential_settings'])
+                                             focal=1.0, pp=(0., 0.), 
+                                             method=cv2.RANSAC, **Frame.config_dict['findEssential_settings'])
         essen_mat_pts = np.sum(mask_e_all)  
         
-        Frame.frlog.debug("Essential matrix: used {} of total {} matches".format(essen_mat_pts,len(kp_j_all)))
-        
+        Frame.frlog.debug("Essential matrix: used {} of total {} matches".format(essen_mat_pts,len(kp_j_all_ud)))
         
         # getting the second mask for filtering using recover pose
-        if FILTER_RP:
+        
+        #if FILTER_RP:
             # Recover Pose filtering is breaking under certain conditions. Leave out for now.
-            _, _, _, mask_RP_all = cv2.recoverPose(E, kp_i_all_ud, kp_j_all_ud, mask=mask_e_all)
-            Frame.frlog.info("Recover pose: used {} of total {} matches".format(np.sum(mask_RP_all),essen_mat_pts))
-        else: 
-            mask_RP_all = mask_e_all
+        _, _, _, mask_RP_all = cv2.recoverPose(E, kp_i_all_ud, kp_j_all_ud, mask=mask_e_all)
+        Frame.frlog.info("Recover pose: used {} of total {} matches".format(np.sum(mask_RP_all),essen_mat_pts))
+        #else: 
+        #    mask_RP_all = mask_e_all
         
         # Split the combined mask to lm feature mask and candidate mask
-        mask_RP_lm = mask_RP_all[:num_landmarks,0].astype(bool)
-        mask_RP_cand = mask_RP_all[-num_cand:,0].astype(bool)
+        mask_RP_lm = mask_RP_all[:num_landmarks]
+        mask_RP_cand = mask_RP_all[-num_cand:]
         
         # Assign indexes 
-        kp_i_cand_ud = kp_i_all_ud[-num_cand:]
-        kp_j_new_ud  = kp_j_all_ud[-num_cand:]
+        fr_i.kp_lm_ind = fr_i.kp_lm_ind[mask_RP_lm[:,0].astype(bool)]
+        fr_j.kp_m_prev_lm_ind = fr_j.kp_m_prev_lm_ind[mask_RP_lm[:,0].astype(bool)]
         
-        kp_i_cand_ud = kp_i_cand_ud[mask_RP_cand]
-        kp_j_new_ud  = kp_j_new_ud[mask_RP_cand]
+        fr_i.kp_cand_ind = fr_i.kp_cand_ind[mask_RP_cand[:,0].astype(bool)]
+        fr_j.kp_m_prev_cand_ind = fr_j.kp_m_prev_cand_ind[mask_RP_cand[:,0].astype(bool)]
         
-        return mask_RP_lm, mask_RP_cand, kp_i_cand_ud, kp_j_new_ud
+        fr_i.lm_ind = fr_i.lm_ind[mask_RP_lm[:,0].astype(bool)]
+        print('inside combine and filter - lm_ind',fr_i.lm_ind)
+
+        Frame.frlog.debug("Essential matrix and RP filtered {} landmarks out of {}".format(np.sum(mask_RP_lm),num_landmarks))
+        Frame.frlog.debug("Essential matrix and RP filtered {} candidates out of {}".format(np.sum(mask_RP_cand),num_cand))
     
     @staticmethod
     def initialize_VSLAM(fr1, fr2):
@@ -447,8 +470,7 @@ class Frame ():
         pose_2T1 = compose_T(rot_2R1,trans_2t1)
         pose_1T2 = T_inv(pose_2T1)
         fr2.T_pnp = pose_1T2
-        Frame.frlog.info("R:\t"+str(pose_1T2[:3,:3]).replace('\n','\n\t\t'))
-        Frame.frlog.info("t:\t"+str(pose_1T2[:3,-1].T))
+        Frame.frlog.info("1T2 :\t"+str(pose_1T2[:3,:]).replace('\n','\n\t\t'))
             
         img12 = Frame.draw_point_tracks(fr1,fr2,mask_RP_12[:,0].astype(bool), True)
         
@@ -467,7 +489,16 @@ class Frame ():
         Frame.trim_using_masks(mask_RP_12[:,0].astype(bool), fr1, fr2)
         
         # d. Triangulate landmarks using matched keypoints 
-        landmarks_12, mask_tri_12 = Frame.triangulate(np.eye(4), pose_1T2, fr1, fr2, None)
+        
+        kp1_m_cand_pt_ud = cv2.undistortPoints(np.expand_dims(fr1.kp[fr1.kp_m_next_ind],1),
+                                                             Frame.K, Frame.D)[:,0,:]
+        kp2_m_cand_pt_ud = cv2.undistortPoints(np.expand_dims(fr2.kp[fr2.kp_m_prev_ind],1),
+                                                             Frame.K, Frame.D)[:,0,:]
+        
+        landmarks_12, mask_tri_12 = Frame.triangulate(np.eye(4), pose_1T2, 
+                                                      kp1_m_cand_pt_ud, 
+                                                      kp2_m_cand_pt_ud, 
+                                                      None)
         Frame.landmarks = landmarks_12
         
         Frame.frlog.info("Triangulation used {} of total matches {} matches".format(np.sum(mask_tri_12),len(mask_tri_12)))
@@ -478,7 +509,7 @@ class Frame ():
         Frame.fig2.canvas.draw_idle(); plt.pause(0.01)
         
         input("Press [enter] to continue.\n")
-        Frame.lm_plot_handle.remove()
+        #Frame.lm_plot_handle.remove()
 
         #kp2_match_12, des2_m = trim_using_mask(mask_tri_12, kp2_match_12, des2_m)
         Frame.trim_using_masks(mask_tri_12[:,0].astype(bool), fr1, fr2)
@@ -508,100 +539,135 @@ class Frame ():
         
         Frame.combine_and_filter(fr_i, fr_j)
         
-        Frame.frlog.info("len of lm_i: {}".format(len(lm_i)))
-        Frame.frlog.info("len of kp_i: {}".format(len(kp_i)))
-    
         time_start = time.time()
             
         # Display translucent mask on image.
         # if mask_j is not None:
         #    gr_j_masked = cv2.addWeighted(mask_j, 0.2, gr_j, 1 - 0.2, 0)
         # else: gr_j_masked = gr_j
+
+        # Display landmarks carried from previous frame        
+        img_track_lm = draw_point_tracks(fr_i.kp[fr_i.kp_lm_ind],
+                                         fr_j.gr,
+                                         fr_j.kp[fr_j.kp_m_prev_lm_ind],
+                                         None, False)
         
-        img_track_lm = draw_point_tracks(kpil_match,gr_j_masked,
-                                           kpjl_match,mask_RP_lm, False)
-        img_track_all = draw_point_tracks(kpic_match,img_track_lm,
-                                           kpjn_match,mask_RP_cand, False, color=[255,255,0])
+        # Display candidates carred from previous frame
+        img_track_all = draw_point_tracks(fr_i.kp[fr_i.kp_cand_ind],
+                                          img_track_lm,
+                                          fr_j.kp[fr_j.kp_m_prev_cand_ind],
+                                          None, False, color=[255,255,0])
+        
+        Frame.fig_frame_image.set_data(img_track_all)
+        Frame.fig1.canvas.draw_idle(); plt.pause(0.05)
+        input("Enter to continue")
     
         Frame.frlog.debug("Time elapsed in drawing tracks: {:.4f}".format(time.time()-time_start))
         time_start = time.time()
     
-        Frame.frlog.debug('shape of mask_RP_lm: {}, shape of lm_if'.format(mask_RP_lm.shape,lm_i.shape))
-    
-        lm_if_up = lm_if[mask_RP_lm]
-    
-        Frame.frlog.info("LM prev(i) was: {}. LM(i) updated after Ess mat filter is: {}".format(len(lm_if),len(lm_if_up)))
-        kpjl_match = kpjl_match[mask_RP_lm]
-        desjl_match = desjl_match[mask_RP_lm]
-               
-        #success, T_j, mask_PNP = T_from_PNP(lm_if_up, kpjl_match, K, D)
-        kpjl_match_ud = cv2.undistortPoints(np.expand_dims(kpjl_match,1),K,D)[:,0,:]
-        success, T_j, mask_PNP = T_from_PNP_norm(lm_if_up, kpjl_match_ud, repErr = ceil2MSD(1/gr_j.shape[1]))
-    
+        # success, T_j, mask_PNP = T_from_PNP(lm_if_up, kpjl_match, K, D)
+        
+        # Slice inlier keypoints from fr_j.kp and undistort
+        kp_j_m_lm_pt_ud = cv2.undistortPoints(np.expand_dims(fr_j.kp[fr_j.kp_m_prev_lm_ind],1),
+                                                             Frame.K, Frame.D)[:,0,:]
+        success, fr_j.T_pnp, mask_pnp = T_from_PNP_norm(Frame.landmarks[fr_i.lm_ind], 
+                                                        kp_j_m_lm_pt_ud, 
+                                                        **Frame.config_dict['solvePnPRansac_settings']) # repErr = ceil2MSD(1/fr_j.gr.shape[1])
+        
         if not success:
             Frame.frlog.critical("PNP failed in frame {}. Exiting...".format(frame_no+1))
             exit()
             
-        Frame.frlog.info("PNP inliers: {}  of {}".format(np.sum(mask_PNP),len(lm_if_up)))
-    
-        lm_if_up = lm_if_up[mask_PNP] 
-        kpjl_match = kpjl_match[mask_PNP]
-        desjl_match = desjl_match[mask_PNP]
+        Frame.frlog.info("PNP inliers: {}  of {}".format(np.sum(mask_pnp),len(fr_i.lm_ind)))
+        Frame.frlog.info("PNP_Pose:\t"+str(fr_j.T_pnp[:3,:]).replace('\n','\n\t\t\t'))
         
+        plot_pose3_on_axes(Frame.ax2, fr_j.T_pnp, axis_length=2.0, center_plot=True, line_obj_list=Frame.cam_pose)
+        
+        Frame.cam_trail_pts = np.append(Frame.cam_trail_pts,fr_j.T_pnp[:3,[-1]].T,axis=0)
+        plot_3d_points(Frame.ax2,Frame.cam_trail_pts , line_obj=Frame.cam_pose_trail, linestyle="", color='g', marker=".", markersize=2)
+        Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)
+        input("Press [enter] to continue.")
+                    
+        fr_i.lm_ind = fr_i.lm_ind[mask_pnp[:,0].astype(bool)] 
+        fr_j.kp_m_prev_lm_ind = fr_j.kp_m_prev_lm_ind[mask_pnp[:,0].astype(bool)] 
+        print("inside update pose, fr_i lm_ind",fr_i.lm_ind)
         Frame.frlog.debug("Time elapsed in PNP: {:.4f}".format(time.time()-time_start))
         time_start = time.time()
-    
-        kpic_match = kpic_match[mask_RP_cand]    
-        kpjn_match = kpjn_match[mask_RP_cand]
-        desjn_match = desjn_match[mask_RP_cand]   
-           
-        lm_j, mask_tri = triangulate(T_i, T_j, kpic_ud, kpjn_ud, None)
+        
+        # Undistort and Triangulate
+        kp_i_m_cand_pt_ud = cv2.undistortPoints(np.expand_dims(fr_i.kp[fr_i.kp_cand_ind],1),
+                                                             Frame.K, Frame.D)[:,0,:]
+        kp_j_m_cand_pt_ud = cv2.undistortPoints(np.expand_dims(fr_j.kp[fr_j.kp_m_prev_cand_ind],1),
+                                                             Frame.K, Frame.D)[:,0,:]
+        
+        lm_j_new, mask_tri = Frame.triangulate(fr_i.T_pnp, fr_j.T_pnp, 
+                                           kp_i_m_cand_pt_ud, 
+                                           kp_j_m_cand_pt_ud, 
+                                           None)
         Frame.frlog.debug("Time elapsed in triangulate: {:.4f}".format(time.time()-time_start)) 
         time_start = time.time()
     
-        Frame.frlog.debug("Points after rejection in triangulation: {} out of length: {}".format(np.sum(mask_tri),len(mask_tri)))
+        Frame.frlog.debug("Points retained after triangulation: {} out of length: {}".format(np.sum(mask_tri),len(mask_tri)))
         
         #if len(kp_prev_cand)>0:
-        img_rej_pts = draw_point_tracks(kpic_match, img_track_all, kpjn_match, 
+        img_rej_pts = draw_point_tracks(fr_i.kp[fr_i.kp_cand_ind], 
+                                        img_track_all, 
+                                        fr_j.kp[fr_j.kp_m_prev_cand_ind], 
                                         (1-mask_tri)[:,0].astype(bool), True, color=[255,0,0])
         #else: img_rej_pts = img_track_all
+        Frame.fig_frame_image.set_data(img_rej_pts)
+        Frame.fig1.canvas.draw_idle(); plt.pause(0.05)
+        input("Enter to continue")
+
         Frame.frlog.debug("Time elapsed in draw pt tracks: {:.4f} ".format(time.time()-time_start)) 
         time_start = time.time()
     
-        kpjn_match = kpjn_match[mask_tri[:,0].astype(bool)]
-        desjn_match = desjn_match[mask_tri[:,0].astype(bool)]
+        fr_i.kp_cand_ind = fr_i.kp_cand_ind[mask_tri[:,0].astype(bool)]
+        fr_j.kp_m_prev_cand_ind = fr_j.kp_m_prev_cand_ind[mask_tri[:,0].astype(bool)]
         
-        try:    
-            new_lm_graph.remove()
-        except NameError:
-            pass
-        new_lm_graph = plot_3d_points(ax2, lm_j, linestyle="", color='r', marker=".", markersize=2)
-        plot_pose3_on_axes(ax2, T_j, axis_length=2.0, center_plot=True, line_obj_list=cam_pose)
+        #try:    
+        #    Frame.lm_plot_handle.remove()
+        #except NameError:
+        #    pass
         
-        cam_trail_pts = np.append(cam_trail_pts,T_j[:3,[-1]].T,axis=0)
-        cam_pose_trail = plot_3d_points(ax2,cam_trail_pts , line_obj=cam_pose_trail, linestyle="", color='g', marker=".", markersize=2)
-        fig2.canvas.draw_idle(); #plt.pause(0.01)
-        if PAUSES: input("Press [enter] to continue.")
+        print(lm_j_new)
+        
+        plot_3d_points(Frame.ax2, lm_j_new, line_obj=Frame.lm_plot_handle, 
+                       linestyle="", color='g', marker=".", markersize=2)
+        
+        Frame.fig2.canvas.draw_idle(); plt.pause(0.1)
+        input("Enter to continue")
+
     
         # Remove pose lines and landmarks to speed plotting
-        if PLOT_LANDMARKS:
-            graph_newlm = plot_3d_points(ax2, lm_j, linestyle="", color='C0', marker=".", markersize=2)    
-            fig2.canvas.draw_idle(); #plt.pause(0.01)
+        #if PLOT_LANDMARKS:
+        #    graph_newlm = plot_3d_points(ax2, lm_j, linestyle="", color='C0', marker=".", markersize=2)    
+        #    fig2.canvas.draw_idle(); #plt.pause(0.01)
         
-        lm_j_up = np.concatenate((lm_if_up,lm_j))
-        kpjl = np.concatenate((kpjl_match,kpjn_match))
-        desjl = np.concatenate((desjl_match,desjn_match))
+        num_curr_landmarks = len(Frame.landmarks)
+        num_new_landmarks = len(lm_j_new)
+        new_lm_ind = np.array(range(num_curr_landmarks,num_curr_landmarks+num_new_landmarks))
+        fr_j.kp_lm_ind = np.concatenate((fr_j.kp_m_prev_lm_ind, fr_j.kp_m_prev_cand_ind))
+        fr_j.lm_ind = np.concatenate((fr_i.lm_ind, new_lm_ind))
+        print('previous indexes:',fr_j.kp_m_prev_lm_ind)                             
+        Frame.landmarks = np.vstack((Frame.landmarks, lm_j_new))
+       
+        print("length of landmark array:",len(Frame.landmarks))
+        print("length of lm_ind:",len(fr_j.lm_ind))
+        # partition kp_m into two sets
+        fr_j.kp_m_prev_ind =  fr_j.kp_lm_ind
+        fr_j.partition_kp_cand()
+        Frame.frlog.debug(" {}".format(len(fr_j.kp_cand_ind)))
+        img_cand_pts = draw_points(img_rej_pts,fr_j.kp[fr_j.kp_cand_ind], 
+                                  color=[255,255,0])
+        Frame.fig_frame_image.set_data(img_cand_pts)
+        Frame.fig1.canvas.draw_idle(); plt.pause(0.05)
         
-        Frame.frlog.debug("Candidate points: {}".format(len(kp_j_cand)))
-        img_cand_pts = draw_points(img_rej_pts,kp_j_cand, color=[255,255,0])
-        fig1_image.set_data(img_cand_pts)
-        fig1.canvas.draw_idle(); plt.pause(0.05)
-        
-        frame_no += 1
+        #frame_no += 1
             
-        Frame.frlog.debug("FRAME seq {} COMPLETE".format(str(frame_no)))
+        #Frame.frlog.debug("FRAME seq {} COMPLETE".format(str(frame_no)))
     
-        return gr_j, kpjl, desjl, kp_j_cand, des_j_cand, lm_j_up, T_j
+        #return gr_j, kpjl, desjl, kp_j_cand, des_j_cand, lm_j_up, T_j
     
 '''    
     @staticmethod

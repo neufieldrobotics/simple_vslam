@@ -31,7 +31,12 @@ lowe_ratio_test_threshold: 0.9
 
 findEssential_settings:
  prob: 0.9999
- threshold: 0.0005
+ threshold: 0.001
+
+solvePnPRansac_settings:
+  iterationsCount: 250
+  reprojectionError: 0.0018  # Using normalized coordinates, this is 1/width * (error in pixels) so 1/1241 * 2 rounded to 0.0009
+  confidence: 0.9999
 
 CLAHE_settings:
  clipLimit: 10.0

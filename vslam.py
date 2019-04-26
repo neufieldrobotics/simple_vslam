@@ -174,10 +174,20 @@ if __name__ == '__main__':
     Frame.initialize_VSLAM(fr1, fr2)
 
     vslog.info(Fore.GREEN+"\tFRAME 2 COMPLETE\n"+Style.RESET_ALL)
-
-    fr3 = mpqueue.get()
-    Frame.process_keyframe(fr2, fr3)
-        
+    
+    fr_prev = fr2
+    for i in range (0,5):
+        fr_curr = mpqueue.get()
+        Frame.process_keyframe(fr_prev, fr_curr)
+        fr_prev = fr_curr
+        time.sleep(.5)
+        Frame.frlog.debug('Frame id :{}'.format(fr_curr.frame_id))
+#    fr4 = mpqueue.get()
+#    Frame.process_keyframe(fr3, fr4)
+#    
+#    fr5 = mpqueue.get()
+#    Frame.process_keyframe(fr4, fr5)
+#    out = fr2
     vslog.info(Fore.GREEN+"\tFRAME 3 COMPLETE\n"+Style.RESET_ALL)
 
     st = time.time()
@@ -197,8 +207,8 @@ if __name__ == '__main__':
             
             ppd = mpqueue.get()
             vslog.debug(Fore.RED+"Time for ppd: "+str(time.time()-ft)+Style.RESET_ALL)
-            
-            out = process_frame(*ppd, *out)
+
+            out = Frame.process_keyframe(*ppd, *out)
     
             vslog.debug(Fore.RED+"Time to process last frame: {:.4f}".format(time.time()-st)+Style.RESET_ALL)
             vslog.debug(Fore.RED+"Time in the function: {:.4f}".format(time.time()-ft)+Style.RESET_ALL)

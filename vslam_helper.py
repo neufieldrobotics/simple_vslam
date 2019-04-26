@@ -92,27 +92,26 @@ def triangulate(T_w_1, T_w_2, pts_1_2d, pts_2_2d, mask):
     return pts_3d_w, mask
 '''
 
-def T_from_PNP(coord_3d, img_pts, K, D):
+def T_from_PNP(coord_3d, img_pts, K, D, **solvePnPRansac_settings):
     success, rvec_to_obj, tvecs_to_obj, inliers = cv2.solvePnPRansac(coord_3d, img_pts, 
-                                                   K, D, iterationsCount=250, reprojectionError=0.002,
-                                                   confidence=0.9999)
+                                                   K, D, **solvePnPRansac_settings)
     if success:    
         R_to_obj, _ = cv2.Rodrigues(rvec_to_obj)
-        mask = np.zeros(len(img_pts)).astype('bool')
-        mask[inliers[:,0]]=True
+        mask = np.zeros([len(img_pts),1],dtype='uint8')
+        #mask[inliers[:,0]]=True
+        mask[inliers[:,0],0]=1
 
         return success, compose_T(*pose_inv(R_to_obj, tvecs_to_obj)), mask#, coord_3d[inliers], img_pts[inliers]
     else: 
         return success, None, None
 
-def T_from_PNP_norm(coord_3d, img_pts, repErr=0.002):
+def T_from_PNP_norm(coord_3d, img_pts, **solvePnPRansac_settings):
     success, rvec_to_obj, tvecs_to_obj, inliers = cv2.solvePnPRansac(coord_3d, img_pts, 
-                                                   np.eye(3), None, iterationsCount=250, reprojectionError=repErr,
-                                                   confidence=0.9999)
+                                                   np.eye(3), None, **solvePnPRansac_settings)
     if success:    
         R_to_obj, _ = cv2.Rodrigues(rvec_to_obj)
-        mask = np.zeros(len(img_pts)).astype('bool')
-        mask[inliers[:,0]]=True
+        mask = np.zeros([len(img_pts),1],dtype='uint8')
+        mask[inliers[:,0],0]=1
 
         return success, compose_T(*pose_inv(R_to_obj, tvecs_to_obj)), mask#, coord_3d[inliers], img_pts[inliers]
     else: 
@@ -187,15 +186,19 @@ def draw_feature_tracks(img_left,kp1,img_right,kp2, matches, mask, display_inval
     
     return img_right_out
 
-def draw_point_tracks(kp1,img_right,kp2, bool_mask, display_invalid=False, color=(0, 255, 0)):
+def draw_point_tracks(kp1,img_right,kp2, bool_mask=None, display_invalid=False, color=(0, 255, 0)):
     '''
     This function extracts takes a 2 images, set of keypoints and a mask of valid
     (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
     The mask should be the same length as matches
     '''
     #bool_mask = mask[:,0].astype(bool)
-    valid_left_matches = kp1[bool_mask,:]
-    valid_right_matches = kp2[bool_mask,:]
+    if bool_mask is None:
+        valid_left_matches = kp1
+        valid_right_matches = kp2
+    else:
+        valid_left_matches = kp1[bool_mask,:]
+        valid_right_matches = kp2[bool_mask,:]
     #img_right_out = draw_points(img_right, valid_right_matches)
     img_right_out = draw_arrows(img_right, valid_left_matches, valid_right_matches, color=color)
     
