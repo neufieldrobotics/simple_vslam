@@ -418,7 +418,6 @@ class Frame ():
         fr_j.kp_m_prev_cand_ind = fr_j.kp_m_prev_cand_ind[mask_RP_cand[:,0].astype(bool)]
         
         fr_i.lm_ind = fr_i.lm_ind[mask_RP_lm[:,0].astype(bool)]
-        print('inside combine and filter - lm_ind',fr_i.lm_ind)
 
         Frame.frlog.debug("Essential matrix and RP filtered {} landmarks out of {}".format(np.sum(mask_RP_lm),num_landmarks))
         Frame.frlog.debug("Essential matrix and RP filtered {} candidates out of {}".format(np.sum(mask_RP_cand),num_cand))
@@ -590,7 +589,6 @@ class Frame ():
                     
         fr_i.lm_ind = fr_i.lm_ind[mask_pnp[:,0].astype(bool)] 
         fr_j.kp_m_prev_lm_ind = fr_j.kp_m_prev_lm_ind[mask_pnp[:,0].astype(bool)] 
-        print("inside update pose, fr_i lm_ind",fr_i.lm_ind)
         Frame.frlog.debug("Time elapsed in PNP: {:.4f}".format(time.time()-time_start))
         time_start = time.time()
         
@@ -630,7 +628,7 @@ class Frame ():
         #except NameError:
         #    pass
         
-        print(lm_j_new)
+        #print(lm_j_new)
         
         plot_3d_points(Frame.ax2, lm_j_new, line_obj=Frame.lm_plot_handle, 
                        linestyle="", color='g', marker=".", markersize=2)
@@ -649,11 +647,11 @@ class Frame ():
         new_lm_ind = np.array(range(num_curr_landmarks,num_curr_landmarks+num_new_landmarks))
         fr_j.kp_lm_ind = np.concatenate((fr_j.kp_m_prev_lm_ind, fr_j.kp_m_prev_cand_ind))
         fr_j.lm_ind = np.concatenate((fr_i.lm_ind, new_lm_ind))
-        print('previous indexes:',fr_j.kp_m_prev_lm_ind)                             
+        #print('previous indexes:',fr_j.kp_m_prev_lm_ind)                             
         Frame.landmarks = np.vstack((Frame.landmarks, lm_j_new))
        
-        print("length of landmark array:",len(Frame.landmarks))
-        print("length of lm_ind:",len(fr_j.lm_ind))
+        #print("length of landmark array:",len(Frame.landmarks))
+        #print("length of lm_ind:",len(fr_j.lm_ind))
         # partition kp_m into two sets
         fr_j.kp_m_prev_ind =  fr_j.kp_lm_ind
         fr_j.partition_kp_cand()
