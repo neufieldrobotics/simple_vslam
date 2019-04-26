@@ -28,7 +28,7 @@ plot_landmarks: False
 use_masks: False
 use_clahe: False
 lowe_ratio_test_threshold: 0.9
-use_RecoverPose_Filter: False
+use_RecoverPose_Filter: True
 
 Triangulation_settings:
  max_dist: 60
