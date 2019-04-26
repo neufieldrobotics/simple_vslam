@@ -16,13 +16,14 @@ linux_image_folder: '/home/vik748/data/time_lapse_5_cervino_800x600'
 image_ext: 'png'
 chessboard: False
 init_image_indxs: [1054, 1064] #[1204, 1214] [1054, 1064]
-image_step: 6
+image_step: 2
 use_masks: True
 plot_landmarks: True
 osx_masks_folder: '/Users/vik748/Google Drive/data/time_lapse_5_cervino_800x600_masks_out'
 linux_masks_folder: '/home/vik748/data/time_lapse_5_cervino_800x600_masks_out'
 masks_ext: 'png'
 lowe_ratio_test_threshold: 0.85
+use_RecoverPose_Filter: False
 
 use_tiling_non_max_supression: False
 tiling_non_max_tile_y: 17 
@@ -38,10 +39,15 @@ CLAHE_settings:
 
 findEssential_settings:
  prob: 0.9999
- threshold: 0.01
+ threshold: 0.001
+
+solvePnPRansac_settings:
+  iterationsCount: 250
+  reprojectionError: 0.004  # Using normalized coordinates, this is 1/width * (error in pixels) so 1/1241 * 2 rounded to 0.0009
+  confidence: 0.9999
 
 ZERNIKE_settings:
- Nfeats: 1200
+ Nfeats: 2400
  seci: 4 
  secj: 3
  levels: 6

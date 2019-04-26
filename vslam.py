@@ -173,10 +173,9 @@ if __name__ == '__main__':
 
     Frame.initialize_VSLAM(fr1, fr2)
 
-    Frame.frlog.info(Fore.GREEN+"\tFRAME 2 COMPLETE\n"+Style.RESET_ALL)
+    Frame.frlog.info(Fore.GREEN+"\tFRAME 1 COMPLETE\n"+Style.RESET_ALL)
     
     fr_prev = fr2
-    Frame.frlog.info(Fore.GREEN+"\tFRAME 3 COMPLETE\n"+Style.RESET_ALL)
 
     st = time.time()
     #for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
@@ -200,11 +199,12 @@ if __name__ == '__main__':
     
             Frame.frlog.debug(Fore.RED+"Time to process last frame: {:.4f}".format(time.time()-st)+Style.RESET_ALL)
             Frame.frlog.debug(Fore.RED+"Time in the function: {:.4f}".format(time.time()-ft)+Style.RESET_ALL)
-    
+            Frame.frlog.info(Fore.GREEN+"\tFRAME seq {} COMPLETE \n".format(fr_curr.frame_id)+Style.RESET_ALL)
+            
             st = time.time()
             fr_prev = fr_curr
             plt.pause(0.001)
-            Frame.frlog.info(Fore.GREEN+"\tFRAME seq {} COMPLETE \n".format(i)+Style.RESET_ALL)
+            
             i+= 1
         else: time.sleep(0.2)            
     
