@@ -43,6 +43,10 @@ def _pickle_keypoints(point):
 copyreg.pickle(cv2.KeyPoint().__class__, _pickle_keypoints)
 
 def writer(imgnames, masknames, config_dict, queue):
+    '''
+        
+    '''
+    
     #TILE_KP = config_dict['use_tiling_non_max_supression']
     USE_MASKS = config_dict['use_masks']
     USE_CLAHE = config_dict['use_clahe']
@@ -111,6 +115,8 @@ def writer(imgnames, masknames, config_dict, queue):
 
 
 if __name__ == '__main__':
+    
+    # passing arguments from the terminal
     parser = argparse.ArgumentParser(description='This is the simple VSLAM pipeline')
     parser.add_argument('-c', '--config', help='location of config file in yaml format',
                         default='config/kitti_config.yaml') #go_pro_icebergs_config.yaml
@@ -194,7 +200,6 @@ if __name__ == '__main__':
     Frame.initialize_figures(window_xadj, window_yadj)
     Frame.fig1.canvas.mpl_connect('key_press_event', onKey)
     Frame.fig2.canvas.mpl_connect('key_press_event', onKey)
-
     Frame.initialize_VSLAM(fr1, fr2)
 
     Frame.frlog.info(Fore.GREEN+"\tFRAME 1 COMPLETE\n"+Style.RESET_ALL)

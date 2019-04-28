@@ -17,7 +17,7 @@ import pickle
 class Frame ():
     '''
     Frame objects contain all the variables required to detect, match and propogate
-    features and landmarks required in VSLAM    
+    features and landmarks required in VSLAM.   
     Additionally it contains a number of static functions which operate on multiple
     Frame objects to perform initialization and keypoint propogation.
     We also use class variable to maintain common variables across all Frame objects
@@ -46,16 +46,15 @@ class Frame ():
     fig1 = None                           # Handle to fig 1
     fig2 = None                           # Handle to fig 2
     lm_plot_handle = None                 # Handle to plot object for landmarks
-    
     landmarks = None                      # Full array of all 3D landmarks
     
     def __init__(self, image_name, mask_name=None):
         '''
         Frame objects initializer
         '''
-        # Popultated during initilization
+        # Populated during initialization
         Frame.last_id += 1  
-        self.frame_id = Frame.last_id
+        self.frame_id = Frame.last_id   # unique id for frame, required for gtsam
         self.mask    = None             # mask for the image
         self.kp_obj = None              # List of keypoint objects calc by Feature Extractor
         self.kp = None                  # Keypoint coordinates as N x 2 array  (flat32)
@@ -68,9 +67,10 @@ class Frame ():
         self.T_pnp = np.zeros([4,4])    # Pose in world frame computed from PNP
         self.T_gtsam = np.zeros([4,4])  # Pose in world frame after iSAM2 optimization
 
-        # Temoporary variables used in processing frames        
-        self.kp_m_prev_lm_ind = None
-        self.kp_m_prev_cand_ind = None  
+        # Variables used in processing frames and also passed to gtsam for optimisation
+        self.kp_m_prev_lm_ind = None    # keypoint indices for pre-existing landmarks
+        self.kp_m_prev_cand_ind = None  # keypoint indices for new landmarks 
+        self.lm_new_ind = None          # landmark indices for new landmakrs
         
         ''''
         kp_j_new_ud  = kp_j_all_ud[-num_cand:]
@@ -116,15 +116,6 @@ class Frame ():
         pbf = "New feature candidates detected: "+str(len(self.kp))
         Frame.frlog.debug("Image Pre-processing time is {:.4f}".format(time.time()-pt))
         Frame.frlog.debug(pbf)
-
-    '''
-    def undistort_matched_pts(self, isForward):
-        if isForward:
-            kpm = self.kp[self.kp_m_next_ind]
-        else:
-            kpm = self.kp[self.kp_m_prev_ind]
-        return cv2.undistortPoints(np.expand_dims(kpm,1),Frame.K,Frame.D)[:,0,:]
-    '''
     
     def show_features(self):
         '''
@@ -148,6 +139,24 @@ class Frame ():
            
     @staticmethod
     def initialize_figures(window_xadj = 65, window_yadj = 430):
+        '''
+        Initialises two figure windows using Frame's static variables:
+            Figure 1 displays the matched features of image i and image j
+            Figure 2 displays the pose of the camera and the landmarks of the position
+            
+        Parameters
+        ----------
+        window_xadj: widith of figure
+        window_yadj : height of figure
+        
+        Returns
+        -------
+        None
+        
+        Modifies / Updates
+        -------
+        
+        '''
         #Frame.fig1, Frame.ax1 = plt.subplots()
         Frame.fig1 = plt.figure(1)
         Frame.ax1 = Frame.fig1.add_subplot(111)
@@ -204,7 +213,8 @@ class Frame ():
                 pdist = np.linalg.norm(p2-p1)
                 #angle = angle_between(lm_cand,lm_cand-t_2_1)
                 #dist = np.linalg.norm(lm_cand-t_2_1)
-    
+                
+        # checks the distance threshold after triangulation and create a mask
                 if pts_3d_frame1_hom_norm[pt_iter,2]<=0 or \
                    pts_3d_frame1_hom_norm[pt_iter,2]>120: #or Frame.config_dict["Triangulation_settings"]["max_dist"]
                    #pdist < .01: 
@@ -482,7 +492,27 @@ class Frame ():
     @staticmethod
     def process_keyframe(fr_i, fr_j):
         '''
+        performs the following operations on frame i and frame j
+        a. match and propagate keypoints:
+         1.matches points with existing landmarks in frame i and frame j and 
+           stores their index for respective frames
+         2.matches new candidate points to triangulate in frame i and frame j 
+           and stores their index for respective frames
+        b. combine and filter: combine the above two sets of points and filters 
+           them with essential matrix and recover pose method
+        c. Slice inlier keypoints, undistort and compute pose using PNP Ransac algorithm
+        d. Undistort and Triangulate
+        
+        Parameters
+        ----------                        
+        fr_i: Frame object
+        fr_j: Frame object
         i = previous frame, j = current frame
+        
+        Returns
+        -------
+        None
+        
         '''
         Frame.match_and_propagate_keypoints(fr_i, fr_j)
         
@@ -609,12 +639,11 @@ class Frame ():
         img_cand_pts = draw_points(img_rej_pts,fr_j.kp[fr_j.kp_cand_ind], 
                                   color=[255,255,0])
         Frame.fig_frame_image.set_data(img_cand_pts)
-        Frame.fig1.canvas.draw_idle(); #plt.pause(0.01)
- 
-        # Delete variables not required for next iteration       
-        fr_j.kp_m_prev_lm_ind = None
-        fr_j.kp_m_prev_cand_ind = None
 
+        Frame.fig1.canvas.draw_idle(); #plt.pause(0.01)
+        
+        fr_j.lm_new_ind = new_lm_ind
+              
         Frame.fig1.canvas.start_event_loop(0.001)
         Frame.fig2.canvas.start_event_loop(0.001)
 
