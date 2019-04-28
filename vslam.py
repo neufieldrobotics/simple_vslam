@@ -7,7 +7,7 @@ matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import time
-import sys
+import os, sys
 from vslam_helper import *
 from utils.ssc import *
 import yaml
@@ -22,6 +22,7 @@ import multiprocessing as mp
 from colorama import Fore, Style
 from itertools import cycle
 import logging
+import copyreg
 
 from helper_functions.frame import Frame
 
@@ -35,16 +36,30 @@ logging.basicConfig(level=logging.DEBUG,
 mpl_logger = logging.getLogger('matplotlib') 
 mpl_logger.setLevel(logging.WARNING) 
 
+def _pickle_keypoints(point):
+    return cv2.KeyPoint, (*point.pt, point.size, point.angle,
+                          point.response, point.octave, point.class_id)
+
+copyreg.pickle(cv2.KeyPoint().__class__, _pickle_keypoints)
+
 def writer(imgnames, masknames, config_dict, queue):
     #TILE_KP = config_dict['use_tiling_non_max_supression']
     USE_MASKS = config_dict['use_masks']
     USE_CLAHE = config_dict['use_clahe']
+    ZERNIKE_settings = config_dict['ZERNIKE_settings']
     #RADIAL_NON_MAX = config_dict['radial_non_max']
     
     #detector = cv2.ORB_create(**config_dict['ORB_settings'])
-    Frame.detector = MultiHarrisZernike(**config_dict['ZERNIKE_settings'])
+    Frame.detector = MultiHarrisZernike(**ZERNIKE_settings)
     
-   
+    #settings_hash_string = str(hash(frozenset(a.items()))).replace('-','z')
+    settings_string = ''.join(['_%s' % ZERNIKE_settings[k] for k in sorted(ZERNIKE_settings.keys())])
+    local_temp_dir = os.path.dirname(os.path.abspath(__file__))+'/temp_data'
+    img_folder_name = os.path.dirname(imgnames[0]).replace('/','_')[1:]
+    
+    temp_obj_folder = local_temp_dir+'/'+img_folder_name+settings_string
+    os.makedirs(temp_obj_folder, exist_ok=True)
+    
     vslog.info("K: \t"+str(Frame.K).replace('\n','\n\t\t'))
     vslog.info("D: \t"+str(Frame.D))
         
@@ -67,16 +82,25 @@ def writer(imgnames, masknames, config_dict, queue):
     
     try:
         for i in range(len(imgnames)):
-            if queue.empty(): vslog.debug(Fore.RED+"Queue empty, reading is slow..."+Style.RESET_ALL)
-            while queue.full():
-                time.sleep(0.01)
-                #print(Fore.GREEN+"Writer queue full, waiting..."+Style.RESET_ALL)
-            if USE_MASKS:
-                fr = Frame(imgnames[i],mask_name=masknames[i])
-            else: 
-                fr = Frame(imgnames[i])
-                #gr, mask, kp, des = ppoutput
-            queue.put(fr)
+            frame_obj_filename = temp_obj_folder+'/'+imgnames[i].split('/')[-1]+'.pkl'
+            if os.path.isfile(frame_obj_filename):
+                vslog.debug(Fore.GREEN+"File exisits, reusing ..."+Style.RESET_ALL)
+                fr = Frame.load_frame(frame_obj_filename)
+                Frame.last_id += 1                
+                queue.put(fr)
+            else:                
+                if queue.empty(): vslog.debug(Fore.RED+"Queue empty, reading is slow..."+Style.RESET_ALL)
+                while queue.full():
+                    time.sleep(0.01)
+                    #print(Fore.GREEN+"Writer queue full, waiting..."+Style.RESET_ALL)
+                if USE_MASKS:
+                    fr = Frame(imgnames[i],mask_name=masknames[i])
+                else: 
+                    fr = Frame(imgnames[i])
+                    #gr, mask, kp, des = ppoutput
+                queue.put(fr)
+                Frame.save_frame(fr, frame_obj_filename)
+            
     except KeyboardInterrupt:
         vslog.critical("Keyboard interrupt from me")
         pass
@@ -185,7 +209,10 @@ if __name__ == '__main__':
         if not mpqueue.empty():
             while(paused):   
                 print('\b'+next(spinner), end='', flush=True)
-                plt.pause(0.1)
+                #plt.pause(0.1)
+                Frame.fig1.canvas.start_event_loop(0.001)
+                Frame.fig2.canvas.start_event_loop(0.001)
+                time.sleep(0.1)
                 if cue_to_exit: break
             if cue_to_exit: vslog.info("EXITING!!!"); raise SystemExit(0)
             
@@ -203,7 +230,7 @@ if __name__ == '__main__':
             
             st = time.time()
             fr_prev = fr_curr
-            plt.pause(0.001)
+            #plt.pause(0.001)
             
             i+= 1
         else: time.sleep(0.2)            
@@ -211,6 +238,6 @@ if __name__ == '__main__':
     writer_p.join()
     while(True):   
         print('\b'+next(spinner), end='', flush=True)
-        plt.pause(0.5)
+        #plt.pause(0.5)
         if cue_to_exit: break
     plt.close(fig='all')

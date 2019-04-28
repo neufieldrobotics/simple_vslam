@@ -12,6 +12,7 @@ import time
 import logging
 from matplotlib import pyplot as plt
 from vslam_helper import *
+import pickle
 
 class Frame ():
     '''
@@ -360,6 +361,17 @@ class Frame ():
         Frame.frlog.debug("Essential matrix and RP filtered {} candidates out of {}".format(np.sum(mask_RP_cand),num_cand))
     
     @staticmethod
+    def save_frame(fr_obj, file_name):
+        with open(file_name, 'wb') as output:
+            pickle.dump(fr_obj, output)
+    
+    @staticmethod
+    def load_frame(file_name):
+        with open(file_name, 'rb') as input:
+            fr_obj = pickle.load(input)
+        return fr_obj
+        
+    @staticmethod
     def initialize_VSLAM(fr1, fr2):
         '''
         This function takes two Frame objects fr1 and fr2 and initizalizes the algorithm by:
@@ -411,8 +423,8 @@ class Frame ():
                                   mask_RP_12[:,0].astype(bool), False, color=[255,255,0])
         
         Frame.fig_frame_image = Frame.ax1.imshow(img12)
-        plt.draw()
-        plt.pause(0.01)
+        #plt.draw()
+        #plt.pause(0.01)
         
         plot_pose3_on_axes(Frame.ax2,np.eye(4), axis_length=0.5)
         Frame.cam_pose = plot_pose3_on_axes(Frame.ax2, pose_1T2, axis_length=1.0)
@@ -441,7 +453,7 @@ class Frame ():
     
         Frame.lm_plot_handle = plot_3d_points(Frame.ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='r')
         set_axes_equal(Frame.ax2)
-        Frame.fig2.canvas.draw_idle(); plt.pause(0.01)
+        Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)
         
         #input("Press [enter] to continue.\n")
         #Frame.lm_plot_handle.remove()
@@ -496,7 +508,7 @@ class Frame ():
                                           None, False, color=[255,255,0])
         
         Frame.fig_frame_image.set_data(img_track_all)
-        Frame.fig1.canvas.draw_idle(); plt.pause(0.01)
+        #Frame.fig1.canvas.draw_idle(); plt.pause(0.01)
         #input("Enter to continue")
     
         Frame.frlog.debug("Time elapsed in drawing tracks: {:.4f}".format(time.time()-time_start))
@@ -522,7 +534,7 @@ class Frame ():
         
         Frame.cam_trail_pts = np.append(Frame.cam_trail_pts,fr_j.T_pnp[:3,[-1]].T,axis=0)
         plot_3d_points(Frame.ax2,Frame.cam_trail_pts , line_obj=Frame.cam_pose_trail, linestyle="", color='g', marker=".", markersize=2)
-        Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)
+        #Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)
         #input("Press [enter] to continue.")
                     
         fr_i.lm_ind = fr_i.lm_ind[mask_pnp[:,0].astype(bool)] 
@@ -552,7 +564,7 @@ class Frame ():
                                         (1-mask_tri)[:,0].astype(bool), True, color=[255,0,0])
         #else: img_rej_pts = img_track_all
         Frame.fig_frame_image.set_data(img_rej_pts)
-        Frame.fig1.canvas.draw_idle(); plt.pause(0.01)
+        #Frame.fig1.canvas.draw_idle(); #plt.pause(0.01)
         #input("Enter to continue")
 
         Frame.frlog.debug("Time elapsed in draw pt tracks: {:.4f} ".format(time.time()-time_start)) 
@@ -571,7 +583,7 @@ class Frame ():
         plot_3d_points(Frame.ax2, lm_j_new, line_obj=Frame.lm_plot_handle, 
                        linestyle="", color='g', marker=".", markersize=2)
         
-        Frame.fig2.canvas.draw_idle(); plt.pause(0.01)
+        Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)
         #input("Enter to continue")
 
     
@@ -597,13 +609,15 @@ class Frame ():
         img_cand_pts = draw_points(img_rej_pts,fr_j.kp[fr_j.kp_cand_ind], 
                                   color=[255,255,0])
         Frame.fig_frame_image.set_data(img_cand_pts)
-        Frame.fig1.canvas.draw_idle(); plt.pause(0.05)
+        Frame.fig1.canvas.draw_idle(); #plt.pause(0.01)
  
         # Delete variables not required for next iteration       
         fr_j.kp_m_prev_lm_ind = None
         fr_j.kp_m_prev_cand_ind = None
 
-        
+        Frame.fig1.canvas.start_event_loop(0.001)
+        Frame.fig2.canvas.start_event_loop(0.001)
+
         #frame_no += 1
             
         #Frame.frlog.debug("FRAME seq {} COMPLETE".format(str(frame_no)))

@@ -6,6 +6,9 @@ wrapper
 
 from __future__ import print_function
 
+import sys, os
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+
 import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W0611
@@ -16,6 +19,7 @@ from gtsam.examples import SFMdata
 
 from GTSAM_helper import iSAM2Wrapper
 import cv2
+
 
 if __name__ == '__main__':
     plt.ion()
@@ -40,7 +44,7 @@ if __name__ == '__main__':
     # Create the set of ground-truth poses
     poses = SFMdata.createPoses(Ksim)
     
-    factor_graph = iSAM2Wrapper(poses[0].matrix(), pose0_to_pose1_range=22.96,
+    factor_graph = iSAM2Wrapper(poses[0].matrix(), pose0_to_pose1_range=17,
                                 relinearizeThreshold=0.1, relinearizeSkip=1)
     factor_graph.set_Camera_matrix(np.eye(3))
     factor_graph.set_Projection_noise(1.0/100)
