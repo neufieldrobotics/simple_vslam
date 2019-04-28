@@ -1,0 +1,49 @@
+digraph G {
+ concentrate=true;
+
+  x0i[shape=point label=<x<SUB>0_initial</SUB>>]
+  x0[label=<x<SUB>0</SUB>>, style=filled color=black fillcolor=green];
+  x1[label=<x<SUB>1</SUB>>, style=invis color="black" fillcolor="green"];
+  x2[label=<x<SUB>2</SUB>> style=invis]
+  x3[label=<x<SUB>3</SUB>> style=invis]
+
+  l0[label=<l<SUB>0</SUB>> style="filled" color="black" fillcolor="yellow"]
+  l1[label=<l<SUB>1</SUB>> style="filled" color="black" fillcolor="yellow"]
+  l2[label=<l<SUB>2</SUB>> style="filled" color="black" fillcolor="yellow"]
+  l3[label=<l<SUB>3</SUB>> style="invis" color="black" fillcolor="white"]
+  l4[label=<l<SUB>4</SUB>> style="invis" color="black" fillcolor="white"]
+  l5[label=<l<SUB>5</SUB>> style=invis]
+  l6[label=<l<SUB>6</SUB>> style=invis]
+  l7[label=<l<SUB>7</SUB>> style=invis]
+
+  edge  [style=bold, fontname="Arial" weight=1]
+  
+
+        x0i -> x0 [arrowhead=none color=green constraint=false]
+
+
+  x0 -> l0 [style=dashed color=blue]
+
+  x0 -> l1 [style=dashed color=blue]
+  x0 -> l2 [style=dashed color=blue]
+
+  x1 -> l1 [style=invis color=green]
+  x1 -> l2 [style=invis color=green]
+
+  x1 -> l3 [style=invis color=blue]
+  x1 -> l4 [style=invis color=blue]
+
+  x2 -> l2 [style=invis]
+  x2 -> l3 [style=invis]
+  x2 -> l4 [style=invis]
+
+  x2 -> l5 [style=invis]
+
+  x3 -> l4 [style=invis]
+  x3 -> l5 [style=invis]
+
+  x3 -> l6 [style=invis]
+  x3 -> l7 [style=invis]
+
+}
+

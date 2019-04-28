@@ -1,0 +1,20 @@
+digraph structs {
+    rankdir=LR
+    node [shape=record];
+    
+    
+    fr_i [label="fr_i |{ {kp_m_prev_cand_ind | kp_m_prev_lm_ind| | } |
+                      {}|{<kp_cand_ind>kp_cand_ind | <kp_lm_ind>kp_lm_ind | |<lm_ind>lm_ind}}"];
+
+    fr_j [label="fr_j|{ {<kp_m_prev_cand_ind>kp_m_prev_cand_ind | <kp_m_prev_lm_ind>kp_m_prev_lm_ind| |<lm_ind_new>lm_ind_new} |{}|
+                      {kp_cand_ind | kp_lm_ind |  |<lm_ind>lm_ind}}"];
+
+    fr_i:kp_cand_ind -> fr_j:kp_m_prev_cand_ind[label="triangulation"];
+    fr_i:kp_lm_ind -> fr_j:kp_m_prev_lm_ind[label="PnP"];
+
+    fr_j:kp_m_prev_cand_ind:"e" -> fr_j:lm_ind_new:"w"
+    fr_j:lm_ind_new:"s" -> fr_j:lm_ind:"s"
+    fr_i:lm_ind:"se" -> fr_j:lm_ind:"sw"
+  
+}
+
