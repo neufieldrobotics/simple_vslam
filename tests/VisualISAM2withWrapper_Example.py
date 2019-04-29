@@ -45,9 +45,10 @@ if __name__ == '__main__':
     poses = SFMdata.createPoses(Ksim)
     
     factor_graph = iSAM2Wrapper(poses[0].matrix(), pose0_to_pose1_range=17,
-                                relinearizeThreshold=0.1, relinearizeSkip=1)
-    factor_graph.set_Camera_matrix(np.eye(3))
-    factor_graph.set_Projection_noise(1.0/100)
+                                relinearizeThreshold=0.1, relinearizeSkip=1, K=np.eye(3), 
+                                proj_noise_val=1.0/100)
+    #factor_graph.set_Camera_matrix(np.eye(3))
+    #factor_graph.set_Projection_noise(1.0/100)
     
 
     # Create a Factor Graph and Values to hold the new data
@@ -58,17 +59,18 @@ if __name__ == '__main__':
         for j, point in enumerate(points):
             camera = gtsam.PinholeCameraCal3_S2(pose, Ksim)
             measurement = camera.project(point)
-            undist_m = cv2.undistortPoints(np.expand_dims(np.expand_dims(iSAM2Wrapper.Point2arr(measurement),0),1),K,D)[0,0,:]
-            undist_pt = iSAM2Wrapper.arr2Point(undist_m)
+            undist_m = cv2.undistortPoints(np.expand_dims(np.expand_dims(iSAM2Wrapper.Point2arr(measurement),0),1),K,D)[:,0,:]
+            #undist_pt = iSAM2Wrapper.arr2Point(undist_m)
 
             #m_pt = np.array([measurement.x(), measurement.y()])
-            factor_graph.add_GenericProjectionFactorCal3_S2_factor(undist_m, i, j)
+            factor_graph.add_GenericProjectionFactorCal3_S2_factor(undist_m, i, np.array([j]))
 
         # Add an initial guess for the current pose
         # Intentionally initialize the variables off from the ground truth
         pose_est = pose.compose(gtsam.Pose3(gtsam.Rot3.Rodrigues(-0.1, 0.2, 0.25), 
                                             gtsam.Point3(0.05, -0.10, 0.20)))        
-        factor_graph.add_PoseEstimate(i, pose_est.matrix() )
+        if i != 0:
+            factor_graph.add_PoseEstimate(i, pose_est.matrix() )
 
         # If this is the first iteration, add a prior on the first pose to set the
         # coordinate frame and a prior on the first landmark to set the scale.
@@ -78,13 +80,13 @@ if __name__ == '__main__':
             # Add initial guesses to all observed landmarks
             # Intentionally initialize the variables off from the ground truth
             for j, point in enumerate(points):
-                factor_graph.add_LandmarkEstimate(j, np.array([point.x()-0.25, point.y()+0.20, point.z()+0.15]))
+                factor_graph.add_LandmarkEstimate(np.array([j]), np.array([[point.x()-0.25, point.y()+0.20, point.z()+0.15]]))
         else:
             # Update iSAM with the new factors
             # Each call to iSAM2 update(*) performs one iteration of the iterative nonlinear solver.
             # If accuracy is desired at the expense of time, update(*) can be called additional
             # times to perform multiple optimizer iterations every step.
-            
+            break
             factor_graph.update(3)
             
             current_estimate = factor_graph.get_Estimate()

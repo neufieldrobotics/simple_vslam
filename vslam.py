@@ -25,6 +25,7 @@ import logging
 import copyreg
 
 from helper_functions.frame import Frame
+from GTSAM_helper import iSAM2Wrapper
 
 '''
 PROCESS FRAME
@@ -201,6 +202,12 @@ if __name__ == '__main__':
     Frame.fig1.canvas.mpl_connect('key_press_event', onKey)
     Frame.fig2.canvas.mpl_connect('key_press_event', onKey)
     Frame.initialize_VSLAM(fr1, fr2)
+    
+    factor_graph = iSAM2Wrapper(pose0=np.eye(4), K=np.eye(3), **config_dict['iSAM2_settings'])    
+    factor_graph.add_keyframe_factors(fr1, fr2, initialization=True)
+
+    factor_graph.update(1)
+    #current_estimate = factor_graph.get_Estimate()
 
     Frame.frlog.info(Fore.GREEN+"\tFRAME 1 COMPLETE\n"+Style.RESET_ALL)
     
@@ -210,15 +217,9 @@ if __name__ == '__main__':
     #for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
     spinner = cycle(['|', '/', '-', '\\'])
     i = 4
+    flag = False
     while True:
         if not mpqueue.empty():
-            while(paused):   
-                print('\b'+next(spinner), end='', flush=True)
-                #plt.pause(0.1)
-                Frame.fig1.canvas.start_event_loop(0.001)
-                Frame.fig2.canvas.start_event_loop(0.001)
-                time.sleep(0.1)
-                if cue_to_exit: break
             if cue_to_exit: vslog.info("EXITING!!!"); raise SystemExit(0)
             
             ft = time.time()
@@ -228,14 +229,34 @@ if __name__ == '__main__':
             Frame.frlog.debug(Fore.RED+"Time for current frame: "+str(time.time()-ft)+Style.RESET_ALL)
 
             Frame.process_keyframe(fr_prev, fr_curr)
+            factor_graph.add_keyframe_factors(fr_prev, fr_curr)
+            factor_graph.update(1)
+            fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)
+            #iSAM2Wrapper.process_keyframe(fr_prev, fr_curr)
+            #Frame.frame_2_factor_dict
+            #add factors to grap
+            #update isam
+            #update landmarks and P
+            
     
             Frame.frlog.debug(Fore.RED+"Time to process last frame: {:.4f}".format(time.time()-st)+Style.RESET_ALL)
             Frame.frlog.debug(Fore.RED+"Time in the function: {:.4f}".format(time.time()-ft)+Style.RESET_ALL)
             Frame.frlog.info(Fore.GREEN+"\tFRAME seq {} COMPLETE \n".format(fr_curr.frame_id)+Style.RESET_ALL)
             
             st = time.time()
-            fr_prev = fr_curr
-            #plt.pause(0.001)
+
+            while(paused):   
+                print('\b'+next(spinner), end='', flush=True)
+                #plt.pause(0.1)
+                Frame.fig1.canvas.start_event_loop(0.001)
+                Frame.fig2.canvas.start_event_loop(0.001)
+
+                if cue_to_exit: 
+                    flag = True
+                    break
+            if not flag:
+                fr_prev = fr_curr
+            plt.pause(0.001)
             
             i+= 1
         else: time.sleep(0.2)            

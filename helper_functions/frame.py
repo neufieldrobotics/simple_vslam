@@ -64,8 +64,8 @@ class Frame ():
         self.kp_lm_ind = []             # Indices of keypoints that already have landmarks
         self.kp_cand_ind = []           # Indices of candidate keypoints that dont have landmarks associated
         self.lm_ind = []                # Index of landmarks which match kp_lm_ind
-        self.T_pnp = np.zeros([4,4])    # Pose in world frame computed from PNP
-        self.T_gtsam = np.zeros([4,4])  # Pose in world frame after iSAM2 optimization
+        self.T_pnp = np.eye(4)    # Pose in world frame computed from PNP
+        self.T_gtsam = np.eye(4)  # Pose in world frame after iSAM2 optimization
 
         # Variables used in processing frames and also passed to gtsam for optimisation
         self.kp_m_prev_lm_ind = None    # keypoint indices for pre-existing landmarks
@@ -481,11 +481,9 @@ class Frame ():
         if len(Frame.landmarks) != len(fr2.kp_m_prev_cand_ind)  or len(fr2.kp_m_prev_cand_ind) != len(fr1.kp_cand_ind):
             raise ValueError('Between Frame {} and {}: Length of of kp_m_prev doesnt match kp_m_next or landmarks',format(fr1.frameid,fr2.frameid))
 
-        fr2.lm_ind = np.array(range(len(fr2.kp_m_prev_cand_ind))) 
+        fr2.lm_new_ind = np.array(range(len(fr2.kp_m_prev_cand_ind))) 
+        fr2.lm_ind = fr2.lm_new_ind
         fr2.kp_lm_ind = fr2.kp_m_prev_cand_ind
-        
-        fr2.kp_m_prev_lm_ind = None
-        fr2.kp_m_prev_cand_ind = None
         
         input("Press [enter] to continue.")  
         
@@ -568,6 +566,7 @@ class Frame ():
         #input("Press [enter] to continue.")
                     
         fr_i.lm_ind = fr_i.lm_ind[mask_pnp[:,0].astype(bool)] 
+        fr_i.kp_lm_ind = fr_i.kp_lm_ind[mask_pnp[:,0].astype(bool)] 
         fr_j.kp_m_prev_lm_ind = fr_j.kp_m_prev_lm_ind[mask_pnp[:,0].astype(bool)] 
         Frame.frlog.debug("Time elapsed in PNP: {:.4f}".format(time.time()-time_start))
         time_start = time.time()
@@ -624,9 +623,10 @@ class Frame ():
         
         num_curr_landmarks = len(Frame.landmarks)
         num_new_landmarks = len(lm_j_new)
-        new_lm_ind = np.array(range(num_curr_landmarks,num_curr_landmarks+num_new_landmarks))
+        fr_j.lm_new_ind = np.array(range(num_curr_landmarks,num_curr_landmarks+num_new_landmarks))
+        fr_i.kp_lm_ind = np.concatenate((fr_i.kp_lm_ind, fr_i.kp_cand_ind))
         fr_j.kp_lm_ind = np.concatenate((fr_j.kp_m_prev_lm_ind, fr_j.kp_m_prev_cand_ind))
-        fr_j.lm_ind = np.concatenate((fr_i.lm_ind, new_lm_ind))
+        fr_j.lm_ind = np.concatenate((fr_i.lm_ind, fr_j.lm_new_ind))
         #print('previous indexes:',fr_j.kp_m_prev_lm_ind)                             
         Frame.landmarks = np.vstack((Frame.landmarks, lm_j_new))
        
@@ -641,9 +641,7 @@ class Frame ():
         Frame.fig_frame_image.set_data(img_cand_pts)
 
         Frame.fig1.canvas.draw_idle(); #plt.pause(0.01)
-        
-        fr_j.lm_new_ind = new_lm_ind
-              
+                      
         Frame.fig1.canvas.start_event_loop(0.001)
         Frame.fig2.canvas.start_event_loop(0.001)
 

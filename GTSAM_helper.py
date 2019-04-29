@@ -13,10 +13,12 @@ from gtsam.gtsam import (Cal3_S2, Cal3DS2, DoglegOptimizer,
 import gtsam.utils.plot as gtsam_plot
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W0611
 from matplotlib import pyplot as plt
+import cv2
+from helper_functions.frame import Frame
 
 class iSAM2Wrapper():
-    def __init__(self,pose0=np.eye(4),pose0_to_pose1_range = 1.0,
-                 relinearizeThreshold=0.1,relinearizeSkip=1):
+    def __init__(self,pose0=np.eye(4),pose0_to_pose1_range = 1.0, K=np.eye(3),
+                 relinearizeThreshold=0.1,relinearizeSkip=1, proj_noise_val=1.0):
         self.graph = NonlinearFactorGraph()
 
         # Add a prior on pose x0. This indirectly specifies where the origin is.
@@ -35,39 +37,43 @@ class iSAM2Wrapper():
         iS2params.setRelinearizeThreshold(relinearizeThreshold)
         iS2params.setRelinearizeSkip(relinearizeSkip)
         self.isam2 = gtsam.ISAM2(iS2params)
+        
+        self.projection_noise = gtsam.noiseModel_Isotropic.Sigma(2, proj_noise_val)
+        self.K = gtsam.Cal3_S2(iSAM2Wrapper.CameraMatrix_to_Cal3_S2(K))
         #self.opt_params = gtsam.DoglegParams()
         #self.opt_params.setVerbosity('Error')
         #self.opt_params.setErrorTol(0.1)
        
         self.initial_estimate = gtsam.Values()
-
-    def set_Projection_noise(self, noise_val=1.0): # one pixel in u and v
-        '''
-        Set noise model for the Projecttion factors in pixels
-        '''
-        self.projection_noise = gtsam.noiseModel_Isotropic.Sigma(2, noise_val)  
+        self.initial_estimate.insert(iSAM2Wrapper.get_key('x',0), 
+                                     gtsam.gtsam.Pose3(pose0))
         
-    def set_Camera_matrix(self, K=np.eye(3)):
-        '''
-        Set camera Matrix for the 
-        '''            
-        self.K = gtsam.Cal3_S2(iSAM2Wrapper.CameraMatrix_to_Cal3_S2(K))
 
     def add_GenericProjectionFactorCal3_S2_factor(self, pt_uv, X_id, L_id):
-        fact = gtsam.GenericProjectionFactorCal3_S2(gtsam.gtsam.Point2(*pt_uv), 
-                                                    self.projection_noise, 
-                                                    self.get_key('x', X_id), 
-                                                    self.get_key('l', L_id), 
-                                                    self.K)    
-        self.graph.push_back(fact)
+        if pt_uv.ndim == 1: 
+            raise ValueError("Supplied point is 1-dimensional, required Nx2 array")
+        if pt_uv.shape[1] != 2:
+            raise ValueError("2nd dimension on supplied point is not 2, required Nx2 array")
+        for pt,l in zip(pt_uv, L_id):
+            fact = gtsam.GenericProjectionFactorCal3_S2(gtsam.gtsam.Point2(*pt), 
+                                                        self.projection_noise, 
+                                                        self.get_key('x', X_id), 
+                                                        self.get_key('l', l), 
+                                                        self.K)    
+            self.graph.push_back(fact)
         
     def add_PoseEstimate(self, X_id, T):    
         self.initial_estimate.insert(iSAM2Wrapper.get_key('x',X_id), 
                                      gtsam.gtsam.Pose3(T))
     
-    def add_LandmarkEstimate(self, L_id, P):
-        self.initial_estimate.insert(iSAM2Wrapper.get_key('l',L_id), 
-                                     gtsam.Point3(*P))
+    def add_LandmarkEstimate(self, L_id, Pt_estimate):
+        if Pt_estimate.ndim == 1: 
+            raise ValueError("Supplied point is 1-dimensional, required Nx3 array")
+        if Pt_estimate.shape[1] != 3:
+            raise ValueError("2nd dimension on supplied point is not 3, required Nx3 array")
+        for l, p_est in zip(L_id, Pt_estimate):
+            self.initial_estimate.insert(iSAM2Wrapper.get_key('l',l), 
+                                         gtsam.Point3(*p_est))
         
     def update(self,iterations = 1):
         self.isam2.update(self.graph, self.initial_estimate)
@@ -79,7 +85,10 @@ class iSAM2Wrapper():
         self.initial_estimate.clear()
 
     def get_Estimate(self):    
-        return self.isam2.calculateEstimate()
+        return self.current_estimate
+    
+    def get_curr_Pose_Estimate(self,x_id):    
+        return self.current_estimate.atPose3(iSAM2Wrapper.get_key('x',x_id)).matrix()
     
     def plot_estimate(self,fignum = 0):
         """
@@ -138,7 +147,7 @@ class iSAM2Wrapper():
         """Plot a 3D point on given figure with given 'linespec'."""
         fig = plt.figure(fignum)
         axes = fig.gca(projection='3d')
-        plot_line_on_axes(axes, point1, point2, linespec)
+        plot_line_on_axes(axes, point1, padd_keyframe_factorsoint2, linespec)
 
     @staticmethod
     def draw_graph(graph,values,fig_num=1):
@@ -188,7 +197,33 @@ class iSAM2Wrapper():
             raise ValueError('K matrix not upper triangular, might be incorrrect')
         fx,fy,s,u0,v0 = K[0,0],K[1,1],K[0,1],K[0,2],K[1,2]
         return np.array([fx,fy,s,u0,v0])
+       
+    def add_keyframe_factors(self, fr_i, fr_j, initialization=False):
+        
+        if not initialization:
+            ## Add exsisting landmarks        
+            #  Add projection factors only to frame j
+            pt_uv = cv2.undistortPoints(np.expand_dims(fr_j.kp[fr_j.kp_m_prev_lm_ind],1),
+                                                       Frame.K, Frame.D)[:,0,:]
+            self.add_GenericProjectionFactorCal3_S2_factor(pt_uv, fr_j.frame_id, fr_i.lm_ind)
+        
+        ## Add new landmarks to frame i and j
+        #  Add projection factors to frame i
+        print ("k:", Frame.K)
+        pt_uv = cv2.undistortPoints(np.expand_dims(fr_i.kp[fr_i.kp_cand_ind],1),
+                                                   Frame.K, Frame.D)[:,0,:]
+        self.add_GenericProjectionFactorCal3_S2_factor(pt_uv, fr_i.frame_id, fr_j.lm_new_ind)
 
+        #  Add projection factors to frame j
+        pt_uv = cv2.undistortPoints(np.expand_dims(fr_j.kp[fr_j.kp_m_prev_cand_ind],1),
+                                                   Frame.K, Frame.D)[:,0,:]
+        self.add_GenericProjectionFactorCal3_S2_factor(pt_uv, fr_j.frame_id, fr_j.lm_new_ind)
+        
+        ## Add estiamates
+        # Add landmark estimates for the newly created landmarks
+        self.add_LandmarkEstimate(fr_j.lm_new_ind, Frame.landmarks[fr_j.lm_new_ind])
+        # Add pose estimate from the new frame j
+        self.add_PoseEstimate(fr_j.frame_id, fr_j.T_pnp)
 
 '''
 if __name__ == '__main__':
