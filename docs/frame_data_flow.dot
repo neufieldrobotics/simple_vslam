@@ -19,11 +19,11 @@ digraph structs {
        { 
        color=black;
        label = "keypoints and landmarks";
-       fr_i_r[label="{{ <kp_lm_ind>kp_lm_ind | <kp_cand_ind>kp_cand_ind}}", shape = "Mrecord" fillcolor=green];
+       fr_i_r[label="{{ <kp_lm_ind>kp_lm_ind \n  | <kp_cand_ind>kp_cand_ind \n  }}", shape = "Mrecord" fillcolor=green];
        lm_i[label="lm_ind" shape=triangle fillcolor=green]
        }
-        
-       pose_est_i[shape = circle label="T_i" fillcolor=lightblue]
+       lm_i_new[style=invis label="new lm" shape = triangle fillcolor = yellow]  
+       pose_est_i[shape = circle label="T_i PNP" fillcolor=lightblue]
        fr_i_l:M1_i->fr_i_r:kp_lm_ind
        fr_i_l:M2_i->fr_i_r:kp_lm_ind
        fr_i_l:UM_i->fr_i_r:kp_cand_ind 
@@ -42,7 +42,7 @@ digraph structs {
        { 
        color=black;
        label = "keypoints and landmarks"; 
-        fr_j_r[label="{{ <kp_lm_ind>kp_lm_ind | <kp_cand_ind>kp_cand_ind}}" shape = "Mrecord" fillcolor=green];
+        fr_j_r[label="{{ <kp_lm_ind>kp_lm_ind \n  | <kp_cand_ind>kp_cand_ind \n  }}" shape = "Mrecord" fillcolor=green];
         lm_j[label="lm_ind" shape = triangle fillcolor = green]
  }      
        lm_j_new[label="new lm" shape = triangle fillcolor = yellow] 
@@ -56,6 +56,6 @@ digraph structs {
     //PNP:"e"->fr_i_r:kp_lm_ind:"e"
     //PNP->fr_j_l:M2_j
     fr_i_r:kp_cand_ind->fr_j_l:M1_j[label="2. match and Triangulate" dir = "both"];
-    lm_i->lm_j
+    lm_i:e->lm_j:w
     lm_j_new->lm_j
  }
