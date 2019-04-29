@@ -35,7 +35,7 @@ Triangulation_settings:
 
 findEssential_settings:
  prob: 0.9999
- threshold: 0.001
+ threshold: 0.0003
 
 solvePnPRansac_settings:
   iterationsCount: 250
@@ -57,6 +57,12 @@ ZERNIKE_settings:
  nmax: 8
  like_matlab: False
  lmax_nd: 3
+
+iSAM2_settings:
+ pose0_to_pose1_range: 1.0
+ relinearizeThreshold: 0.1
+ relinearizeSkip: 1
+ proj_noise_val: 0.0027  # 1/376
 
 ORB_settings:
  WTA_K: 4
