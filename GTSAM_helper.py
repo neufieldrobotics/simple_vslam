@@ -114,10 +114,11 @@ class iSAM2Wrapper():
             i += 1
     
         # draw
-        axes.set_xlim3d(-40, 40)
-        axes.set_ylim3d(-40, 40)
-        axes.set_zlim3d(-40, 40)
+        #axes.set_xlim3d(-40, 40)
+        #axes.set_ylim3d(-40, 40)
+        #axes.set_zlim3d(-40, 40)
         axes.view_init(90, 0)
+        
         plt.pause(.01)
     
     @staticmethod

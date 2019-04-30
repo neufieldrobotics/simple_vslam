@@ -86,7 +86,6 @@ if __name__ == '__main__':
             # Each call to iSAM2 update(*) performs one iteration of the iterative nonlinear solver.
             # If accuracy is desired at the expense of time, update(*) can be called additional
             # times to perform multiple optimizer iterations every step.
-            break
             factor_graph.update(3)
             
             current_estimate = factor_graph.get_Estimate()
@@ -102,6 +101,7 @@ if __name__ == '__main__':
             plt.pause(1)
 
             factor_graph.plot_estimate(1)
+            #plt.figure(1).get_axes().set_aspect('equal')
 
     plt.ioff()
     plt.show()

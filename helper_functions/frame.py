@@ -174,7 +174,7 @@ class Frame ():
         Frame.ax2.view_init(0, -90)
         
     @staticmethod
-    def triangulate(T_w_1, T_w_2,  pts_1_2d, pts_2_2d, mask):
+    def triangulate(Pose_wT1, Pose_wT2,  pts_1_2d, pts_2_2d, mask):
         '''
         This function accepts two homogeneous transforms (poses) of 2 cameras in world coordinates,
         along with corresponding matching points and returns the 3D coordinates in world coordinates
@@ -182,52 +182,63 @@ class Frame ():
         '''
         pts_1 = np.expand_dims(pts_1_2d,1)
         pts_2 = np.expand_dims(pts_2_2d,1)
-        T_origin = np.eye(4)
-        P_origin = T_origin[:3]
-        # calculate the transform of 1 in 2's frame
-        T_2_w = T_inv(T_w_2)
-        T_2_1 = T_2_w @ T_w_1
-        P_2_1 = T_2_1[:3]
-        #Frame.frlog.info("P_2_1:\t"+str(P_2_1).replace('\n','\n\t\t\t'))
         
-        t_2_1 = T_2_1[:3,-1]
+        
+        Pose_1Tw = T_inv(Pose_wT1)
+        Pose_2Tw = T_inv(Pose_wT2)
+        
+        Proj_1Tw = Pose_1Tw[:3]
+        Proj_2Tw = Pose_2Tw[:3]
+        Frame.frlog.debug("Proj_1Tw:\t"+str(Proj_1Tw).replace('\n','\n\t\t\t'))
+        Frame.frlog.debug("Proj_2Tw:\t"+str(Proj_2Tw).replace('\n','\n\t\t\t'))
+        
+        Pose_1T2 = Pose_1Tw @ Pose_wT2
+        trans_1T2 = Pose_1T2[:3,-1]
+                
         Frame.frlog.debug("No of points in pts_1: {}".format(pts_1.shape))
         # Calculate points in 0,0,0 frame
         if mask is None:
-            pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1, pts_2).T
+            pts_3d_frame1_hom = cv2.triangulatePoints(Proj_1Tw, Proj_2Tw, pts_1, pts_2).T
             mask = np.ones((pts_1.shape[0],1),dtype='uint8')
         else:
-            pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1[mask==1], 
+            pts_3d_frame1_hom = cv2.triangulatePoints(Proj_1Tw, Proj_2Tw, pts_1[mask==1], 
                                                   pts_2[mask==1]).T
         pts_3d_frame1_hom_norm = pts_3d_frame1_hom /  pts_3d_frame1_hom[:,-1][:,None]
         
         pt_iter = 0
         rows_to_del = []
-        ANGLE_THRESHOLD = np.radians(.5)    
+        ANGLE_THRESHOLD = np.deg2rad(Frame.config_dict["Triangulation_settings"]["subtended_angle_threshold"])
         
         for i,v in enumerate(mask):
             if v==1:
                 lm_cand = pts_3d_frame1_hom_norm[pt_iter,:3]
-                p1 = pts_1[i,0,:]
-                p2 = pts_2[i,0,:]
-                pdist = np.linalg.norm(p2-p1)
-                #angle = angle_between(lm_cand,lm_cand-t_2_1)
-                #dist = np.linalg.norm(lm_cand-t_2_1)
+                kp1 = pts_1[i,0,:]
+                kp2 = pts_2[i,0,:]
+                parallax = np.linalg.norm(kp2-kp1)
+                angle = angle_between(lm_cand,lm_cand-trans_1T2)
+                dist = np.linalg.norm(lm_cand-trans_1T2)
                 
         # checks the distance threshold after triangulation and create a mask
                 if pts_3d_frame1_hom_norm[pt_iter,2]<=0 or \
-                   pts_3d_frame1_hom_norm[pt_iter,2]>120: #or Frame.config_dict["Triangulation_settings"]["max_dist"]
-                   #pdist < .01: 
+                   pts_3d_frame1_hom_norm[pt_iter,2]>Frame.config_dict["Triangulation_settings"]["max_dist"] or \
+                   angle < ANGLE_THRESHOLD: 
+                   # This eliminates points that lie beyond the circle where trans_1T2 is the a cord 
+                   # and the circle represents the locus of all points subtending angle_threshold to the cord
+                       
+                       
+                       
+                   #parallax < .01: 
                     #dist > 50.0:
-                    #angle < ANGLE_THRESHOLD:
+                    #
                     #print ("Point is negative")
                     mask[i,0]=0 
                     rows_to_del.append(pt_iter)
+                Frame.frlog.debug("Pt: {}, parallax:{:.3f}, angle: {:.3f}, dist: {:.2f} accepted: {}".format(lm_cand,parallax,np.rad2deg(angle),dist, mask[i,0]))
                 pt_iter +=1
         
         pts_3d_frame1_hom_norm = np.delete(pts_3d_frame1_hom_norm,rows_to_del,axis=0)
-        # Move 3d points to world frame by transforming with T_w_1
-        pts_3d_w_hom = pts_3d_frame1_hom_norm @ T_w_1.T
+        # Move 3d points to world frame by transforming with Pose_wT1
+        pts_3d_w_hom = pts_3d_frame1_hom_norm
         pts_3d_w = pts_3d_w_hom[:, :3]
         return pts_3d_w, mask   
   

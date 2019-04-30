@@ -206,7 +206,7 @@ if __name__ == '__main__':
     factor_graph = iSAM2Wrapper(pose0=np.eye(4), K=np.eye(3), **config_dict['iSAM2_settings'])    
     factor_graph.add_keyframe_factors(fr1, fr2, initialization=True)
 
-    factor_graph.update(1)
+    #factor_graph.update(2)
     #current_estimate = factor_graph.get_Estimate()
 
     Frame.frlog.info(Fore.GREEN+"\tFRAME 1 COMPLETE\n"+Style.RESET_ALL)
@@ -229,9 +229,10 @@ if __name__ == '__main__':
             Frame.frlog.debug(Fore.RED+"Time for current frame: "+str(time.time()-ft)+Style.RESET_ALL)
 
             Frame.process_keyframe(fr_prev, fr_curr)
-            factor_graph.add_keyframe_factors(fr_prev, fr_curr)
-            factor_graph.update(1)
-            fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)
+            #factor_graph.add_keyframe_factors(fr_prev, fr_curr)
+            #factor_graph.update(2)
+            #fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)
+            #input("Enter to continue...")
             #iSAM2Wrapper.process_keyframe(fr_prev, fr_curr)
             #Frame.frame_2_factor_dict
             #add factors to grap
