@@ -34,4 +34,3 @@ Depending on the system, make sure either osx_image_folder or linux_image_folder
 ```sh
 ./vslam.py -c config/kitti.conf
 ```
-![Data flow diagram](https://gitlab.com/neu-mit-lfi/simple_vslam/blob/zernike_gtsam/frame_data_flow.png)
