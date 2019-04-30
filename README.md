@@ -19,7 +19,7 @@ conda activate simple_vslam_env
 ```sh
 git clone --recurse-submodules https://gitlab.com/neu-mit-lfi/simple_vslam.git
 cd simple_vslam
-git checkout zernike-gtsam
+git checkout zernike_gtsam
 ```
 
 ## Get test data
