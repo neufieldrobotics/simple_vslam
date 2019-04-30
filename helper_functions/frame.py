@@ -177,16 +177,33 @@ class Frame ():
     def triangulate(Pose_wT1, Pose_wT2,  pts_1_2d, pts_2_2d, mask):
         '''
         This function accepts two homogeneous transforms (poses) of 2 cameras in world coordinates,
-        along with corresponding matching points and returns the 3D coordinates in world coordinates
-        Mask must be a dimensionless array or n, array
-        '''
+        along with corresponding matching points and returns the 3D coordinates in world coordinates.
+        Additionally, the triangulated points are filtered based on various critereia to avoid points
+        which would have poor triangulation.
+        
+        Parameters
+        ----------
+        Pose_wT1: 4x4 Homogenous Transform of Camera 1 pose in world coordinates
+        Pose_wT2: 4x4 Homogenous Transform of Camera 1 pose in world coordinates
+        pts_1_2d: Nx2 Array of Undistorted and normalized keypoints in camera 1
+        pts_2_2d: Nx2 Array of Undistorted and normalized keypoints in camera 2
+        mask: Nx1 Mask of 1s and 0s with 1s for points which should be triangulated
+        
+        Returns
+        -------
+        pts_3d_w: Nx3 array of Keypoint location in world coordinates
+        mask: Nx1 array with 1s for triangulation inliers
+        ''' 
+        # Convert points to 3D array for processing
         pts_1 = np.expand_dims(pts_1_2d,1)
         pts_2 = np.expand_dims(pts_2_2d,1)
         
-        
+        # Invert poses to find Transform from cam1 and cam2 to world frame
         Pose_1Tw = T_inv(Pose_wT1)
         Pose_2Tw = T_inv(Pose_wT2)
         
+        # Extract Projection matrices from Transform. Usually P1 = 1Tw * K, but in our
+        # case K = np.eye(3) since the points are normalized
         Proj_1Tw = Pose_1Tw[:3]
         Proj_2Tw = Pose_2Tw[:3]
         Frame.frlog.debug("Proj_1Tw:\t"+str(Proj_1Tw).replace('\n','\n\t\t\t'))
@@ -249,7 +266,6 @@ class Frame ():
             a. matches for features which were previously tracked and had landmarks
             b. matches for features which are candidates from previous image and 
                not associated with landmark
-            
         
         Parameters
         ----------
@@ -264,13 +280,9 @@ class Frame ():
         -------
         fr_i: kp_lm_ind, lm_ind, kp_cand_ind
         fr_j: kp_m_prev_lm_ind, kp_m_prev_cand_ind
-        '''
-        
-        #if len(kp2) != len(des2):
-        #    raise ValueError('Length of kp2:{} doesn''t match length of des2:'.format(len(kp2),len(des2)))
- 
-        #matches for features which are candidates from previous image and 
-        #not associated with landmarks
+        ''' 
+        # matches for features which are candidates from previous image and 
+        # not associated with landmarks
         if initialization:
             des_i_cand = fr_i.des
         else:            
@@ -316,11 +328,8 @@ class Frame ():
             fr_j.kp_m_prev_lm_ind = np.array(l_j)      # fr_j.des is the full list, so m.train gives us index into fr_j.kp
             
             Frame.frlog.debug("No of fr_i.kp_lm_ind: {}, fr_i.lm_ind: {}, fr_j.kp_m_prev_lm_ind: {}".format(
-                              len(fr_i.kp_lm_ind),len(fr_i.lm_ind),len(fr_j.kp_m_prev_lm_ind)))
-
+                              len(fr_i.kp_lm_ind),len(fr_i.lm_ind),len(fr_j.kp_m_prev_lm_ind)))     
         
-        
-
     @staticmethod
     def combine_and_filter(fr_i, fr_j):
         '''
@@ -335,7 +344,7 @@ class Frame ():
         
         Returns
         ----------
-
+        None
         '''    
         num_landmarks = len(fr_i.kp_lm_ind)
         num_cand = len(fr_j.kp_m_prev_cand_ind)
