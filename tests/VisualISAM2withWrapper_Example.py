@@ -89,6 +89,7 @@ if __name__ == '__main__':
             factor_graph.update(3)
             
             current_estimate = factor_graph.get_Estimate()
+            factor_graph.isam2.saveGraph("ex_iter_"+str(i)+".dot")
             '''
             print("****************************************************")
             print("Frame", i, ":")

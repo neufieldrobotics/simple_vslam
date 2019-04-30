@@ -17,7 +17,7 @@ import argparse
 import traceback
 from zernike.zernike import MultiHarrisZernike
 from helper_functions.frame import Frame
-np.set_printoptions(precision=3,suppress=True)
+np.set_printoptions(precision=5,suppress=True)
 import multiprocessing as mp
 from colorama import Fore, Style
 from itertools import cycle
@@ -206,8 +206,19 @@ if __name__ == '__main__':
     factor_graph = iSAM2Wrapper(pose0=np.eye(4), K=np.eye(3), **config_dict['iSAM2_settings'])    
     factor_graph.add_keyframe_factors(fr1, fr2, initialization=True)
 
-    #factor_graph.update(2)
-    #current_estimate = factor_graph.get_Estimate()
+    factor_graph.update(2)
+    current_estimate = factor_graph.get_Estimate()
+    corr_landmarks = factor_graph.get_landmark_estimates()
+    mean_correction = np.mean(np.linalg.norm(corr_landmarks - Frame.landmarks,axis=1))
+    max_correction = np.max(np.linalg.norm(corr_landmarks - Frame.landmarks,axis=1))
+    Frame.frlog.debug("Mean correction in lm:{:.3f} max correction in lm:{:.3f}".format(mean_correction,max_correction))
+    Frame.landmarks = corr_landmarks
+    fr2.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr2.frame_id)
+    trans_correction = np.linalg.norm(fr2.T_gtsam[:3,-1]-fr2.T_gtsam[:3,-1])
+    rot_correction = rotation_distance(fr2.T_gtsam[:3,:3], fr2.T_pnp[:3,:3])
+    Frame.frlog.debug("Translation correction with GTSAM:{:.5f} rotation angle correction with GTSAM:{:.4f} deg".format(trans_correction,rot_correction))
+    
+    input("Enter to continue...")
 
     Frame.frlog.info(Fore.GREEN+"\tFRAME 1 COMPLETE\n"+Style.RESET_ALL)
     
@@ -229,10 +240,22 @@ if __name__ == '__main__':
             Frame.frlog.debug(Fore.RED+"Time for current frame: "+str(time.time()-ft)+Style.RESET_ALL)
 
             Frame.process_keyframe(fr_prev, fr_curr)
-            #factor_graph.add_keyframe_factors(fr_prev, fr_curr)
-            #factor_graph.update(2)
-            #fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)
-            #input("Enter to continue...")
+            factor_graph.add_keyframe_factors(fr_prev, fr_curr)
+            factor_graph.update(2)
+            fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)
+            
+            current_estimate = factor_graph.get_Estimate()
+            corr_landmarks = factor_graph.get_landmark_estimates()
+            mean_correction = np.mean(np.linalg.norm(corr_landmarks - Frame.landmarks,axis=1))
+            max_correction = np.max(np.linalg.norm(corr_landmarks - Frame.landmarks,axis=1))
+            Frame.frlog.debug("Mean correction in lm:{:.3f} max correction in lm:{:.3f}".format(mean_correction,max_correction))
+            Frame.landmarks = corr_landmarks
+            trans_correction = np.linalg.norm(fr_curr.T_gtsam[:3,-1]-fr_curr.T_gtsam[:3,-1])
+            rot_correction = rotation_distance(fr_curr.T_gtsam[:3,:3], fr_curr.T_pnp[:3,:3])
+            Frame.frlog.debug("Translation correction with GTSAM:{:.5f} rotation angle correction with GTSAM:{:.4f} deg".format(trans_correction,rot_correction))
+            
+            
+            input("Enter to continue...")
             #iSAM2Wrapper.process_keyframe(fr_prev, fr_curr)
             #Frame.frame_2_factor_dict
             #add factors to grap

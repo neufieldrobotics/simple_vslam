@@ -87,6 +87,15 @@ class iSAM2Wrapper():
     def get_Estimate(self):    
         return self.current_estimate
     
+    def get_landmark_estimates(self):
+        i = 0
+        lm = []
+        while self.current_estimate.exists(iSAM2Wrapper.get_key('l',i)):
+            lm_i = self.current_estimate.atPoint3(iSAM2Wrapper.get_key('l',i)).vector()
+            lm += [lm_i]
+            i += 1
+        return np.array(lm)
+    
     def get_curr_Pose_Estimate(self,x_id):    
         return self.current_estimate.atPose3(iSAM2Wrapper.get_key('x',x_id)).matrix()
     

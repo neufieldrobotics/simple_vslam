@@ -31,12 +31,12 @@ lowe_ratio_test_threshold: 0.9
 use_RecoverPose_Filter: True
 
 Triangulation_settings:
- max_dist: 60 # In units set by frame 1 and 2
- subtended_angle_threshold: 0.000 # In degrees
+ z_threshold: 60 # In units set by frame 1 and 2
+ subtended_angle_threshold: 0.25 # In degrees
 
 findEssential_settings:
  prob: 0.9999
- threshold: 0.0005
+ threshold: 0.0003
 
 solvePnPRansac_settings:
   iterationsCount: 250

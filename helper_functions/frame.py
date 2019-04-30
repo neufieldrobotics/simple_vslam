@@ -28,7 +28,8 @@ class Frame ():
         des     : Keypoint Descriptors
         _ind    : Row Indices into the full kp array
         _pt     : Actual points
-        _pt_ud  : Actual points undistorted using K and D
+        _pt_ud  : Actual points undistorted using K and D    
+    ![alternate text](docs/frame_data_flow.png)
     '''
     K = np.eye(3)                         # Camera matrix
     D = np.zeros([5,1])                   # Distortion coefficients
@@ -38,7 +39,7 @@ class Frame ():
     matcher = None                        # Matcher object being used
     config_dict = None                    # Dictionary containing all the required configuration settings
     is_config_set = False                 # Flag to make sure user is setting all the required config
-    frlog = logging.getLogger('Frame')    # Logger object for console and file logging
+
     # Visualization
     fig_frame_image = None                # Handle to Frame image which contains the image array being displayed
     ax1 = None                            # Handle to axes in fig 1
@@ -47,6 +48,9 @@ class Frame ():
     fig2 = None                           # Handle to fig 2
     lm_plot_handle = None                 # Handle to plot object for landmarks
     landmarks = None                      # Full array of all 3D landmarks
+    lm_obs_count = None                   # Number of times a landmark has been observed
+    
+    frlog = logging.getLogger('Frame')    # Logger object for console and file logging
     
     def __init__(self, image_name, mask_name=None):
         '''
@@ -146,8 +150,8 @@ class Frame ():
             
         Parameters
         ----------
-        window_xadj: widith of figure
-        window_yadj : height of figure
+        window_xadj: width of figure
+        window_yadj: height of figure
         
         Returns
         -------
@@ -155,7 +159,6 @@ class Frame ():
         
         Modifies / Updates
         -------
-        
         '''
         #Frame.fig1, Frame.ax1 = plt.subplots()
         Frame.fig1 = plt.figure(1)
@@ -183,10 +186,10 @@ class Frame ():
         
         Parameters
         ----------
-        Pose_wT1: 4x4 Homogenous Transform of Camera 1 pose in world coordinates
-        Pose_wT2: 4x4 Homogenous Transform of Camera 1 pose in world coordinates
-        pts_1_2d: Nx2 Array of Undistorted and normalized keypoints in camera 1
-        pts_2_2d: Nx2 Array of Undistorted and normalized keypoints in camera 2
+        Pose_wT1: 4x4 array Homogenous Transform of Camera 1 pose in world coordinates
+        Pose_wT2: 4x4 array Homogenous Transform of Camera 1 pose in world coordinates
+        pts_1_2d: Nx2 array of Undistorted and normalized keypoints in camera 1
+        pts_2_2d: Nx2 array of Undistorted and normalized keypoints in camera 2
         mask: Nx1 Mask of 1s and 0s with 1s for points which should be triangulated
         
         Returns
@@ -210,54 +213,72 @@ class Frame ():
         Frame.frlog.debug("Proj_2Tw:\t"+str(Proj_2Tw).replace('\n','\n\t\t\t'))
         
         Pose_1T2 = Pose_1Tw @ Pose_wT2
-        trans_1T2 = Pose_1T2[:3,-1]
+        #trans_1T2 = Pose_1T2[:3,-1]
+        
+        trans_wT1 = Pose_wT1[:3,-1]
+        trans_wT2 = Pose_wT2[:3,-1]
                 
         Frame.frlog.debug("No of points in pts_1: {}".format(pts_1.shape))
         # Calculate points in 0,0,0 frame
-        if mask is None:
-            pts_3d_frame1_hom = cv2.triangulatePoints(Proj_1Tw, Proj_2Tw, pts_1, pts_2).T
+        if mask is None:            
+            pts_3d_world_hom = cv2.triangulatePoints(Proj_1Tw, Proj_2Tw, pts_1, pts_2).T
             mask = np.ones((pts_1.shape[0],1),dtype='uint8')
         else:
-            pts_3d_frame1_hom = cv2.triangulatePoints(Proj_1Tw, Proj_2Tw, pts_1[mask==1], 
+            pts_3d_world_hom = cv2.triangulatePoints(Proj_1Tw, Proj_2Tw, pts_1[mask==1], 
                                                   pts_2[mask==1]).T
-        pts_3d_frame1_hom_norm = pts_3d_frame1_hom /  pts_3d_frame1_hom[:,-1][:,None]
+        Frame.frlog.debug("Shape of pts_3d_world_hom {}".format(pts_3d_world_hom.shape))
+        # pts_3d_world_hom is a Nx4 array of non-nomalized homogenous coorinates
+        # So we normalize them by dividing with last element of each row
+        # [:, None] returns the last elements of each row as a Nx1 2D instead of a 1
+        pts_3d_world_hom_norm = pts_3d_world_hom /  pts_3d_world_hom[:,-1][:,None]
+        
         
         pt_iter = 0
         rows_to_del = []
-        ANGLE_THRESHOLD = np.deg2rad(Frame.config_dict["Triangulation_settings"]["subtended_angle_threshold"])
         
-        for i,v in enumerate(mask):
-            if v==1:
-                lm_cand = pts_3d_frame1_hom_norm[pt_iter,:3]
-                kp1 = pts_1[i,0,:]
-                kp2 = pts_2[i,0,:]
-                parallax = np.linalg.norm(kp2-kp1)
-                angle = angle_between(lm_cand,lm_cand-trans_1T2)
-                dist = np.linalg.norm(lm_cand-trans_1T2)
+        ANGLE_THRESHOLD = np.deg2rad(Frame.config_dict["Triangulation_settings"]["subtended_angle_threshold"])
+        Z_THRESHOLD = Frame.config_dict["Triangulation_settings"]["z_threshold"]
+        
+        for i,mask_val in enumerate(mask):
+            if mask_val==1:
+                #Frame.frlog.debug("i: {} \t pt_iter: {}".format(i, pt_iter))                                                             
                 
-        # checks the distance threshold after triangulation and create a mask
-                if pts_3d_frame1_hom_norm[pt_iter,2]<=0 or \
-                   pts_3d_frame1_hom_norm[pt_iter,2]>Frame.config_dict["Triangulation_settings"]["max_dist"] or \
-                   angle < ANGLE_THRESHOLD: 
-                   # This eliminates points that lie beyond the circle where trans_1T2 is the a cord 
-                   # and the circle represents the locus of all points subtending angle_threshold to the cord
-                       
-                       
-                       
+                # Find lm candidate point in 2nd Cameras frame
+                # Homogenous lm candidate in world frame
+                pt_wX_hom = pts_3d_world_hom_norm[pt_iter]
+                # lm candidate in frame 2
+                pt_2X = (Pose_2Tw @ pt_wX_hom)[:3]
+                
+                # Find angle between vectors from 2 Poses to the lm candidate point
+                pt_wX = pt_wX_hom[:3]
+                beta = angle_between(pt_wX-trans_wT1,pt_wX-trans_wT2)
+                
+                # Calculate point parallax
+                kp1 = pts_1_2d[i] #pts_1[i,0,:]
+                kp2 = pts_2_2d[i] #pts_2[i,0,:]
+                parallax = np.linalg.norm(kp2-kp1)
+                               
+                dist = np.linalg.norm(pt_wX-trans_wT2)
+                
+                # Make sure triangulated point is in front of 2nd frame
+                # checks the z_threshold threshold after triangulation and create a mask
+                # This eliminates points that lie beyond the circle where trans_1T2 is the a cord 
+                # and the circle represents the locus of all points subtending angle_threshold to the cord
+                if pt_2X[2]<=0 or \
+                   pt_2X[2]>Z_THRESHOLD or \
+                   beta < ANGLE_THRESHOLD:
                    #parallax < .01: 
-                    #dist > 50.0:
-                    #
-                    #print ("Point is negative")
+                   #dist > 50.0:                    
+                    
                     mask[i,0]=0 
                     rows_to_del.append(pt_iter)
-                Frame.frlog.debug("Pt: {}, parallax:{:.3f}, angle: {:.3f}, dist: {:.2f} accepted: {}".format(lm_cand,parallax,np.rad2deg(angle),dist, mask[i,0]))
+                #Frame.frlog.debug("Pt: {}, parallax:{:.3f}, angle: {:.3f}, dist: {:.2f} accepted: {}".format(pt_2X,parallax,np.rad2deg(beta),dist, mask[i,0]))
                 pt_iter +=1
         
-        pts_3d_frame1_hom_norm = np.delete(pts_3d_frame1_hom_norm,rows_to_del,axis=0)
+        pts_3d_world_hom_norm = np.delete(pts_3d_world_hom_norm,rows_to_del,axis=0)
         # Move 3d points to world frame by transforming with Pose_wT1
-        pts_3d_w_hom = pts_3d_frame1_hom_norm
-        pts_3d_w = pts_3d_w_hom[:, :3]
-        return pts_3d_w, mask   
+        pts_3d_world = pts_3d_world_hom_norm[:, :3]
+        return pts_3d_world, mask   
   
     @staticmethod
     def match_and_propagate_keypoints(fr_i, fr_j, initialization=False):
@@ -392,11 +413,34 @@ class Frame ():
     
     @staticmethod
     def save_frame(fr_obj, file_name):
+        '''
+        This function saves Frame to the given file_name using the pickling function.
+
+        Parameters
+        ----------                        
+        fr_obj: Frame
+        file_name: string
+        
+        Returns
+        -------
+        None
+        '''
         with open(file_name, 'wb') as output:
             pickle.dump(fr_obj, output)
     
     @staticmethod
     def load_frame(file_name):
+        '''
+        This function load a pre-processed Frame from a given file_name and returns it.
+
+        Parameters
+        ----------                        
+        file_name: string
+        
+        Returns
+        -------
+        Frame
+        '''
         with open(file_name, 'rb') as input:
             fr_obj = pickle.load(input)
         return fr_obj
@@ -412,8 +456,8 @@ class Frame ():
             e. Populates fr2 variables with required information for next frame
         Parameters
         ----------                        
-        fr1: Frame object
-        fr2: Frame object
+        fr1: Frame
+        fr2: Frame
         
         Returns
         -------
@@ -478,6 +522,7 @@ class Frame ():
                                                       kp2_m_cand_pt_ud, 
                                                       None)
         Frame.landmarks = landmarks_12
+        Frame.lm_obs_count = np.ones(len(Frame.landmarks),dtype=np.int8) * 2
         
         Frame.frlog.info("Triangulation used {} of total matches {} matches".format(np.sum(mask_tri_12),len(mask_tri_12)))
     
@@ -510,7 +555,7 @@ class Frame ():
     @staticmethod
     def process_keyframe(fr_i, fr_j):
         '''
-        performs the following operations on frame i and frame j
+        Performs the following operations on frame i and frame j
         a. match and propagate keypoints:
          1.matches points with existing landmarks in frame i and frame j and 
            stores their index for respective frames
@@ -572,7 +617,7 @@ class Frame ():
                                                         **Frame.config_dict['solvePnPRansac_settings']) # repErr = ceil2MSD(1/fr_j.gr.shape[1])
         
         if not success:
-            Frame.frlog.critical("PNP failed in frame {}. Exiting...".format(frame_no+1))
+            Frame.frlog.critical("PNP failed in frame {}. Exiting...".format(fr_j.frame_id))
             exit()
             
         Frame.frlog.info("PNP inliers: {}  of {}".format(np.sum(mask_pnp),len(fr_i.lm_ind)))
@@ -641,6 +686,8 @@ class Frame ():
         #    graph_newlm = plot_3d_points(ax2, lm_j, linestyle="", color='C0', marker=".", markersize=2)    
         #    fig2.canvas.draw_idle(); #plt.pause(0.01)
         
+        Frame.lm_obs_count[fr_i.lm_ind] += 1
+        
         num_curr_landmarks = len(Frame.landmarks)
         num_new_landmarks = len(lm_j_new)
         fr_j.lm_new_ind = np.array(range(num_curr_landmarks,num_curr_landmarks+num_new_landmarks))
@@ -649,6 +696,9 @@ class Frame ():
         fr_j.lm_ind = np.concatenate((fr_i.lm_ind, fr_j.lm_new_ind))
         #print('previous indexes:',fr_j.kp_m_prev_lm_ind)                             
         Frame.landmarks = np.vstack((Frame.landmarks, lm_j_new))
+        
+        lm_obs_count_new = np.ones(num_new_landmarks,dtype=np.int8) * 2
+        Frame.lm_obs_count = np.concatenate((Frame.lm_obs_count, lm_obs_count_new))
        
         #print("length of landmark array:",len(Frame.landmarks))
         #print("length of lm_ind:",len(fr_j.lm_ind))
