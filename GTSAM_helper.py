@@ -47,6 +47,7 @@ class iSAM2Wrapper():
         self.initial_estimate = gtsam.Values()
         self.initial_estimate.insert(iSAM2Wrapper.get_key('x',0), 
                                      gtsam.gtsam.Pose3(pose0))
+        self.lm_factor_ids = []
         
 
     def add_GenericProjectionFactorCal3_S2_factor(self, pt_uv, X_id, L_id):
@@ -59,8 +60,9 @@ class iSAM2Wrapper():
                                                         self.projection_noise, 
                                                         self.get_key('x', X_id), 
                                                         self.get_key('l', l), 
-                                                        self.K)    
+                                                        self.K)
             self.graph.push_back(fact)
+        self.lm_factor_ids += L_id
         
     def add_PoseEstimate(self, X_id, T):    
         self.initial_estimate.insert(iSAM2Wrapper.get_key('x',X_id), 
@@ -80,7 +82,8 @@ class iSAM2Wrapper():
         # Perform additional iterations as specified
         for i in range(2,iterations+1):
             self.isam2.update()
-        self.current_estimate = self.isam2.calculateEstimate()
+        #self.current_estimate = self.isam2.calculateEstimate()
+        self.current_estimate = self.isam2.calculateBestEstimate()
         self.graph.resize(0)
         self.initial_estimate.clear()
 
@@ -88,13 +91,10 @@ class iSAM2Wrapper():
         return self.current_estimate
     
     def get_landmark_estimates(self):
-        i = 0
         lm = []
-        while self.current_estimate.exists(iSAM2Wrapper.get_key('l',i)):
-            lm_i = self.current_estimate.atPoint3(iSAM2Wrapper.get_key('l',i)).vector()
-            lm += [lm_i]
-            i += 1
-        return np.array(lm)
+        for l_id in self.lm_factor_ids:
+            lm += [self.current_estimate.atPoint3(iSAM2Wrapper.get_key('l',l_id)).vector()]            
+        return np.array(lm), self.lm_factor_ids
     
     def get_curr_Pose_Estimate(self,x_id):    
         return self.current_estimate.atPose3(iSAM2Wrapper.get_key('x',x_id)).matrix()
@@ -208,7 +208,7 @@ class iSAM2Wrapper():
         fx,fy,s,u0,v0 = K[0,0],K[1,1],K[0,1],K[0,2],K[1,2]
         return np.array([fx,fy,s,u0,v0])
 
-'''      
+    '''      
     def add_keyframe_factors(self, frame_queue, initialization=False):
         fr_j = frame_queue.queue[-1]
         fr_i = frame_queue.queue[-2]
@@ -238,37 +238,31 @@ class iSAM2Wrapper():
         self.add_LandmarkEstimate(fr_j.lm_new_ind, Frame.landmarks[fr_j.lm_new_ind])
         # Add pose estimate from the new frame j
         self.add_PoseEstimate(fr_j.frame_id, fr_j.T_pnp)
-'''
-    def add_keyframe_factors(self, fr_i, fr_j,):
-        
-        #  Add projection factors only to frame j  for landmarks already added to GTSAM before      
-        mask_lm_already_in_gtsam =  Frame.lm_obs_count[fr_.lm_ind] > 3
-        kpj_lm_ind_already_in_gtsam = fr_j.kp_m_prev_lm_ind[mask_lm_already_in_gtsam]
-        fri_lm_ind_already_in_gtsam = fr_i.lm_ind[mask_lm_already_in_gtsam]
-        
-        pt_uv = cv2.undistortPoints(np.expand_dims(kpj_lm_ind_already_in_gtsam,1),
-                                                   Frame.K, Frame.D)[:,0,:]
-        self.add_GenericProjectionFactorCal3_S2_factor(pt_uv, fr_j.frame_id, fri_lm_ind_already_in_gtsam)
-        
-        #  Add projection factors only to frame j  for landmarks already added to GTSAM before      
+    '''
+    def add_keyframe_factors(self, fr_j):         
 
-        
-        ''
-        ## Add new landmarks to frame i and j
-        #  Add projection factors to frame i
-        print ("k:", Frame.K)
-        pt_uv = cv2.undistortPoints(np.expand_dims(fr_i.kp[fr_i.kp_cand_ind],1),
-                                                   Frame.K, Frame.D)[:,0,:]
-        self.add_GenericProjectionFactorCal3_S2_factor(pt_uv, fr_i.frame_id, fr_j.lm_new_ind)
-
-        #  Add projection factors to frame j
-        pt_uv = cv2.undistortPoints(np.expand_dims(fr_j.kp[fr_j.kp_m_prev_cand_ind],1),
-                                                   Frame.K, Frame.D)[:,0,:]
-        self.add_GenericProjectionFactorCal3_S2_factor(pt_uv, fr_j.frame_id, fr_j.lm_new_ind)
-        ''
-        
+        for l,l_id in zip(Frame.landmark_array[fr_j.lm_ind], fr_j.lm_ind):
+            if len(l.observed_kps) == 3:
+                ## Add new landmarks to GTSAM when they have been observed in 3 frames
+                # Add from frame j to landmark
+                self.add_GenericProjectionFactorCal3_S2_factor(l.keypoint_in_frame(fr_j.frame_id), 
+                                                               fr_j.frame_id,
+                                                               [l_id])
+                # Add from frame i to landmark
+                self.add_GenericProjectionFactorCal3_S2_factor(l.keypoint_in_frame(fr_j.frame_id -1), 
+                                                               fr_j.frame_id - 1,
+                                                               [l_id])
+                # Add from frame h to landmark
+                self.add_GenericProjectionFactorCal3_S2_factor(l.keypoint_in_frame(fr_j.frame_id -2), 
+                                                               fr_j.frame_id - 2,
+                                                               [l_id])                
+                # Add landmark estimates for the newly created landmarks
+                self.add_LandmarkEstimate([l_id], l.coord_3d)
+            elif len(l.observed_kps) > 3:
+                #  Add projection factors only to frame j  for landmarks already added to GTSAM before
+                self.add_GenericProjectionFactorCal3_S2_factor(l.keypoint_in_frame(fr_j.frame_id), 
+                                                               fr_j.frame_id,
+                                                               [l_id])
         ## Add estiamates
-        # Add landmark estimates for the newly created landmarks
-        self.add_LandmarkEstimate(fr_j.lm_new_ind, Frame.landmarks[fr_j.lm_new_ind])
-        # Add pose estimate from the new frame j
         self.add_PoseEstimate(fr_j.frame_id, fr_j.T_pnp)  
+                

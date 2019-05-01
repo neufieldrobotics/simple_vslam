@@ -14,6 +14,27 @@ from matplotlib import pyplot as plt
 from vslam_helper import *
 import pickle
 
+class landmark():
+    def __init__(self, fr_i_id,fr_j_id, kp_i_pt, kp_j_pt, coord_3d):
+        '''
+        landmark obj initializer
+        '''
+        # Populated during initialization
+        self.observed_kps = {fr_i_id:kp_i_pt, fr_j_id:kp_j_pt}
+        self.coord_3d = coord_3d
+    
+    def add_observation(self,fr_id, kp_j_pt):
+        ''' 
+        Add new observation of existing landmark
+        '''
+        self.observed_kps[fr_id] = kp_j_pt    
+    
+    def keypoint_in_frame(self,fr_id):
+        ''' 
+        Return observation in given frame
+        '''
+        return self.observed_kps[fr_id]
+
 class Frame ():
     '''
     Frame objects contain all the variables required to detect, match and propogate
@@ -49,6 +70,7 @@ class Frame ():
     lm_plot_handle = None                 # Handle to plot object for landmarks
     landmarks = None                      # Full array of all 3D landmarks
     lm_obs_count = None                   # Number of times a landmark has been observed
+    landmark_array = np.array([])         # NP Array of landmark objects
     
     frlog = logging.getLogger('Frame')    # Logger object for console and file logging
     
@@ -140,7 +162,7 @@ class Frame ():
         kp_ind_set = set(range(len(self.kp)))
         kp_m_prev_cand_ind_set = set(self.kp_m_prev_cand_ind)
         self.kp_cand_ind = np.array(list(kp_ind_set - kp_m_prev_cand_ind_set))
-           
+                
     @staticmethod
     def initialize_figures(window_xadj = 65, window_yadj = 430):
         '''
@@ -525,7 +547,8 @@ class Frame ():
                                                       kp2_m_cand_pt_ud, 
                                                       None)
         Frame.landmarks = landmarks_12
-        Frame.lm_obs_count = np.ones(len(Frame.landmarks),dtype=np.int8) * 2
+        #Frame.lm_obs_count = np.ones(len(Frame.landmarks),dtype=np.int8) * 2
+        
         
         Frame.frlog.info("Triangulation used {} of total matches {} matches".format(np.sum(mask_tri_12),len(mask_tri_12)))
     
@@ -539,6 +562,16 @@ class Frame ():
         #kp2_match_12, des2_m = trim_using_mask(mask_tri_12, kp2_match_12, des2_m)
         fr1.kp_cand_ind         = fr1.kp_cand_ind[mask_tri_12[:,0].astype(bool)]
         fr2.kp_m_prev_cand_ind  = fr2.kp_m_prev_cand_ind[mask_tri_12[:,0].astype(bool)]
+        kp1_m_cand_pt_ud = kp1_m_cand_pt_ud[mask_tri_12[:,0].astype(bool)]
+        kp2_m_cand_pt_ud = kp2_m_cand_pt_ud[mask_tri_12[:,0].astype(bool)]
+        
+        print(kp2_m_cand_pt_ud)
+        
+        ### Add new landmarks to landmark array
+        lm_list = []
+        for (i,coord) in enumerate(landmarks_12):
+            lm_list.append(landmark(fr1.frame_id,fr2.frame_id, kp1_m_cand_pt_ud[[i]], kp2_m_cand_pt_ud[[i]], coord[None]))
+        Frame.landmark_array=np.array(lm_list)
 
         fr2.partition_kp_cand()
         Frame.frlog.debug("Length of candidate pts: {}".format(len(fr2.kp_cand_ind)))
@@ -640,7 +673,12 @@ class Frame ():
         fr_i.lm_ind = fr_i.lm_ind[mask_pnp[:,0].astype(bool)] 
         fr_i.kp_lm_ind = fr_i.kp_lm_ind[mask_pnp[:,0].astype(bool)] 
         fr_j.kp_m_prev_lm_ind = fr_j.kp_m_prev_lm_ind[mask_pnp[:,0].astype(bool)] 
+        kp_j_m_lm_pt_ud = kp_j_m_lm_pt_ud[mask_pnp[:,0].astype(bool)] 
         Frame.frlog.debug("Time elapsed in PNP: {:.4f}".format(time.time()-time_start))
+        
+        for (row,l) in enumerate(fr_i.lm_ind):
+            Frame.landmark_array[l].add_observation(fr_j.frame_id, kp_j_m_lm_pt_ud[[row]])
+        
         time_start = time.time()
         
         # Undistort and Triangulate
@@ -673,7 +711,9 @@ class Frame ():
     
         fr_i.kp_cand_ind = fr_i.kp_cand_ind[mask_tri[:,0].astype(bool)]
         fr_j.kp_m_prev_cand_ind = fr_j.kp_m_prev_cand_ind[mask_tri[:,0].astype(bool)]
-        
+        kp_i_m_cand_pt_ud = kp_i_m_cand_pt_ud[mask_tri[:,0].astype(bool)]
+        kp_j_m_cand_pt_ud = kp_j_m_cand_pt_ud[mask_tri[:,0].astype(bool)]
+                
         #try:    
         #    Frame.lm_plot_handle.remove()
         #except NameError:
@@ -693,7 +733,7 @@ class Frame ():
         #    graph_newlm = plot_3d_points(ax2, lm_j, linestyle="", color='C0', marker=".", markersize=2)    
         #    fig2.canvas.draw_idle(); #plt.pause(0.01)
         
-        Frame.lm_obs_count[fr_i.lm_ind] += 1
+        #Frame.lm_obs_count[fr_i.lm_ind] += 1
         
         num_curr_landmarks = len(Frame.landmarks)
         num_new_landmarks = len(lm_j_new)
@@ -702,10 +742,18 @@ class Frame ():
         fr_j.kp_lm_ind = np.concatenate((fr_j.kp_m_prev_lm_ind, fr_j.kp_m_prev_cand_ind))
         fr_j.lm_ind = np.concatenate((fr_i.lm_ind, fr_j.lm_new_ind))
         #print('previous indexes:',fr_j.kp_m_prev_lm_ind)                             
-        Frame.landmarks = np.vstack((Frame.landmarks, lm_j_new))
+        Frame.landmarks = np.vstack((Frame.landmarks, lm_j_new))            
         
-        lm_obs_count_new = np.ones(num_new_landmarks,dtype=np.int8) * 2
-        Frame.lm_obs_count = np.concatenate((Frame.lm_obs_count, lm_obs_count_new))
+        lm_new_list = []
+        for (i,coord) in enumerate(lm_j_new):
+            lm_new_list.append(landmark(fr_i.frame_id,fr_j.frame_id, 
+                                        kp_i_m_cand_pt_ud[[i]], 
+                                        kp_j_m_cand_pt_ud[[i]], 
+                                        coord[None]))
+        Frame.landmark_array=np.concatenate((Frame.landmark_array,np.array(lm_new_list)))
+        
+        #lm_obs_count_new = np.ones(num_new_landmarks,dtype=np.int8) * 2
+        #Frame.lm_obs_count = np.concatenate((Frame.lm_obs_count, lm_obs_count_new))
        
         #print("length of landmark array:",len(Frame.landmarks))
         #print("length of lm_ind:",len(fr_j.lm_ind))

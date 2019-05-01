@@ -46,9 +46,12 @@ copyreg.pickle(cv2.KeyPoint().__class__, _pickle_keypoints)
 
 def writer(imgnames, masknames, config_dict, queue):
     '''
-        
-    '''
-    
+    This funtion creates Frame objects which read images from the disk, detects features 
+    and feature descriptors using settings in the config file. It then puts the object into
+    a multi-process queue.
+    This function is designed to run in a separate heap and thus takes everything it needs
+    in form of parameteres and doesn't rely on global variables.    
+    '''    
     #TILE_KP = config_dict['use_tiling_non_max_supression']
     USE_MASKS = config_dict['use_masks']
     USE_CLAHE = config_dict['use_clahe']
@@ -103,7 +106,6 @@ def writer(imgnames, masknames, config_dict, queue):
                     fr = Frame(imgnames[i],mask_name=masknames[i])
                 else: 
                     fr = Frame(imgnames[i])
-                    #gr, mask, kp, des = ppoutput
                 queue.put(fr)
                 Frame.save_frame(fr, frame_obj_filename)
             
@@ -112,12 +114,11 @@ def writer(imgnames, masknames, config_dict, queue):
         pass
     except:
         traceback.print_exc(file=sys.stdout)
-    
+
     vslog.info("Finished pre-processing all images")
 
 
-if __name__ == '__main__':
-    
+if __name__ == '__main__':    
     # passing arguments from the terminal
     parser = argparse.ArgumentParser(description='This is the simple VSLAM pipeline')
     parser.add_argument('-c', '--config', help='location of config file in yaml format',
@@ -125,7 +126,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
      
     # Inputs, images and camera info
-        
     config_dict = yaml.load(open(args.config))
     CHESSBOARD = config_dict['chessboard']
     USE_MASKS = config_dict['use_masks']
@@ -147,7 +147,6 @@ if __name__ == '__main__':
         if USE_MASKS: masks_folder = config_dict['linux_masks_folder']
         window_xadj = 65
         window_yadj = 430
-
 
     PAUSES = False
     FILTER_RP = False
@@ -207,10 +206,10 @@ if __name__ == '__main__':
     Frame.fig2.canvas.mpl_connect('key_press_event', onKey)
     Frame.initialize_VSLAM(fr1, fr2)
     
-    
     factor_graph = iSAM2Wrapper(pose0=np.eye(4), K=np.eye(3), **config_dict['iSAM2_settings'])    
+    factor_graph.add_PoseEstimate(fr2.frame_id, fr2.T_pnp)      
     
-    
+    '''
     factor_graph.add_keyframe_factors(frame_queue, initialization=True)
 
     factor_graph.update(2)
@@ -226,11 +225,12 @@ if __name__ == '__main__':
     Frame.frlog.debug("Translation correction with GTSAM:{:.5f} rotation angle correction with GTSAM:{:.4f} deg".format(trans_correction,rot_correction))
     
     input("Enter to continue...")
+    '''
     plt.pause(0.001)
     
     Frame.frlog.info(Fore.GREEN+"\tFRAME 1 COMPLETE\n"+Style.RESET_ALL)
     
-    #fr_prev = fr2
+    fr_prev = fr2
 
     st = time.time()
     #for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
@@ -245,43 +245,42 @@ if __name__ == '__main__':
             
             fr_curr = mpqueue.get()
             
-            if frame_queue.full(): frame_queue.get()
-            frame_queue.put(fr_curr)
+            #if frame_queue.full(): frame_queue.get()
+            #frame_queue.put(fr_curr)
             
             Frame.frlog.debug("Frame id:"+str(fr_curr.frame_id))
             Frame.frlog.debug(Fore.RED+"Time for current frame: "+str(time.time()-ft)+Style.RESET_ALL)
             ft = time.time()
-            Frame.process_keyframe(frame_queue.queue[-2], frame_queue.queue[-1])
+            Frame.process_keyframe(fr_prev, fr_curr)
             Frame.frlog.debug("Time elapsed in process_keyframe: {:.4f}".format(time.time()-ft))
 
             ft = time.time()
-            factor_graph.add_keyframe_factors(frame_queue)
-            factor_graph.update(2)
-            fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)
             
+            factor_graph.add_keyframe_factors(fr_curr)
+                        
+            factor_graph.update(2)
+            
+            fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)  
             current_estimate = factor_graph.get_Estimate()
-            corr_landmarks = factor_graph.get_landmark_estimates()
-            mean_correction = np.mean(np.linalg.norm(corr_landmarks - Frame.landmarks,axis=1))
-            max_correction = np.max(np.linalg.norm(corr_landmarks - Frame.landmarks,axis=1))
+            corr_landmarks, gtsam_lm_ids = factor_graph.get_landmark_estimates()
+            mean_correction = np.mean(np.linalg.norm(corr_landmarks - Frame.landmarks[gtsam_lm_ids],axis=1))
+            max_correction = np.max(np.linalg.norm(corr_landmarks - Frame.landmarks[gtsam_lm_ids],axis=1))
             Frame.frlog.debug("Mean correction in lm:{:.3f} max correction in lm:{:.3f}".format(mean_correction,max_correction))
-            Frame.landmarks = corr_landmarks
+            #Frame.landmarks[gtsam_lm_ids] = corr_landmarks
             trans_correction = np.linalg.norm(fr_curr.T_gtsam[:3,-1]-fr_curr.T_gtsam[:3,-1])
             rot_correction = rotation_distance(fr_curr.T_gtsam[:3,:3], fr_curr.T_pnp[:3,:3])
             Frame.frlog.debug("Translation correction with GTSAM:{:.5f} rotation angle correction with GTSAM:{:.4f} deg".format(trans_correction,rot_correction))
             Frame.frlog.debug("Time elapsed in iSAM optimization: {:.4f}".format(time.time()-ft))
-
+            
             #input("Enter to continue...")
-            #iSAM2Wrapper.process_keyframe(fr_prev, fr_curr)
-            #Frame.frame_2_factor_dict
-            #add factors to grap
-            #update isam
-            #update landmarks and P
   
             Frame.frlog.debug(Fore.RED+"Time to process last frame: {:.4f}".format(time.time()-st)+Style.RESET_ALL)
             Frame.frlog.debug(Fore.RED+"Time in the function: {:.4f}".format(time.time()-ft)+Style.RESET_ALL)
             Frame.frlog.info(Fore.GREEN+"\tFRAME seq {} COMPLETE \n".format(fr_curr.frame_id)+Style.RESET_ALL)
             
             st = time.time()
+            
+            fr_prev=fr_curr
 
             while(paused):   
                 print('\b'+next(spinner), end='', flush=True)
@@ -293,9 +292,6 @@ if __name__ == '__main__':
                     flag = True
                     break
                 time.sleep(0.1)
-            #if not flag:
-                #fr_prev = fr_curr
-            #plt.pause(0.001)
             
             i+= 1
         else: time.sleep(0.2)            

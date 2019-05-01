@@ -61,7 +61,7 @@ ZERNIKE_settings:
 
 iSAM2_settings:
  pose0_to_pose1_range: 1.0
- relinearizeThreshold: 0.1
+ relinearizeThreshold: 0.01
  relinearizeSkip: 1
  proj_noise_val: 0.0027  # 1/376
 
