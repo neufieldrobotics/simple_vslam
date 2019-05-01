@@ -23,6 +23,7 @@ from colorama import Fore, Style
 from itertools import cycle
 import logging
 import copyreg
+import queue
 
 from helper_functions.frame import Frame
 from GTSAM_helper import iSAM2Wrapper
@@ -157,10 +158,9 @@ if __name__ == '__main__':
                      if re.match('^.*\.'+image_ext+'$', f, flags=re.IGNORECASE)])
     
     images = [images_full[init_imgs_indx[0]]]+images_full[init_imgs_indx[1]::img_step]
-    
+
     assert images is not None, "ERROR: No images read"
-    
-            
+
     if USE_MASKS:
         masks_ext = config_dict['masks_ext']
         masks_full = sorted([f for f in glob.glob(masks_folder+'/*') 
@@ -197,14 +197,21 @@ if __name__ == '__main__':
     fr2 = mpqueue.get()
     #gr2, mask2, kp2, des2 = fr2.gr,fr2.mask,fr2.kp,fr2.des
     
+    frame_queue = queue.Queue(maxsize=5)
+    frame_queue.put(fr1)
+    frame_queue.put(fr2)
+    
     # Show image
     Frame.initialize_figures(window_xadj, window_yadj)
     Frame.fig1.canvas.mpl_connect('key_press_event', onKey)
     Frame.fig2.canvas.mpl_connect('key_press_event', onKey)
     Frame.initialize_VSLAM(fr1, fr2)
     
+    
     factor_graph = iSAM2Wrapper(pose0=np.eye(4), K=np.eye(3), **config_dict['iSAM2_settings'])    
-    factor_graph.add_keyframe_factors(fr1, fr2, initialization=True)
+    
+    
+    factor_graph.add_keyframe_factors(frame_queue, initialization=True)
 
     factor_graph.update(2)
     current_estimate = factor_graph.get_Estimate()
@@ -219,10 +226,11 @@ if __name__ == '__main__':
     Frame.frlog.debug("Translation correction with GTSAM:{:.5f} rotation angle correction with GTSAM:{:.4f} deg".format(trans_correction,rot_correction))
     
     input("Enter to continue...")
-
+    plt.pause(0.001)
+    
     Frame.frlog.info(Fore.GREEN+"\tFRAME 1 COMPLETE\n"+Style.RESET_ALL)
     
-    fr_prev = fr2
+    #fr_prev = fr2
 
     st = time.time()
     #for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
@@ -236,11 +244,18 @@ if __name__ == '__main__':
             ft = time.time()
             
             fr_curr = mpqueue.get()
+            
+            if frame_queue.full(): frame_queue.get()
+            frame_queue.put(fr_curr)
+            
             Frame.frlog.debug("Frame id:"+str(fr_curr.frame_id))
             Frame.frlog.debug(Fore.RED+"Time for current frame: "+str(time.time()-ft)+Style.RESET_ALL)
+            ft = time.time()
+            Frame.process_keyframe(frame_queue.queue[-2], frame_queue.queue[-1])
+            Frame.frlog.debug("Time elapsed in process_keyframe: {:.4f}".format(time.time()-ft))
 
-            Frame.process_keyframe(fr_prev, fr_curr)
-            factor_graph.add_keyframe_factors(fr_prev, fr_curr)
+            ft = time.time()
+            factor_graph.add_keyframe_factors(frame_queue)
             factor_graph.update(2)
             fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)
             
@@ -253,16 +268,15 @@ if __name__ == '__main__':
             trans_correction = np.linalg.norm(fr_curr.T_gtsam[:3,-1]-fr_curr.T_gtsam[:3,-1])
             rot_correction = rotation_distance(fr_curr.T_gtsam[:3,:3], fr_curr.T_pnp[:3,:3])
             Frame.frlog.debug("Translation correction with GTSAM:{:.5f} rotation angle correction with GTSAM:{:.4f} deg".format(trans_correction,rot_correction))
-            
-            
-            input("Enter to continue...")
+            Frame.frlog.debug("Time elapsed in iSAM optimization: {:.4f}".format(time.time()-ft))
+
+            #input("Enter to continue...")
             #iSAM2Wrapper.process_keyframe(fr_prev, fr_curr)
             #Frame.frame_2_factor_dict
             #add factors to grap
             #update isam
             #update landmarks and P
-            
-    
+  
             Frame.frlog.debug(Fore.RED+"Time to process last frame: {:.4f}".format(time.time()-st)+Style.RESET_ALL)
             Frame.frlog.debug(Fore.RED+"Time in the function: {:.4f}".format(time.time()-ft)+Style.RESET_ALL)
             Frame.frlog.info(Fore.GREEN+"\tFRAME seq {} COMPLETE \n".format(fr_curr.frame_id)+Style.RESET_ALL)
@@ -278,9 +292,10 @@ if __name__ == '__main__':
                 if cue_to_exit: 
                     flag = True
                     break
-            if not flag:
-                fr_prev = fr_curr
-            plt.pause(0.001)
+                time.sleep(0.1)
+            #if not flag:
+                #fr_prev = fr_curr
+            #plt.pause(0.001)
             
             i+= 1
         else: time.sleep(0.2)            

@@ -207,8 +207,12 @@ class iSAM2Wrapper():
             raise ValueError('K matrix not upper triangular, might be incorrrect')
         fx,fy,s,u0,v0 = K[0,0],K[1,1],K[0,1],K[0,2],K[1,2]
         return np.array([fx,fy,s,u0,v0])
-       
-    def add_keyframe_factors(self, fr_i, fr_j, initialization=False):
+
+'''      
+    def add_keyframe_factors(self, frame_queue, initialization=False):
+        fr_j = frame_queue.queue[-1]
+        fr_i = frame_queue.queue[-2]
+        #fr_h = frame_queue[-3]
         
         if not initialization:
             ## Add exsisting landmarks        
@@ -234,88 +238,37 @@ class iSAM2Wrapper():
         self.add_LandmarkEstimate(fr_j.lm_new_ind, Frame.landmarks[fr_j.lm_new_ind])
         # Add pose estimate from the new frame j
         self.add_PoseEstimate(fr_j.frame_id, fr_j.T_pnp)
-
 '''
-if __name__ == '__main__':
-    #main()
-        # Define the camera calibration parameters
-    K_sim = Cal3_S2(50.0, 50.0, 0.0, 50.0, 50.0)
-    K = Cal3_S2(1.0, 1.0, 0.0, 0.0, 0.0)
-    K_cam = np.array([[50.0, 0.0, 50.0],
-                     [0.0, 50.0, 50.0],
-                     [0.0, 0.0, 1.0]])
-    D = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
+    def add_keyframe_factors(self, fr_i, fr_j,):
+        
+        #  Add projection factors only to frame j  for landmarks already added to GTSAM before      
+        mask_lm_already_in_gtsam =  Frame.lm_obs_count[fr_.lm_ind] > 3
+        kpj_lm_ind_already_in_gtsam = fr_j.kp_m_prev_lm_ind[mask_lm_already_in_gtsam]
+        fri_lm_ind_already_in_gtsam = fr_i.lm_ind[mask_lm_already_in_gtsam]
+        
+        pt_uv = cv2.undistortPoints(np.expand_dims(kpj_lm_ind_already_in_gtsam,1),
+                                                   Frame.K, Frame.D)[:,0,:]
+        self.add_GenericProjectionFactorCal3_S2_factor(pt_uv, fr_j.frame_id, fri_lm_ind_already_in_gtsam)
+        
+        #  Add projection factors only to frame j  for landmarks already added to GTSAM before      
 
-    # Define the camera observation noise model
-    measurement_noise = gtsam.noiseModel_Isotropic.Sigma(2, 1.0)  # one pixel in u and v
+        
+        ''
+        ## Add new landmarks to frame i and j
+        #  Add projection factors to frame i
+        print ("k:", Frame.K)
+        pt_uv = cv2.undistortPoints(np.expand_dims(fr_i.kp[fr_i.kp_cand_ind],1),
+                                                   Frame.K, Frame.D)[:,0,:]
+        self.add_GenericProjectionFactorCal3_S2_factor(pt_uv, fr_i.frame_id, fr_j.lm_new_ind)
 
-    # Create the set of ground-truth landmarks
-    points = SFMdata.createPoints()
-
-    # Create the set of ground-truth poses
-    poses = SFMdata.createPoses(K)
-
-    # Create a factor graph
-    graph = NonlinearFactorGraph()
-
-    # Add a prior on pose x1. This indirectly specifies where the origin is.
-    # 0.3 rad std on roll,pitch,yaw and 0.1m on x,y,z
-    pose_noise = gtsam.noiseModel_Diagonal.Sigmas(np.array([0.3, 0.3, 0.3, 0.1, 0.1, 0.1]))
-    factor = PriorFactorPose3(symbol('x', 0), poses[0], pose_noise)
-    graph.push_back(factor)
-
-    # Simulated measurements from each camera pose, adding them to the factor graph
-    for i, pose in enumerate(poses):
-        camera = SimpleCamera(pose, K_sim)
-        for j, point in enumerate(points):
-            if pt_dist(point,pose.translation())<38.2:
-                measurement = camera.project(point)
-                undist_m = cv2.undistortPoints(np.expand_dims(np.expand_dims(Point_to_arr(measurement),0),1),K_cam,D)[0,0,:]
-                undist_pt = arr2Point(undist_m)
-                print("measurement: ",measurement)
-                factor = GenericProjectionFactorCal3_S2(
-                    undist_pt, measurement_noise, symbol('x', i), symbol('l', j), K)
-                graph.push_back(factor)
-
-    # Because the structure-from-motion problem has a scale ambiguity, the problem is still under-constrained
-    # Here we add a prior on the position of the first landmark. This fixes the scale by indicating the distance
-    # between the first camera and the first landmark. All other landmark positions are interpreted using this scale.
-    #point_noise = gtsam.noiseModel_Isotropic.Sigma(3, 0.1)
-    #factor = PriorFactorPoint3(symbol('l', 0), points[0], point_noise)
-    #graph.push_back(factor)
-    
-    x0x1_noise = gtsam.noiseModel_Isotropic.Sigma(1, 0.1)
-    factor = RangeFactorPose3(symbol('x', 0),symbol('x', 1), 15.0,x0x1_noise)
-    graph.push_back(factor)
-
-    #graph.print_('Factor Graph:\n')
-
-    # Create the data structure to hold the initial estimate to the solution
-    # Intentionally initialize the variables off from the ground truth
-    initial_estimate = Values()
-    for i, pose in enumerate(poses):
-        r = Rot3.Rodrigues(np.random.random(3)) #r = Rot3.Rodrigues(-0.1, 0.2, 0.25)
-        t = Point3(np.random.random(3)*1)#t = Point3(0.05, -0.10, 0.20)
-        transformed_pose = pose.compose(Pose3(r, t))
-        initial_estimate.insert(symbol('x', i), transformed_pose)
-    for j, point in enumerate(points):
-        transformed_point = Point3(point.vector() + np.random.random(3)*10) #np.array([-0.25, 0.20, 0.15]))
-        initial_estimate.insert(symbol('l', j), transformed_point)
-    initial_estimate.print_('Initial Estimates:\n')
-    draw_graph(graph,initial_estimate,1)
-
-
-    # Optimize the graph and print results
-    params = gtsam.DoglegParams()
-    params.setVerbosity('Error')
-    params.setErrorTol(0.1)
-    optimizer = DoglegOptimizer(graph, initial_estimate, params)
-    print('Optimizing:')
-    result = optimizer.optimizeSafely()
-    #result.print_('Final results:\n')
-    print('\n\ninitial error = {}'.format(graph.error(initial_estimate)))
-#    print('\n\nfinal error = {}'.format(graph.error(result)))
-    
-
-    draw_graph(graph,result,2)
- '''      
+        #  Add projection factors to frame j
+        pt_uv = cv2.undistortPoints(np.expand_dims(fr_j.kp[fr_j.kp_m_prev_cand_ind],1),
+                                                   Frame.K, Frame.D)[:,0,:]
+        self.add_GenericProjectionFactorCal3_S2_factor(pt_uv, fr_j.frame_id, fr_j.lm_new_ind)
+        ''
+        
+        ## Add estiamates
+        # Add landmark estimates for the newly created landmarks
+        self.add_LandmarkEstimate(fr_j.lm_new_ind, Frame.landmarks[fr_j.lm_new_ind])
+        # Add pose estimate from the new frame j
+        self.add_PoseEstimate(fr_j.frame_id, fr_j.T_pnp)  

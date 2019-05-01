@@ -379,9 +379,12 @@ class Frame ():
         kp_j_all_ud = cv2.undistortPoints(np.expand_dims(fr_j.kp[kp_j_all_ind],1),Frame.K,Frame.D)[:,0,:]
                 
         # getting the first mask for filter using essential matrix method
+        essmat_time = time.time()
         E, mask_e_all = cv2.findEssentialMat(kp_i_all_ud, kp_j_all_ud, 
                                              focal=1.0, pp=(0., 0.), 
                                              method=cv2.RANSAC, **Frame.config_dict['findEssential_settings'])
+        Frame.frlog.debug("Time to perform essential mat filter: {:.4f}".format(time.time()-essmat_time))
+
         essen_mat_pts = np.sum(mask_e_all)  
         
         Frame.frlog.debug("Essential matrix: used {} of total {} matches".format(essen_mat_pts,len(kp_j_all_ud)))
@@ -577,12 +580,16 @@ class Frame ():
         None
         
         '''
+        time_start = time.time()
         Frame.match_and_propagate_keypoints(fr_i, fr_j)
-        
-        Frame.combine_and_filter(fr_i, fr_j)
+        Frame.frlog.debug("Time elapsed in match and prop keypoints: {:.4f}".format(time.time()-time_start))
         
         time_start = time.time()
-            
+        Frame.combine_and_filter(fr_i, fr_j)
+        Frame.frlog.debug("Time elapsed in combine and filter: {:.4f}".format(time.time()-time_start))
+
+        
+        time_start = time.time()
         # Display translucent mask on image.
         # if mask_j is not None:
         #    gr_j_masked = cv2.addWeighted(mask_j, 0.2, gr_j, 1 - 0.2, 0)
