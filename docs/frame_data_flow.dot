@@ -2,10 +2,12 @@ digraph structs {
     graph [fontsize=10 fontname="Verdana" compound=true];
     node [shape=record fontsize=10 fontname="Verdana"];
     rankdir = LR
+    
+    
     subgraph cluster_0 
     {
     node [style=filled];
-    label = "FRAME i";
+    label = "FRAME h";
     color=blue;
     
     
@@ -13,32 +15,60 @@ digraph structs {
     {
     label = keypoints
     color=black; 
-    fr_i_l[label="{ { <M2_i> kp_m_prev_lm_ind|<M1_i>kp_m_prev_cand_ind|<UM_i>kp_unmatched }}" fillcolor = yellow pos = "0,0"]
+    fr_h_l[label="{ { <M2_h> kp_m_prev_lm_ind|<M1_h>kp_m_prev_cand_ind|<UM_h>kp_unmatched }}" fillcolor = yellow pos = "0,0"]
     }
     subgraph cluster_0_r
+       { 
+       color=black;
+       label = "keypoints and landmarks";
+       fr_h_r[label="{{ <kp_lm_ind>kp_lm_ind \n  | <kp_cand_ind>kp_cand_ind \n  }}", shape = "Mrecord" fillcolor=green];
+       lm_h[label="lm_ind" shape=triangle fillcolor=green]
+       }
+       lm_h_new[label="new lm" shape = triangle fillcolor = yellow]  
+       pose_est_h[shape = circle label="T_h PNP" fillcolor=lightblue]
+       fr_h_l:M1_h->fr_h_r:kp_lm_ind
+       fr_h_l:M2_h->fr_h_r:kp_lm_ind
+       fr_h_l:UM_h->fr_h_r:kp_cand_ind 
+    }
+
+    
+    subgraph cluster_1 
+    {
+    node [style=filled];
+    label = "FRAME i";
+    color=blue;
+    
+    
+    subgraph cluster_1_l
+    {
+    label = keypoints
+    color=black; 
+    fr_i_l[label="{ { <M2_i> kp_m_prev_lm_ind|<M1_i>kp_m_prev_cand_ind|<UM_i>kp_unmatched }}" fillcolor = yellow pos = "0,0"]
+    }
+    subgraph cluster_1_r
        { 
        color=black;
        label = "keypoints and landmarks";
        fr_i_r[label="{{ <kp_lm_ind>kp_lm_ind \n  | <kp_cand_ind>kp_cand_ind \n  }}", shape = "Mrecord" fillcolor=green];
        lm_i[label="lm_ind" shape=triangle fillcolor=green]
        }
-       lm_i_new[style=invis label="new lm" shape = triangle fillcolor = yellow]  
+       lm_i_new[label="new lm" shape = triangle fillcolor = yellow]  
        pose_est_i[shape = circle label="T_i PNP" fillcolor=lightblue]
        fr_i_l:M1_i->fr_i_r:kp_lm_ind
        fr_i_l:M2_i->fr_i_r:kp_lm_ind
        fr_i_l:UM_i->fr_i_r:kp_cand_ind 
     }
 
-    subgraph cluster_1 {
+    subgraph cluster_2 {
         node [style=filled];
         label = "FRAME j";
         color=blue;
-    subgraph cluster_1_l
+    subgraph cluster_2_l
     {
     label = keypoints
         fr_j_l [label="{ {<M2_j> kp_m_prev_lm_ind|<M1_j>kp_m_prev_cand_ind |<UM_j>kp_unmatched }}" fillcolor = yellow ]
        } 
-      subgraph cluster_1_r
+      subgraph cluster_2_r
        { 
        color=black;
        label = "keypoints and landmarks"; 
@@ -58,4 +88,18 @@ digraph structs {
     fr_i_r:kp_cand_ind->fr_j_l:M1_j[label="2. match and Triangulate" dir = "both"];
     lm_i:e->lm_j:w
     lm_j_new->lm_j
+    
+    fr_h_r:kp_lm_ind->fr_i_l:M2_i[label="1. match and PNP" dir="both"];
+    //PNP:"e"->fr_i_r:kp_lm_ind:"e"
+    //PNP->fr_j_l:M2_j
+    fr_h_r:kp_cand_ind->fr_i_l:M1_i[label="2. match and Triangulate" dir = "both"];
+    lm_h:e->lm_i:w
+    lm_i_new->lm_i
+    fr_h_l:M1_h->lm_h_new[label="bijective"  arrowhead =none color = "black:black" constraint=false ];
+    fr_i_l:M1_i->lm_i_new[label="bijective"  arrowhead =none color = "black:black" constraint=false ];
+    fr_j_l:M1_j->lm_j_new[label="bijective"  arrowhead =none color = "black:black" constraint=false ];
+    fr_h_r:kp_lm_ind:e->lm_h[label="bijective"  arrowhead =none color = "black:black" constraint=false ];
+    fr_i_r:kp_lm_ind:e->lm_i[label="bijective"  arrowhead =none color = "black:black" constraint=false ];
+    fr_j_r:kp_lm_ind:e->lm_j[label="bijective"  arrowhead =none color = "black:black" constraint=false ];
+    
  }
