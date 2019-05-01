@@ -24,11 +24,11 @@ digraph G {
 
   x0 -> l0 [style=dashed color=black]
 
-  x0 -> l1 [color=green]
-  x0 -> l2 [color=green]
+  x0 -> l1 [style=dashed color=black]
+  x0 -> l2 [style=dashed color=black]
 
-  x1 -> l1 [color=green]
-  x1 -> l2 [color=green]
+  x1 -> l1 [style=dashed color=blue]
+  x1 -> l2 [style=dashed color=blue]
 
   x1 -> l3 [style=dashed color=blue]
   x1 -> l4 [style=dashed color=blue]

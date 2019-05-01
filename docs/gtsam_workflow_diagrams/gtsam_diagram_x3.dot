@@ -24,23 +24,23 @@ digraph G {
 
   x0 -> l0 [style=dashed color=black]
 
-  x0 -> l1 [color=black]
+  x0 -> l1 [style=dashed color=black]
   x0 -> l2 [color=black]
 
-  x1 -> l1 [color=black]
+  x1 -> l1 [style=dashed color=black]
   x1 -> l2 [color=black]
 
-  x1 -> l3 [style=filled color=black]
-  x1 -> l4 [style=filled color=black]
+  x1 -> l3 [style=dashed color=black]
+  x1 -> l4 [color=green]
 
-  x2 -> l2 [style=filled color=black]
-  x2 -> l3 [style=filled color=black]
-  x2 -> l4 [style=filled color=black]
+  x2 -> l2 [color=black]
+  x2 -> l3 [style=dashed color=black]
+  x2 -> l4 [color=green]
 
-  x2 -> l5 [style=filled color=green]
+  x2 -> l5 [style=dashed color=black]
 
-  x3 -> l4 [style=filled color=red]
-  x3 -> l5 [style=filled color=green]
+  x3 -> l4 [color=green]
+  x3 -> l5 [style=dashed color=blue]
 
   x3 -> l6 [style=dashed color=blue]
   x3 -> l7 [style=dashed color=blue]
