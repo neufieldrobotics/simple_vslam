@@ -13,6 +13,7 @@ import logging
 from matplotlib import pyplot as plt
 from vslam_helper import *
 import pickle
+from colorama import Fore, Style
 
 class landmark():
     def __init__(self, fr_i_id,fr_j_id, kp_i_pt, kp_j_pt, coord_3d):
@@ -185,7 +186,7 @@ class Frame ():
         #Frame.fig1, Frame.ax1 = plt.subplots()
         Frame.fig1 = plt.figure(1)
         Frame.ax1 = Frame.fig1.add_subplot(111)
-        Frame.ax1.set_title('Image 1 to 2 matches')
+        Frame.ax1.set_title('Frame 1')
         Frame.ax1.axis("off")
         Frame.fig1.subplots_adjust(0,0,1,1)
         plt.get_current_fig_manager().window.setGeometry(window_xadj,window_yadj,640,338)
@@ -195,7 +196,7 @@ class Frame ():
         Frame.fig2.subplots_adjust(0,0,1,1)
         plt.get_current_fig_manager().window.setGeometry(640+window_xadj,window_yadj,640,676) #(864, 430, 800, 900)
         Frame.ax2.set_aspect('equal')         # important!
-        Frame.fig2.suptitle('Image 1 to 2 after triangulation')
+        Frame.fig2.suptitle('Frame 1')
         Frame.ax2.view_init(0, -90)
         
     @staticmethod
@@ -231,8 +232,8 @@ class Frame ():
         # case K = np.eye(3) since the points are normalized
         Proj_1Tw = Pose_1Tw[:3]
         Proj_2Tw = Pose_2Tw[:3]
-        Frame.frlog.debug("Proj_1Tw:\t"+str(Proj_1Tw).replace('\n','\n\t\t\t'))
-        Frame.frlog.debug("Proj_2Tw:\t"+str(Proj_2Tw).replace('\n','\n\t\t\t'))
+        #Frame.frlog.debug("Proj_1Tw:\t"+str(Proj_1Tw).replace('\n','\n\t\t\t'))
+        #Frame.frlog.debug("Proj_2Tw:\t"+str(Proj_2Tw).replace('\n','\n\t\t\t'))
         
         Pose_1T2 = Pose_1Tw @ Pose_wT2
         #trans_1T2 = Pose_1T2[:3,-1]
@@ -240,21 +241,17 @@ class Frame ():
         trans_wT1 = Pose_wT1[:3,-1]
         trans_wT2 = Pose_wT2[:3,-1]
                 
-        Frame.frlog.debug("No of points in pts_1: {}".format(pts_1.shape))
-        # Calculate points in 0,0,0 frame
         if mask is None:            
             pts_3d_world_hom = cv2.triangulatePoints(Proj_1Tw, Proj_2Tw, pts_1, pts_2).T
             mask = np.ones((pts_1.shape[0],1),dtype='uint8')
         else:
             pts_3d_world_hom = cv2.triangulatePoints(Proj_1Tw, Proj_2Tw, pts_1[mask==1], 
                                                   pts_2[mask==1]).T
-        Frame.frlog.debug("Shape of pts_3d_world_hom {}".format(pts_3d_world_hom.shape))
         # pts_3d_world_hom is a Nx4 array of non-nomalized homogenous coorinates
         # So we normalize them by dividing with last element of each row
         # [:, None] returns the last elements of each row as a Nx1 2D instead of a 1
         pts_3d_world_hom_norm = pts_3d_world_hom /  pts_3d_world_hom[:,-1][:,None]
-        
-        
+                
         pt_iter = 0
         rows_to_del = []
         
@@ -262,9 +259,7 @@ class Frame ():
         Z_THRESHOLD = Frame.config_dict["Triangulation_settings"]["z_threshold"]
         
         for i,mask_val in enumerate(mask):
-            if mask_val==1:
-                #Frame.frlog.debug("i: {} \t pt_iter: {}".format(i, pt_iter))                                                             
-                
+            if mask_val==1:                
                 # Find lm candidate point in 2nd Cameras frame
                 # Homogenous lm candidate in world frame
                 pt_wX_hom = pts_3d_world_hom_norm[pt_iter]
@@ -276,11 +271,11 @@ class Frame ():
                 beta = angle_between(pt_wX-trans_wT1,pt_wX-trans_wT2)
                 
                 # Calculate point parallax
-                kp1 = pts_1_2d[i] #pts_1[i,0,:]
-                kp2 = pts_2_2d[i] #pts_2[i,0,:]
-                parallax = np.linalg.norm(kp2-kp1)
+                #kp1 = pts_1_2d[i] #pts_1[i,0,:]
+                #kp2 = pts_2_2d[i] #pts_2[i,0,:]
+                #parallax = np.linalg.norm(kp2-kp1)
                                
-                dist = np.linalg.norm(pt_wX-trans_wT2)
+                #dist = np.linalg.norm(pt_wX-trans_wT2)
                 
                 # Make sure triangulated point is in front of 2nd frame
                 # checks the z_threshold threshold after triangulation and create a mask
@@ -298,9 +293,8 @@ class Frame ():
                 pt_iter +=1
         
         pts_3d_world_hom_norm = np.delete(pts_3d_world_hom_norm,rows_to_del,axis=0)
-        # Move 3d points to world frame by transforming with Pose_wT1
         pts_3d_world = pts_3d_world_hom_norm[:, :3]
-        return pts_3d_world, mask   
+        return pts_3d_world, mask
   
     @staticmethod
     def match_and_propagate_keypoints(fr_i, fr_j, initialization=False):
@@ -333,7 +327,7 @@ class Frame ():
             
         matches_cand = knn_match_and_lowe_ratio_filter(Frame.matcher, des_i_cand, fr_j.des,
                                                        Frame.config_dict['lowe_ratio_test_threshold'])
-        Frame.frlog.debug("Found matches for {} prev candidates out of {}".format(len(matches_cand),len(des_i_cand)))
+        dbg_str = "Found {} / {} prev candidates".format(len(matches_cand),len(des_i_cand))
             
         l_i = []    
         l_j = []    
@@ -348,8 +342,8 @@ class Frame ():
         
         fr_j.kp_m_prev_cand_ind = np.array(l_j)
         
-        Frame.frlog.debug("No of fr_i.kp_cand_ind: {}, fr_j.kp_m_prev_cand_ind: {}".format(
-                           len(fr_i.kp_cand_ind),len(fr_j.kp_m_prev_cand_ind)))
+        #Frame.frlog.debug("No of fr_i.kp_cand_ind: {}, fr_j.kp_m_prev_cand_ind: {}".format(
+        #                   len(fr_i.kp_cand_ind),len(fr_j.kp_m_prev_cand_ind)))
     
         #matches for features which were previously tracked and had landmarks
         if not initialization:
@@ -358,7 +352,8 @@ class Frame ():
             matches_lm = knn_match_and_lowe_ratio_filter(Frame.matcher, des_i_lm, fr_j.des, 
                                                          Frame.config_dict['lowe_ratio_test_threshold'])
             
-            Frame.frlog.debug("Found matches for {} existing landmarks out of {}".format(len(matches_lm),len(des_i_lm)))
+            
+            dbg_str += "\t{} / {} existing landmarks".format(len(matches_lm),len(des_i_lm))
             l_i = []    
             l_j = []
             for m in matches_lm:
@@ -369,9 +364,10 @@ class Frame ():
                                                    # this has to be done this way since des_i_lm is a subset of fr1.des
             fr_i.lm_ind = fr_i.lm_ind[l_i]
             fr_j.kp_m_prev_lm_ind = np.array(l_j)      # fr_j.des is the full list, so m.train gives us index into fr_j.kp
-            
-            Frame.frlog.debug("No of fr_i.kp_lm_ind: {}, fr_i.lm_ind: {}, fr_j.kp_m_prev_lm_ind: {}".format(
-                              len(fr_i.kp_lm_ind),len(fr_i.lm_ind),len(fr_j.kp_m_prev_lm_ind)))     
+        
+        Frame.frlog.info(dbg_str)
+            #Frame.frlog.debug("No of fr_i.kp_lm_ind: {}, fr_i.lm_ind: {}, fr_j.kp_m_prev_lm_ind: {}".format(
+            #                  len(fr_i.kp_lm_ind),len(fr_i.lm_ind),len(fr_j.kp_m_prev_lm_ind)))     
         
     @staticmethod
     def combine_and_filter(fr_i, fr_j):
@@ -405,21 +401,22 @@ class Frame ():
         E, mask_e_all = cv2.findEssentialMat(kp_i_all_ud, kp_j_all_ud, 
                                              focal=1.0, pp=(0., 0.), 
                                              method=cv2.RANSAC, **Frame.config_dict['findEssential_settings'])
-        Frame.frlog.debug("Time to perform essential mat filter: {:.4f}".format(time.time()-essmat_time))
+        Frame.frlog.info("Time to perform essential mat filter: {:.4f}".format(time.time()-essmat_time))
 
         essen_mat_pts = np.sum(mask_e_all)  
         
-        Frame.frlog.debug("Essential matrix: used {} of total {} matches".format(essen_mat_pts,len(kp_j_all_ud)))
+        dbg_str = "Total -> Ess matrix : {} -> {}".format(len(kp_j_all_ud),essen_mat_pts)
         
         # getting the second mask for filtering using recover pose
         
         if Frame.config_dict['use_RecoverPose_Filter']:
             # Recover Pose filtering is breaking under certain conditions. Leave out for now.
             _, _, _, mask_RP_all = cv2.recoverPose(E, kp_i_all_ud, kp_j_all_ud, mask=mask_e_all)
-            Frame.frlog.info("Recover pose: used {} of total {} matches".format(np.sum(mask_RP_all),essen_mat_pts))
+            dbg_str += "\t Rec pose: {} -> {}".format(essen_mat_pts,np.sum(mask_RP_all))
         else: 
             mask_RP_all = mask_e_all
         
+        Frame.frlog.info(dbg_str)
         # Split the combined mask to lm feature mask and candidate mask
         mask_RP_lm = mask_RP_all[:num_landmarks]
         mask_RP_cand = mask_RP_all[-num_cand:]
@@ -433,8 +430,8 @@ class Frame ():
         
         fr_i.lm_ind = fr_i.lm_ind[mask_RP_lm[:,0].astype(bool)]
 
-        Frame.frlog.debug("Essential matrix and RP filtered {} landmarks out of {}".format(np.sum(mask_RP_lm),num_landmarks))
-        Frame.frlog.debug("Essential matrix and RP filtered {} candidates out of {}".format(np.sum(mask_RP_cand),num_cand))
+        Frame.frlog.info("Ess mat and RP filt: {} / {} landmarks and {} / {} candidates".format(np.sum(mask_RP_lm),
+                                        num_landmarks, np.sum(mask_RP_cand), num_cand))
     
     @staticmethod
     def save_frame(fr_obj, file_name):
@@ -564,9 +561,7 @@ class Frame ():
         fr2.kp_m_prev_cand_ind  = fr2.kp_m_prev_cand_ind[mask_tri_12[:,0].astype(bool)]
         kp1_m_cand_pt_ud = kp1_m_cand_pt_ud[mask_tri_12[:,0].astype(bool)]
         kp2_m_cand_pt_ud = kp2_m_cand_pt_ud[mask_tri_12[:,0].astype(bool)]
-        
-        print(kp2_m_cand_pt_ud)
-        
+                
         ### Add new landmarks to landmark array
         lm_list = []
         for (i,coord) in enumerate(landmarks_12):
@@ -660,7 +655,7 @@ class Frame ():
             Frame.frlog.critical("PNP failed in frame {}. Exiting...".format(fr_j.frame_id))
             exit()
             
-        Frame.frlog.info("PNP inliers: {}  of {}".format(np.sum(mask_pnp),len(fr_i.lm_ind)))
+        Frame.frlog.info((Fore.GREEN+"PNP inliers: {} / {} : {:.1f} %"+Style.RESET_ALL).format(np.sum(mask_pnp),len(fr_i.lm_ind),np.sum(mask_pnp)/len(fr_i.lm_ind)*100))
         Frame.frlog.info("PNP_Pose:\t"+str(fr_j.T_pnp[:3,:]).replace('\n','\n\t\t\t'))
         
         plot_pose3_on_axes(Frame.ax2, fr_j.T_pnp, axis_length=2.0, center_plot=True, line_obj_list=Frame.cam_pose)
@@ -694,7 +689,7 @@ class Frame ():
         Frame.frlog.debug("Time elapsed in triangulate: {:.4f}".format(time.time()-time_start)) 
         time_start = time.time()
     
-        Frame.frlog.debug("Points retained after triangulation: {} out of length: {}".format(np.sum(mask_tri),len(mask_tri)))
+        Frame.frlog.info("Points triangulated: {} / {}".format(np.sum(mask_tri),len(mask_tri)))
         
         #if len(kp_prev_cand)>0:
         img_rej_pts = draw_point_tracks(fr_i.kp[fr_i.kp_cand_ind], 
@@ -724,6 +719,7 @@ class Frame ():
         plot_3d_points(Frame.ax2, lm_j_new, line_obj=Frame.lm_plot_handle, 
                        linestyle="", color='g', marker=".", markersize=2)
         
+        Frame.fig2.suptitle('Frame {}'.format(fr_j.frame_id))
         Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)
         #input("Enter to continue")
 
@@ -755,16 +751,12 @@ class Frame ():
         #lm_obs_count_new = np.ones(num_new_landmarks,dtype=np.int8) * 2
         #Frame.lm_obs_count = np.concatenate((Frame.lm_obs_count, lm_obs_count_new))
        
-        #print("length of landmark array:",len(Frame.landmarks))
-        #print("length of lm_ind:",len(fr_j.lm_ind))
-        # partition kp_m into two sets
-        
+        # partition kp_m into two sets        
         fr_j.partition_kp_cand()
-        Frame.frlog.debug(" {}".format(len(fr_j.kp_cand_ind)))
         img_cand_pts = draw_points(img_rej_pts,fr_j.kp[fr_j.kp_cand_ind], 
                                   color=[255,255,0])
         Frame.fig_frame_image.set_data(img_cand_pts)
-
+        Frame.ax1.set_title('Frame {}'.format(fr_j.frame_id))
         Frame.fig1.canvas.draw_idle(); #plt.pause(0.01)
                       
         Frame.fig1.canvas.start_event_loop(0.001)

@@ -19,7 +19,7 @@ from zernike.zernike import MultiHarrisZernike
 from helper_functions.frame import Frame
 np.set_printoptions(precision=5,suppress=True)
 import multiprocessing as mp
-from colorama import Fore, Style
+from colorama import Fore, Back, Style
 from itertools import cycle
 import logging
 import copyreg
@@ -33,7 +33,7 @@ PROCESS FRAME
 '''
 global vslog
 vslog = logging.getLogger('VSLAM')
-logging.basicConfig(level=logging.DEBUG,
+logging.basicConfig(level=logging.INFO,
                     format='%(levelname)8s  %(message)s')
 mpl_logger = logging.getLogger('matplotlib') 
 mpl_logger.setLevel(logging.WARNING) 
@@ -70,7 +70,7 @@ def writer(imgnames, masknames, config_dict, queue):
     os.makedirs(temp_obj_folder, exist_ok=True)
     
     vslog.info("K: \t"+str(Frame.K).replace('\n','\n\t\t'))
-    vslog.info("D: \t"+str(Frame.D))
+    vslog.info("D: \t"+str(Frame.D.T))
         
     if USE_CLAHE:
         Frame.clahe_obj = cv2.createCLAHE(**config_dict['CLAHE_settings'])
@@ -209,26 +209,9 @@ if __name__ == '__main__':
     factor_graph = iSAM2Wrapper(pose0=np.eye(4), K=np.eye(3), **config_dict['iSAM2_settings'])    
     factor_graph.add_PoseEstimate(fr2.frame_id, fr2.T_pnp)      
     
-    '''
-    factor_graph.add_keyframe_factors(frame_queue, initialization=True)
-
-    factor_graph.update(2)
-    current_estimate = factor_graph.get_Estimate()
-    corr_landmarks = factor_graph.get_landmark_estimates()
-    mean_correction = np.mean(np.linalg.norm(corr_landmarks - Frame.landmarks,axis=1))
-    max_correction = np.max(np.linalg.norm(corr_landmarks - Frame.landmarks,axis=1))
-    Frame.frlog.debug("Mean correction in lm:{:.3f} max correction in lm:{:.3f}".format(mean_correction,max_correction))
-    Frame.landmarks = corr_landmarks
-    fr2.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr2.frame_id)
-    trans_correction = np.linalg.norm(fr2.T_gtsam[:3,-1]-fr2.T_gtsam[:3,-1])
-    rot_correction = rotation_distance(fr2.T_gtsam[:3,:3], fr2.T_pnp[:3,:3])
-    Frame.frlog.debug("Translation correction with GTSAM:{:.5f} rotation angle correction with GTSAM:{:.4f} deg".format(trans_correction,rot_correction))
-    
-    input("Enter to continue...")
-    '''
     plt.pause(0.001)
     
-    Frame.frlog.info(Fore.GREEN+"\tFRAME 1 COMPLETE\n"+Style.RESET_ALL)
+    Frame.frlog.info(Fore.GREEN + Back.BLUE +"\tFRAME 1 COMPLETE\n"+Style.RESET_ALL)
     
     fr_prev = fr2
 
@@ -239,7 +222,10 @@ if __name__ == '__main__':
     flag = False
     while True:
         if not mpqueue.empty():
-            if cue_to_exit: vslog.info("EXITING!!!"); raise SystemExit(0)
+            if cue_to_exit: 
+                vslog.info("EXITING!!!")
+                plt.close('all')
+                raise SystemExit(0)
             
             ft = time.time()
             
@@ -258,25 +244,27 @@ if __name__ == '__main__':
             
             factor_graph.add_keyframe_factors(fr_curr)
                         
-            factor_graph.update(2)
+            factor_graph.update(3)
             
             fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)  
-            current_estimate = factor_graph.get_Estimate()
+            #current_estimate = factor_graph.get_Estimate()
             corr_landmarks, gtsam_lm_ids = factor_graph.get_landmark_estimates()
+            
             mean_correction = np.mean(np.linalg.norm(corr_landmarks - Frame.landmarks[gtsam_lm_ids],axis=1))
             max_correction = np.max(np.linalg.norm(corr_landmarks - Frame.landmarks[gtsam_lm_ids],axis=1))
-            Frame.frlog.debug("Mean correction in lm:{:.3f} max correction in lm:{:.3f}".format(mean_correction,max_correction))
-            #Frame.landmarks[gtsam_lm_ids] = corr_landmarks
+            Frame.frlog.info("GTAM Landmark correction: Mean: {:.3f} Max: {:.3f}".format(mean_correction,max_correction))
+            
+            Frame.landmarks[gtsam_lm_ids] = corr_landmarks
             trans_correction = np.linalg.norm(fr_curr.T_gtsam[:3,-1]-fr_curr.T_gtsam[:3,-1])
             rot_correction = rotation_distance(fr_curr.T_gtsam[:3,:3], fr_curr.T_pnp[:3,:3])
-            Frame.frlog.debug("Translation correction with GTSAM:{:.5f} rotation angle correction with GTSAM:{:.4f} deg".format(trans_correction,rot_correction))
-            Frame.frlog.debug("Time elapsed in iSAM optimization: {:.4f}".format(time.time()-ft))
+            Frame.frlog.info("GTSAM correction: Trans: {:.5f} rot angle: {:.4f} deg".format(trans_correction,rot_correction))
+            Frame.frlog.info("Time elapsed in iSAM optimization: {:.4f}".format(time.time()-ft))
             
             #input("Enter to continue...")
   
             Frame.frlog.debug(Fore.RED+"Time to process last frame: {:.4f}".format(time.time()-st)+Style.RESET_ALL)
             Frame.frlog.debug(Fore.RED+"Time in the function: {:.4f}".format(time.time()-ft)+Style.RESET_ALL)
-            Frame.frlog.info(Fore.GREEN+"\tFRAME seq {} COMPLETE \n".format(fr_curr.frame_id)+Style.RESET_ALL)
+            Frame.frlog.info(Fore.GREEN + Back.BLUE + "\tFRAME seq {} COMPLETE \n".format(fr_curr.frame_id)+Style.RESET_ALL)
             
             st = time.time()
             
@@ -291,7 +279,7 @@ if __name__ == '__main__':
                 if cue_to_exit: 
                     flag = True
                     break
-                time.sleep(0.1)
+                time.sleep(0.2)
             
             i+= 1
         else: time.sleep(0.2)            
@@ -299,6 +287,6 @@ if __name__ == '__main__':
     writer_p.join()
     while(True):   
         print('\b'+next(spinner), end='', flush=True)
-        #plt.pause(0.5)
+        plt.pause(0.5)
         if cue_to_exit: break
     plt.close(fig='all')
