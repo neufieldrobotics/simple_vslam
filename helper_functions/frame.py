@@ -59,7 +59,7 @@ class Frame ():
     clahe_obj = None                      # Contrast Limited Adaptive Histogram Equalization object if being used
     detector = None                       # Feature detector object being used
     matcher = None                        # Matcher object being used
-    config_dict = None                    # Dictionary containing all the required configuration settings
+    config_dict = {}                      # Dictionary containing all the required configuration settings
     is_config_set = False                 # Flag to make sure user is setting all the required config
 
     # Visualization
@@ -84,7 +84,9 @@ class Frame ():
         self.frame_id = Frame.last_id   # unique id for frame, required for gtsam
         self.mask    = None             # mask for the image
         self.kp_obj = None              # List of keypoint objects calc by Feature Extractor
-        self.kp = None                  # Keypoint coordinates as N x 2 array  (flat32)
+        self.kp = None                  # Keypoint coordinates as N x 2 array  (floatt32)
+        self.kp_ud = None               # Keypoint undistorted coordinates as N x 2 array  (flat32) (NOT NOMALIZED)
+        self.kp_ud_norm = None          # Keypoint normalized undistorted coordinates as N x 2 array  (flat32)
         self.des = None                 # Feature descriptor array of N x (des_length) (Float32) 
 
         # Variables forwarded to the next frame
@@ -140,7 +142,14 @@ class Frame ():
         '''
         
         self.kp = cv2.KeyPoint_convert(self.kp_objs)
-        pbf = "New feature candidates detected: "+str(len(self.kp))
+        self.kp_ud = cv2.undistortPoints(np.expand_dims(self.kp,1), 
+                                         Frame.K, 
+                                         Frame.D, 
+                                         P=np.hstack((Frame.K,np.zeros((3,1)))))[:,0,:]
+        self.kp_ud_norm = cv2.undistortPoints(np.expand_dims(self.kp,1), 
+                                              Frame.K, 
+                                              Frame.D)[:,0,:]
+        pbf = "New feature candidates detected: " + str(len(self.kp))
         Frame.frlog.debug("Image Pre-processing time is {:.4f}".format(time.time()-pt))
         Frame.frlog.debug(pbf)
     

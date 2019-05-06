@@ -5,13 +5,14 @@ Created on Fri Mar 22 22:52:23 2019
 
 @author: vik748
 """
-from zernike import MultiHarrisZernike
-import sys
+import sys, os
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
 import cv2
 import time
 from matplotlib import pyplot as plt
 import numpy as np
 #from vslam_helper import *
+from zernike.zernike import MultiHarrisZernike
 
 
 def knn_match_and_filter(matcher, kp1, kp2, des1, des2,threshold=0.9):

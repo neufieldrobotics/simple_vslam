@@ -345,6 +345,7 @@ def knn_match_and_lowe_ratio_filter(matcher, des1, des2,threshold=0.9):
                 mask[match[0].trainIdx,match[0].queryIdx] = 1
     
     # run matches again using mask but from 1 to 2 which should remove duplicates            
+    # This is basically same as running cross match after lowe ratio test
     matches_cross = matcher.match(des1,des2,mask=mask)
     
     return matches_cross
