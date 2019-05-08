@@ -56,6 +56,7 @@ def writer(imgnames, masknames, config_dict, queue):
     USE_MASKS = config_dict['use_masks']
     USE_CLAHE = config_dict['use_clahe']
     ZERNIKE_settings = config_dict['ZERNIKE_settings']
+    USE_CACHING = False
     #RADIAL_NON_MAX = config_dict['radial_non_max']
     
     #detector = cv2.ORB_create(**config_dict['ORB_settings'])
@@ -92,7 +93,7 @@ def writer(imgnames, masknames, config_dict, queue):
     try:
         for i in range(len(imgnames)):
             frame_obj_filename = temp_obj_folder+'/'+imgnames[i].split('/')[-1]+'.pkl'
-            if os.path.isfile(frame_obj_filename):
+            if os.path.isfile(frame_obj_filename) and USE_CACHING:
                 vslog.debug(Fore.GREEN+"File exisits, reusing ..."+Style.RESET_ALL)
                 fr = Frame.load_frame(frame_obj_filename)
                 Frame.last_id += 1                
@@ -107,7 +108,7 @@ def writer(imgnames, masknames, config_dict, queue):
                 else: 
                     fr = Frame(imgnames[i])
                 queue.put(fr)
-                Frame.save_frame(fr, frame_obj_filename)
+                if USE_CACHING: Frame.save_frame(fr, frame_obj_filename)
             
     except KeyboardInterrupt:
         vslog.critical("Keyboard interrupt from me")
@@ -135,6 +136,9 @@ if __name__ == '__main__':
     img_step = config_dict['image_step']
     PLOT_LANDMARKS = config_dict['plot_landmarks']
     findEssential_set = config_dict['findEssential_settings']
+    PAUSES = config_dict['pause_every_iteration']
+    USE_GTSAM = config_dict['use_gtsam']
+
     
     if sys.platform == 'darwin':
         image_folder = config_dict['osx_image_folder']
@@ -148,7 +152,6 @@ if __name__ == '__main__':
         window_xadj = 65
         window_yadj = 430
 
-    PAUSES = False
     FILTER_RP = False
     paused = False
     cue_to_exit = False
@@ -170,12 +173,15 @@ if __name__ == '__main__':
         masks = None     
     
     def onKey(event):
-        global paused, cue_to_exit
+        global paused, cue_to_exit, PAUSES
         #print('you pressed', event.key, event.xdata, event.ydata)
         if event.key==" ":
             paused = not paused
         if event.key=="q":
             cue_to_exit = True
+        if event.key=="p":
+            PAUSES = not PAUSES
+            paused = not paused
     
     # Configure settings for Frame object
     Frame.K = np.array(config_dict['K'])
@@ -242,33 +248,36 @@ if __name__ == '__main__':
 
             ft = time.time()
             
-            factor_graph.add_keyframe_factors(fr_curr)
-                        
-            factor_graph.update(3)
-            
-            fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)  
-            #current_estimate = factor_graph.get_Estimate()
-            corr_landmarks, gtsam_lm_ids = factor_graph.get_landmark_estimates()
-            
-            mean_correction = np.mean(np.linalg.norm(corr_landmarks - Frame.landmarks[gtsam_lm_ids],axis=1))
-            max_correction = np.max(np.linalg.norm(corr_landmarks - Frame.landmarks[gtsam_lm_ids],axis=1))
-            Frame.frlog.info("GTAM Landmark correction: Mean: {:.3f} Max: {:.3f}".format(mean_correction,max_correction))
-            
-            Frame.landmarks[gtsam_lm_ids] = corr_landmarks
-            trans_correction = np.linalg.norm(fr_curr.T_gtsam[:3,-1]-fr_curr.T_gtsam[:3,-1])
-            rot_correction = rotation_distance(fr_curr.T_gtsam[:3,:3], fr_curr.T_pnp[:3,:3])
-            Frame.frlog.info("GTSAM correction: Trans: {:.5f} rot angle: {:.4f} deg".format(trans_correction,rot_correction))
-            Frame.frlog.info("Time elapsed in iSAM optimization: {:.4f}".format(time.time()-ft))
-            
-            #input("Enter to continue...")
-  
+            if USE_GTSAM:
+                factor_graph.add_keyframe_factors(fr_curr)
+                            
+                factor_graph.update(3)
+                
+                fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)  
+                #current_estimate = factor_graph.get_Estimate()
+                corr_landmarks, gtsam_lm_ids = factor_graph.get_landmark_estimates()
+                
+                mean_correction = np.mean(np.linalg.norm(corr_landmarks - Frame.landmarks[gtsam_lm_ids],axis=1))
+                max_correction = np.max(np.linalg.norm(corr_landmarks - Frame.landmarks[gtsam_lm_ids],axis=1))
+                Frame.frlog.info("GTAM Landmark correction: Mean: {:.3f} Max: {:.3f}".format(mean_correction,max_correction))
+                
+                Frame.landmarks[gtsam_lm_ids] = corr_landmarks
+                trans_correction = np.linalg.norm(fr_curr.T_gtsam[:3,-1]-fr_curr.T_gtsam[:3,-1])
+                rot_correction = rotation_distance(fr_curr.T_gtsam[:3,:3], fr_curr.T_pnp[:3,:3])
+                Frame.frlog.info("GTSAM correction: Trans: {:.5f} rot angle: {:.4f} deg".format(trans_correction,rot_correction))
+                Frame.frlog.info("Time elapsed in iSAM optimization: {:.4f}".format(time.time()-ft))
+                  
             Frame.frlog.debug(Fore.RED+"Time to process last frame: {:.4f}".format(time.time()-st)+Style.RESET_ALL)
             Frame.frlog.debug(Fore.RED+"Time in the function: {:.4f}".format(time.time()-ft)+Style.RESET_ALL)
             Frame.frlog.info(Fore.GREEN + Back.BLUE + "\tFRAME seq {} COMPLETE \n".format(fr_curr.frame_id)+Style.RESET_ALL)
             
+            
+            
             st = time.time()
             
             fr_prev=fr_curr
+            
+            if PAUSES: paused=True
 
             while(paused):   
                 print('\b'+next(spinner), end='', flush=True)

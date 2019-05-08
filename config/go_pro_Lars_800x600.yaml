@@ -11,16 +11,16 @@ K:
 D: 
 - [-2.78089511e-01,  1.30037134e-01, -1.17555797e-04, -1.55337290e-04, -4.34486330e-02]
 
-osx_image_folder: '/Users/vik748/Google Drive/data/time_lapse_5_cervino_800x600'
-linux_image_folder: '/home/vik748/data/time_lapse_5_cervino_800x600'
+osx_image_folder: '/Users/vik748/Google Drive/data/Lars2_081018_800x600'
+linux_image_folder: '/home/vik748/data/Lars2_081018_800x600'
 image_ext: 'png'
 chessboard: False
-init_image_indxs: [1054, 1064] #[1204, 1214] [1054, 1064]
-image_step: 2
-use_masks: True
+init_image_indxs: [100, 110]  #[1215, 1225] 
+image_step: 5
+use_masks: False
 plot_landmarks: True
-osx_masks_folder: '/Users/vik748/Google Drive/data/time_lapse_5_cervino_800x600_masks_out'
-linux_masks_folder: '/home/vik748/data/time_lapse_5_cervino_800x600_masks_out'
+osx_masks_folder: '/Users/vik748/Google Drive/data/Lars2_081018_800x600_masks_out'
+linux_masks_folder: '/home/vik748/data/Lars2_081018_800x600_masks_out'
 masks_ext: 'png'
 lowe_ratio_test_threshold: 0.85
 use_RecoverPose_Filter: False
@@ -41,7 +41,7 @@ CLAHE_settings:
 
 Triangulation_settings:
  z_threshold: 60 # In units set by frame 1 and 2
- subtended_angle_threshold: 0.25 # In degrees
+ subtended_angle_threshold: .75 # In degrees
 
 findEssential_settings:
  prob: 0.9999
@@ -54,8 +54,8 @@ solvePnPRansac_settings:
 
 ZERNIKE_settings:
  Nfeats: 2400
- seci: 4 
- secj: 3
+ seci: 8 
+ secj: 6
  levels: 6
  ratio: 0.75
  sigi: 2.75

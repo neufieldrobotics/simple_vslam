@@ -29,6 +29,8 @@ use_masks: False
 use_clahe: False
 lowe_ratio_test_threshold: 0.9
 use_RecoverPose_Filter: True
+pause_every_iteration: False
+use_gtsam: True
 
 Triangulation_settings:
  z_threshold: 60 # In units set by frame 1 and 2

@@ -117,7 +117,7 @@ class Frame ():
         if not Frame.is_config_set:
             raise ValueError('All required class config not set')
         
-        Frame.frlog.debug("Pre-processing image: "+image_name)
+        Frame.frlog.info("Pre-processing image: "+image_name)
 
         pt = time.time()
     
@@ -198,15 +198,17 @@ class Frame ():
         Frame.ax1.set_title('Frame 1')
         Frame.ax1.axis("off")
         Frame.fig1.subplots_adjust(0,0,1,1)
-        plt.get_current_fig_manager().window.setGeometry(window_xadj,window_yadj,640,338)
+        plt.get_current_fig_manager().window.setGeometry(window_xadj,window_yadj,1036,842)
         
         Frame.fig2 = plt.figure(2)
         Frame.ax2 = Frame.fig2.add_subplot(111, projection='3d')
         Frame.fig2.subplots_adjust(0,0,1,1)
-        plt.get_current_fig_manager().window.setGeometry(640+window_xadj,window_yadj,640,676) #(864, 430, 800, 900)
+        plt.get_current_fig_manager().window.setGeometry(1036+window_xadj,window_yadj,640,676) #(864, 430, 800, 900)
         Frame.ax2.set_aspect('equal')         # important!
         Frame.fig2.suptitle('Frame 1')
+        plt.figtext(0.1,0.05, "Press: s - Toggle Pause, p - Toggle Pause after every frame, q - quit", figure = Frame.fig2)
         Frame.ax2.view_init(0, -90)
+        
         
     @staticmethod
     def triangulate(Pose_wT1, Pose_wT2,  pts_1_2d, pts_2_2d, mask):
