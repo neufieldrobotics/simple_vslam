@@ -12,7 +12,7 @@ The following python packages are required to run this code:
 
 The code has been tested with the following conda environment:
 ```sh
-conda create -n simple_vslam_env python=3.5 opencv=3.3.1 matplotlib numpy scipy pyyaml colorama
+conda create -n simple_vslam_env python=3.5 opencv=3.3.1 matplotlib numpy scipy pyyaml colorama progressbar2
 conda activate simple_vslam_env
 ```
 ## Installation
@@ -20,10 +20,20 @@ conda activate simple_vslam_env
 git clone --recurse-submodules https://gitlab.com/neu-mit-lfi/simple_vslam.git
 cd simple_vslam
 git checkout zernike_gtsam
+
+# To checkout a particular 'tag' eg. v0.2.0 run:
+git checkout v0.2.0
 ```
 
+## Some important versions:
+  - v0.1.0: Basic GTSAM incormporated
+  - v0.2.0: Cleaned up and configured to use with Iceberg datasets, use -c config_file flag for appropriate config file. 
+
 ## Get test data
-You can download a subset of the Kitti dataset to test this package from http://rpg.ifi.uzh.ch/docs/teaching/2016/kitti00.zip  Unzip and save it to a convenient location like `~/data`
+Test datasets, Unzip and save it to a convenient location like `~/data`: 
+  - http://rpg.ifi.uzh.ch/docs/teaching/2016/kitti00.zip  
+  - Lars dataset: deepfreeze1 > /data/datasets_for_algorithms/2018_iceberg_datasets/Lars2_081018_800x600.zip
+  - Cervino dataset: deepfreeze1 > /data/datasets_for_algorithms/2018_iceberg_datasets/time_lapse_5_cervino_800x600.zip
 
 ## Executing the package
 Edit a config file to point it to an image folder eg.
