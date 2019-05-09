@@ -139,6 +139,12 @@ class Frame ():
         if rnm_radius is not None:
             kp = radial_non_max(kp,rnm_radius)
             pbf += " > radial supression: "+str(len(kp))
+            
+        # Display translucent mask on image.
+        # if mask_j is not None:
+        #    gr_j_masked = cv2.addWeighted(mask_j, 0.2, gr_j, 1 - 0.2, 0)
+        # else: gr_j_masked = gr_j
+
         '''
         
         self.kp = cv2.KeyPoint_convert(self.kp_objs)
@@ -501,20 +507,17 @@ class Frame ():
 
         Frame.match_and_propagate_keypoints(fr1,fr2,initialization=True)
         
-        kp1_cand_pt_ud = cv2.undistortPoints(np.expand_dims(fr1.kp[fr1.kp_cand_ind],1), Frame.K, Frame.D)[:,0,:]
-        kp2_m_prev_cand_pt_ud = cv2.undistortPoints(np.expand_dims(fr2.kp[fr2.kp_m_prev_cand_ind],1), Frame.K, Frame.D)[:,0,:]
-       
-        E_12, mask_e_12 = cv2.findEssentialMat(kp1_cand_pt_ud, 
-                                               kp2_m_prev_cand_pt_ud,
+        E_12, mask_e_12 = cv2.findEssentialMat(fr1.kp_ud_norm[fr1.kp_cand_ind], 
+                                               fr2.kp_ud_norm[fr2.kp_m_prev_cand_ind],
                                                focal=1.0, pp=(0., 0.), method=cv2.RANSAC, 
                                                **Frame.config_dict['findEssential_settings'])
         
-        Frame.frlog.info("Essential matrix: used {} of total {} matches".format(np.sum(mask_e_12),len(kp2_m_prev_cand_pt_ud)))
+        Frame.frlog.info("Essential matrix: used {} of total {} matches".format(np.sum(mask_e_12),len(fr2.kp_m_prev_cand_ind)))
         essen_mat_pts = np.sum(mask_e_12)
         
         points, rot_2R1, trans_2t1, mask_RP_12 = cv2.recoverPose(E_12, 
-                                                                 kp1_cand_pt_ud, 
-                                                                 kp2_m_prev_cand_pt_ud,
+                                                                 fr1.kp_ud_norm[fr1.kp_cand_ind], 
+                                                                 fr2.kp_ud_norm[fr2.kp_m_prev_cand_ind],
                                                                  mask=mask_e_12)
         
         # b. Computing pose from Essential matrix between fr1 and fr2
@@ -530,8 +533,6 @@ class Frame ():
                                   mask_RP_12[:,0].astype(bool), False, color=[255,255,0])
         
         Frame.fig_frame_image = Frame.ax1.imshow(img12)
-        #plt.draw()
-        #plt.pause(0.01)
         
         plot_pose3_on_axes(Frame.ax2,np.eye(4), axis_length=0.5)
         Frame.cam_pose = plot_pose3_on_axes(Frame.ax2, pose_1T2, axis_length=1.0)
@@ -544,19 +545,12 @@ class Frame ():
         fr1.kp_cand_ind         = fr1.kp_cand_ind[mask_RP_12[:,0].astype(bool)]
         fr2.kp_m_prev_cand_ind  = fr2.kp_m_prev_cand_ind[mask_RP_12[:,0].astype(bool)]
         
-        # d. Triangulate landmarks using matched keypoints        
-        kp1_m_cand_pt_ud = cv2.undistortPoints(np.expand_dims(fr1.kp[fr1.kp_cand_ind],1),
-                                                             Frame.K, Frame.D)[:,0,:]
-        kp2_m_cand_pt_ud = cv2.undistortPoints(np.expand_dims(fr2.kp[fr2.kp_m_prev_cand_ind],1),
-                                                             Frame.K, Frame.D)[:,0,:]
-        
+        # d. Triangulate landmarks using matched keypoints    
         landmarks_12, mask_tri_12 = Frame.triangulate(np.eye(4), pose_1T2, 
-                                                      kp1_m_cand_pt_ud, 
-                                                      kp2_m_cand_pt_ud, 
+                                                      fr1.kp_ud_norm[fr1.kp_cand_ind], 
+                                                      fr2.kp_ud_norm[fr2.kp_m_prev_cand_ind], 
                                                       None)
         Frame.landmarks = landmarks_12
-        #Frame.lm_obs_count = np.ones(len(Frame.landmarks),dtype=np.int8) * 2
-        
         
         Frame.frlog.info("Triangulation used {} of total matches {} matches".format(np.sum(mask_tri_12),len(mask_tri_12)))
     
@@ -567,16 +561,16 @@ class Frame ():
         #input("Press [enter] to continue.\n")
         #Frame.lm_plot_handle.remove()
 
-        #kp2_match_12, des2_m = trim_using_mask(mask_tri_12, kp2_match_12, des2_m)
         fr1.kp_cand_ind         = fr1.kp_cand_ind[mask_tri_12[:,0].astype(bool)]
         fr2.kp_m_prev_cand_ind  = fr2.kp_m_prev_cand_ind[mask_tri_12[:,0].astype(bool)]
-        kp1_m_cand_pt_ud = kp1_m_cand_pt_ud[mask_tri_12[:,0].astype(bool)]
-        kp2_m_cand_pt_ud = kp2_m_cand_pt_ud[mask_tri_12[:,0].astype(bool)]
                 
         ### Add new landmarks to landmark array
         lm_list = []
         for (i,coord) in enumerate(landmarks_12):
-            lm_list.append(landmark(fr1.frame_id,fr2.frame_id, kp1_m_cand_pt_ud[[i]], kp2_m_cand_pt_ud[[i]], coord[None]))
+            lm_list.append(landmark(fr1.frame_id,fr2.frame_id, 
+                                    fr1.kp_ud_norm[fr1.kp_cand_ind][[i]], 
+                                    fr2.kp_ud_norm[fr2.kp_m_prev_cand_ind][[i]], 
+                                    coord[None]))
         Frame.landmark_array=np.array(lm_list)
 
         fr2.partition_kp_cand()
@@ -629,73 +623,56 @@ class Frame ():
 
         
         time_start = time.time()
-        # Display translucent mask on image.
-        # if mask_j is not None:
-        #    gr_j_masked = cv2.addWeighted(mask_j, 0.2, gr_j, 1 - 0.2, 0)
-        # else: gr_j_masked = gr_j
-
         # Display landmarks carried from previous frame        
         img_track_lm = draw_point_tracks(fr_i.kp[fr_i.kp_lm_ind],
                                          fr_j.gr,
                                          fr_j.kp[fr_j.kp_m_prev_lm_ind],
                                          None, False)
         
-        # Display candidates carred from previous frame
+        # Display candidates carried from previous frame
         img_track_all = draw_point_tracks(fr_i.kp[fr_i.kp_cand_ind],
                                           img_track_lm,
                                           fr_j.kp[fr_j.kp_m_prev_cand_ind],
                                           None, False, color=[255,255,0])
         
         Frame.fig_frame_image.set_data(img_track_all)
-        #Frame.fig1.canvas.draw_idle(); plt.pause(0.01)
-        #input("Enter to continue")
     
         Frame.frlog.debug("Time elapsed in drawing tracks: {:.4f}".format(time.time()-time_start))
         time_start = time.time()
     
-        # success, T_j, mask_PNP = T_from_PNP(lm_if_up, kpjl_match, K, D)
-        
-        # Slice inlier keypoints from fr_j.kp and undistort
-        kp_j_m_lm_pt_ud = cv2.undistortPoints(np.expand_dims(fr_j.kp[fr_j.kp_m_prev_lm_ind],1),
-                                                             Frame.K, Frame.D)[:,0,:]
+        # Slice inlier keypoints from fr_j.kp_ud_norm and use them for PNP calculation
         success, fr_j.T_pnp, mask_pnp = T_from_PNP_norm(Frame.landmarks[fr_i.lm_ind], 
-                                                        kp_j_m_lm_pt_ud, 
+                                                        fr_j.kp_ud_norm[fr_j.kp_m_prev_lm_ind], 
                                                         **Frame.config_dict['solvePnPRansac_settings']) # repErr = ceil2MSD(1/fr_j.gr.shape[1])
         
         if not success:
             Frame.frlog.critical("PNP failed in frame {}. Exiting...".format(fr_j.frame_id))
             exit()
             
-        Frame.frlog.info((Fore.GREEN+"PNP inliers: {} / {} : {:.1f} %"+Style.RESET_ALL).format(np.sum(mask_pnp),len(fr_i.lm_ind),np.sum(mask_pnp)/len(fr_i.lm_ind)*100))
+        Frame.frlog.info((Fore.GREEN+"PNP inliers: {} / {} : {:.1f} %"+Style.RESET_ALL).format(np.sum(mask_pnp),len(fr_i.lm_ind),
+                                                                                               np.sum(mask_pnp)/len(fr_i.lm_ind)*100))
         Frame.frlog.info("PNP_Pose:\t"+str(fr_j.T_pnp[:3,:]).replace('\n','\n\t\t\t'))
         
         plot_pose3_on_axes(Frame.ax2, fr_j.T_pnp, axis_length=2.0, center_plot=True, line_obj_list=Frame.cam_pose)
         
         Frame.cam_trail_pts = np.append(Frame.cam_trail_pts,fr_j.T_pnp[:3,[-1]].T,axis=0)
         plot_3d_points(Frame.ax2,Frame.cam_trail_pts , line_obj=Frame.cam_pose_trail, linestyle="", color='g', marker=".", markersize=2)
-        #Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)
-        #input("Press [enter] to continue.")
                     
         fr_i.lm_ind = fr_i.lm_ind[mask_pnp[:,0].astype(bool)] 
         fr_i.kp_lm_ind = fr_i.kp_lm_ind[mask_pnp[:,0].astype(bool)] 
         fr_j.kp_m_prev_lm_ind = fr_j.kp_m_prev_lm_ind[mask_pnp[:,0].astype(bool)] 
-        kp_j_m_lm_pt_ud = kp_j_m_lm_pt_ud[mask_pnp[:,0].astype(bool)] 
+
         Frame.frlog.debug("Time elapsed in PNP: {:.4f}".format(time.time()-time_start))
         
         for (row,l) in enumerate(fr_i.lm_ind):
-            Frame.landmark_array[l].add_observation(fr_j.frame_id, kp_j_m_lm_pt_ud[[row]])
+            Frame.landmark_array[l].add_observation(fr_j.frame_id, fr_j.kp_ud_norm[fr_j.kp_m_prev_lm_ind][[row]])
         
         time_start = time.time()
         
-        # Undistort and Triangulate
-        kp_i_m_cand_pt_ud = cv2.undistortPoints(np.expand_dims(fr_i.kp[fr_i.kp_cand_ind],1),
-                                                             Frame.K, Frame.D)[:,0,:]
-        kp_j_m_cand_pt_ud = cv2.undistortPoints(np.expand_dims(fr_j.kp[fr_j.kp_m_prev_cand_ind],1),
-                                                             Frame.K, Frame.D)[:,0,:]
-        
-        lm_j_new, mask_tri = Frame.triangulate(fr_i.T_pnp, fr_j.T_pnp, 
-                                           kp_i_m_cand_pt_ud, 
-                                           kp_j_m_cand_pt_ud, 
+        # Slice and Triangulate
+        lm_j_new, mask_tri = Frame.triangulate(fr_i.T_pnp, fr_j.T_pnp,
+                                           fr_i.kp_ud_norm[fr_i.kp_cand_ind],
+                                           fr_j.kp_ud_norm[fr_j.kp_m_prev_cand_ind],
                                            None)
         Frame.frlog.debug("Time elapsed in triangulate: {:.4f}".format(time.time()-time_start)) 
         time_start = time.time()
@@ -709,38 +686,18 @@ class Frame ():
                                         (1-mask_tri)[:,0].astype(bool), True, color=[255,0,0])
         #else: img_rej_pts = img_track_all
         Frame.fig_frame_image.set_data(img_rej_pts)
-        #Frame.fig1.canvas.draw_idle(); #plt.pause(0.01)
-        #input("Enter to continue")
 
         Frame.frlog.debug("Time elapsed in draw pt tracks: {:.4f} ".format(time.time()-time_start)) 
         time_start = time.time()
     
         fr_i.kp_cand_ind = fr_i.kp_cand_ind[mask_tri[:,0].astype(bool)]
         fr_j.kp_m_prev_cand_ind = fr_j.kp_m_prev_cand_ind[mask_tri[:,0].astype(bool)]
-        kp_i_m_cand_pt_ud = kp_i_m_cand_pt_ud[mask_tri[:,0].astype(bool)]
-        kp_j_m_cand_pt_ud = kp_j_m_cand_pt_ud[mask_tri[:,0].astype(bool)]
-                
-        #try:    
-        #    Frame.lm_plot_handle.remove()
-        #except NameError:
-        #    pass
-        
-        #print(lm_j_new)
         
         plot_3d_points(Frame.ax2, lm_j_new, line_obj=Frame.lm_plot_handle, 
                        linestyle="", color='g', marker=".", markersize=2)
         
         Frame.fig2.suptitle('Frame {}'.format(fr_j.frame_id))
         Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)
-        #input("Enter to continue")
-
-    
-        # Remove pose lines and landmarks to speed plotting
-        #if PLOT_LANDMARKS:
-        #    graph_newlm = plot_3d_points(ax2, lm_j, linestyle="", color='C0', marker=".", markersize=2)    
-        #    fig2.canvas.draw_idle(); #plt.pause(0.01)
-        
-        #Frame.lm_obs_count[fr_i.lm_ind] += 1
         
         num_curr_landmarks = len(Frame.landmarks)
         num_new_landmarks = len(lm_j_new)
@@ -754,14 +711,11 @@ class Frame ():
         lm_new_list = []
         for (i,coord) in enumerate(lm_j_new):
             lm_new_list.append(landmark(fr_i.frame_id,fr_j.frame_id, 
-                                        kp_i_m_cand_pt_ud[[i]], 
-                                        kp_j_m_cand_pt_ud[[i]], 
+                                        fr_i.kp_ud_norm[fr_i.kp_cand_ind][[i]], 
+                                        fr_j.kp_ud_norm[fr_j.kp_m_prev_cand_ind][[i]], 
                                         coord[None]))
         Frame.landmark_array=np.concatenate((Frame.landmark_array,np.array(lm_new_list)))
         
-        #lm_obs_count_new = np.ones(num_new_landmarks,dtype=np.int8) * 2
-        #Frame.lm_obs_count = np.concatenate((Frame.lm_obs_count, lm_obs_count_new))
-       
         # partition kp_m into two sets        
         fr_j.partition_kp_cand()
         img_cand_pts = draw_points(img_rej_pts,fr_j.kp[fr_j.kp_cand_ind], 
@@ -772,14 +726,3 @@ class Frame ():
                       
         Frame.fig1.canvas.start_event_loop(0.001)
         Frame.fig2.canvas.start_event_loop(0.001)
-
-        #frame_no += 1
-            
-        #Frame.frlog.debug("FRAME seq {} COMPLETE".format(str(frame_no)))
-    
-        #return gr_j, kpjl, desjl, kp_j_cand, des_j_cand, lm_j_up, T_j
-    
-'''    
-    @staticmethod
-    def extract_and_store_kp(fr,):
-'''    

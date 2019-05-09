@@ -60,6 +60,11 @@ def writer(imgnames, masknames, config_dict, queue):
     #RADIAL_NON_MAX = config_dict['radial_non_max']
     
     #detector = cv2.ORB_create(**config_dict['ORB_settings'])
+    Frame.K = np.array(config_dict['K'])
+    Frame.D = np.array(config_dict['D'])
+    Frame.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
+    Frame.config_dict = config_dict
+
     Frame.detector = MultiHarrisZernike(**ZERNIKE_settings)
     
     #settings_hash_string = str(hash(frozenset(a.items()))).replace('-','z')
@@ -71,7 +76,7 @@ def writer(imgnames, masknames, config_dict, queue):
     os.makedirs(temp_obj_folder, exist_ok=True)
     
     vslog.info("K: \t"+str(Frame.K).replace('\n','\n\t\t'))
-    vslog.info("D: \t"+str(Frame.D.T))
+    vslog.info("D: \t"+str(Frame.D))
         
     if USE_CLAHE:
         Frame.clahe_obj = cv2.createCLAHE(**config_dict['CLAHE_settings'])
