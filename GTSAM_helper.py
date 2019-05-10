@@ -18,7 +18,7 @@ from helper_functions.frame import Frame
 
 class iSAM2Wrapper():
     def __init__(self,pose0=np.eye(4),pose0_to_pose1_range = 1.0, K=np.eye(3),
-                 relinearizeThreshold=0.1,relinearizeSkip=1, proj_noise_val=1.0):
+                 relinearizeThreshold=0.1,relinearizeSkip=10, proj_noise_val=1.0):
         self.graph = NonlinearFactorGraph()
 
         # Add a prior on pose x0. This indirectly specifies where the origin is.

@@ -35,6 +35,8 @@ class landmark():
         Return observation in given frame
         '''
         return self.observed_kps[fr_id]
+    def __str__(self):
+        return "coords: "+ str(self.coord_3d[0,:]) + "\nObservations:".format(self.coord_3d) + str(self.observed_kps)
 
 class Frame ():
     '''
@@ -589,7 +591,7 @@ class Frame ():
         input("Press [enter] to continue.")  
         
     @staticmethod
-    def process_keyframe(fr_i, fr_j):
+    def process_keyframe_PNP(fr_i, fr_j):
         '''
         Performs the following operations on frame i and frame j
         a. match and propagate keypoints:
@@ -600,7 +602,6 @@ class Frame ():
         b. combine and filter: combine the above two sets of points and filters 
            them with essential matrix and recover pose method
         c. Slice inlier keypoints, undistort and compute pose using PNP Ransac algorithm
-        d. Undistort and Triangulate
         
         Parameters
         ----------                        
@@ -630,12 +631,12 @@ class Frame ():
                                          None, False)
         
         # Display candidates carried from previous frame
-        img_track_all = draw_point_tracks(fr_i.kp[fr_i.kp_cand_ind],
+        fr_j.img_track_all = draw_point_tracks(fr_i.kp[fr_i.kp_cand_ind],
                                           img_track_lm,
                                           fr_j.kp[fr_j.kp_m_prev_cand_ind],
                                           None, False, color=[255,255,0])
         
-        Frame.fig_frame_image.set_data(img_track_all)
+        Frame.fig_frame_image.set_data(fr_j.img_track_all)
     
         Frame.frlog.debug("Time elapsed in drawing tracks: {:.4f}".format(time.time()-time_start))
         time_start = time.time()
@@ -667,6 +668,26 @@ class Frame ():
         for (row,l) in enumerate(fr_i.lm_ind):
             Frame.landmark_array[l].add_observation(fr_j.frame_id, fr_j.kp_ud_norm[fr_j.kp_m_prev_lm_ind][[row]])
         
+        fr_j.lm_ind = fr_i.lm_ind
+
+    def process_keyframe_triangulation(fr_i, fr_j):
+        '''
+        Performs the following operations on frame i and frame j:
+        a. Slice filtered candidate keypoints using index in respective frames 
+           and Triangulate them into new landmarks
+        
+        Parameters
+        ----------                        
+        fr_i: Frame object
+        fr_j: Frame object
+        i = previous frame, j = current frame
+        
+        Returns
+        -------
+        None
+        
+        '''
+        
         time_start = time.time()
         
         # Slice and Triangulate
@@ -681,7 +702,7 @@ class Frame ():
         
         #if len(kp_prev_cand)>0:
         img_rej_pts = draw_point_tracks(fr_i.kp[fr_i.kp_cand_ind], 
-                                        img_track_all, 
+                                        fr_j.img_track_all, 
                                         fr_j.kp[fr_j.kp_m_prev_cand_ind], 
                                         (1-mask_tri)[:,0].astype(bool), True, color=[255,0,0])
         #else: img_rej_pts = img_track_all
@@ -704,7 +725,8 @@ class Frame ():
         fr_j.lm_new_ind = np.array(range(num_curr_landmarks,num_curr_landmarks+num_new_landmarks))
         fr_i.kp_lm_ind = np.concatenate((fr_i.kp_lm_ind, fr_i.kp_cand_ind))
         fr_j.kp_lm_ind = np.concatenate((fr_j.kp_m_prev_lm_ind, fr_j.kp_m_prev_cand_ind))
-        fr_j.lm_ind = np.concatenate((fr_i.lm_ind, fr_j.lm_new_ind))
+        
+        fr_j.lm_ind = np.concatenate((fr_j.lm_ind, fr_j.lm_new_ind))
         #print('previous indexes:',fr_j.kp_m_prev_lm_ind)                             
         Frame.landmarks = np.vstack((Frame.landmarks, lm_j_new))            
         

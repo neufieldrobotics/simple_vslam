@@ -248,7 +248,7 @@ if __name__ == '__main__':
             Frame.frlog.debug("Frame id:"+str(fr_curr.frame_id))
             Frame.frlog.debug(Fore.RED+"Time for current frame: "+str(time.time()-ft)+Style.RESET_ALL)
             ft = time.time()
-            Frame.process_keyframe(fr_prev, fr_curr)
+            Frame.process_keyframe_PNP(fr_prev, fr_curr)
             Frame.frlog.debug("Time elapsed in process_keyframe: {:.4f}".format(time.time()-ft))
 
             ft = time.time()
@@ -256,9 +256,11 @@ if __name__ == '__main__':
             if USE_GTSAM:
                 factor_graph.add_keyframe_factors(fr_curr)
                             
-                factor_graph.update(3)
+                factor_graph.update(1)
                 
                 fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)  
+                fr_curr.T_pnp = fr_curr.T_gtsam 
+
                 #current_estimate = factor_graph.get_Estimate()
                 corr_landmarks, gtsam_lm_ids = factor_graph.get_landmark_estimates()
                 
@@ -271,7 +273,9 @@ if __name__ == '__main__':
                 rot_correction = rotation_distance(fr_curr.T_gtsam[:3,:3], fr_curr.T_pnp[:3,:3])
                 Frame.frlog.info("GTSAM correction: Trans: {:.5f} rot angle: {:.4f} deg".format(trans_correction,rot_correction))
                 Frame.frlog.info("Time elapsed in iSAM optimization: {:.4f}".format(time.time()-ft))
-                  
+            
+            Frame.process_keyframe_triangulation(fr_prev, fr_curr)
+            
             Frame.frlog.debug(Fore.RED+"Time to process last frame: {:.4f}".format(time.time()-st)+Style.RESET_ALL)
             Frame.frlog.debug(Fore.RED+"Time in the function: {:.4f}".format(time.time()-ft)+Style.RESET_ALL)
             Frame.frlog.info(Fore.GREEN + Back.BLUE + "\tFRAME seq {} COMPLETE \n".format(fr_curr.frame_id)+Style.RESET_ALL)
