@@ -30,6 +30,7 @@ for photo in chunk.cameras:
 
 selected_photos = chunk.cameras #[200:205]
 
+'''
 for photo in selected_photos:
 	
 	point_index = 0
@@ -42,6 +43,7 @@ for photo in selected_photos:
 				continue	
 			else:
 				points[point_index].selected = True
+'''
 
 Metashape.app.update()
 
@@ -60,10 +62,19 @@ for cam in selected_photos:
         frame_data['name'] = cam.label
         frame_data['kp'] = kp_list
         frame_data['track_ids'] = track_id_list
+        frame_data['transform'] = np.array(cam.transform).reshape(4,4)
         
         frames.append(frame_data)
     
 #with open('data.yml', 'w') as outfile:
 #    yaml.dump(frames, outfile, default_flow_style=True)
-with open("data.pkl", 'wb') as output:
-    pickle.dump(frames, output)   
+
+points_dict = {}
+for point in points:
+    if point.valid:
+        points_dict[point.track_id] = [point.coord.x, point.coord.y, point.coord.z]
+    
+with open("/data/Lars/Project_files/metashape_export.pkl", 'wb') as output:
+    pickle.dump((frames, points_dict), output)
+    
+calib = selected_photos[0].calibration.save('/data/Lars/Project_files/calibration_export_opencv.xml', format='opencv')
