@@ -28,9 +28,6 @@ import queue
 from helper_functions.frame import Frame
 from GTSAM_helper import iSAM2Wrapper
 
-'''
-PROCESS FRAME
-'''
 global vslog
 vslog = logging.getLogger('VSLAM')
 logging.basicConfig(level=logging.INFO,
