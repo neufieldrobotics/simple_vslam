@@ -330,6 +330,22 @@ def draw_keypoints(vis, keypoints, color = (0, 255, 255)):
         cv2.circle(vis, (int(x), int(y)), 15, color)
     return vis
 
+def match_metashape_track_ids(t_ids_1, t_ids_2):
+    '''
+    This functions accepts lists of track ids and returns matches with correct indexes
+    '''
+    t_id_2_dict = dict(zip(t_ids_2, range(len(t_ids_2))))
+    eps = np.finfo(np.float16).eps
+    
+    matches = []
+    for ind_1, t1 in enumerate(t_ids_1):
+            ind_2 = t_id_2_dict.get(t1)
+            if ind_2 is not None:
+                matches += [cv2.DMatch(ind_1, ind_2, 0, eps )]
+    
+    return matches
+    
+
 def knn_match_and_lowe_ratio_filter(matcher, des1, des2,threshold=0.9):
     # First match 2 against 1
     matches_knn = matcher.knnMatch(des2,des1, k=2)

@@ -413,25 +413,28 @@ class Frame ():
         kp_j_all_ind = np.concatenate((fr_j.kp_m_prev_lm_ind, fr_j.kp_m_prev_cand_ind))
                 
         # Compute undisorted points from the complete list 
-        kp_i_all_ud = cv2.undistortPoints(np.expand_dims(fr_i.kp[kp_i_all_ind],1),Frame.K,Frame.D)[:,0,:]
-        kp_j_all_ud = cv2.undistortPoints(np.expand_dims(fr_j.kp[kp_j_all_ind],1),Frame.K,Frame.D)[:,0,:]
-                
+        #kp_i_all_ud = cv2.undistortPoints(np.expand_dims(fr_i.kp[kp_i_all_ind],1),Frame.K,Frame.D)[:,0,:]
+        #kp_j_all_ud = cv2.undistortPoints(np.expand_dims(fr_j.kp[kp_j_all_ind],1),Frame.K,Frame.D)[:,0,:]
+        
+        kp_i_all_ud_norm = fr_i.kp_ud_norm[kp_i_all_ind]
+        kp_j_all_ud_norm = fr_j.kp_ud_norm[kp_j_all_ind]
+                        
         # getting the first mask for filter using essential matrix method
         essmat_time = time.time()
-        E, mask_e_all = cv2.findEssentialMat(kp_i_all_ud, kp_j_all_ud, 
+        E, mask_e_all = cv2.findEssentialMat(kp_i_all_ud_norm, kp_j_all_ud_norm, 
                                              focal=1.0, pp=(0., 0.), 
                                              method=cv2.RANSAC, **Frame.config_dict['findEssential_settings'])
         Frame.frlog.info("Time to perform essential mat filter: {:.4f}".format(time.time()-essmat_time))
 
         essen_mat_pts = np.sum(mask_e_all)  
         
-        dbg_str = "Total -> Ess matrix : {} -> {}".format(len(kp_j_all_ud),essen_mat_pts)
+        dbg_str = "Total -> Ess matrix : {} -> {}".format(len(kp_j_all_ud_norm),essen_mat_pts)
         
         # getting the second mask for filtering using recover pose
         
         if Frame.config_dict['use_RecoverPose_Filter']:
             # Recover Pose filtering is breaking under certain conditions. Leave out for now.
-            _, _, _, mask_RP_all = cv2.recoverPose(E, kp_i_all_ud, kp_j_all_ud, mask=mask_e_all)
+            _, _, _, mask_RP_all = cv2.recoverPose(E, kp_i_all_ud_norm, kp_j_all_ud_norm, mask=mask_e_all)
             dbg_str += "\t Rec pose: {} -> {}".format(essen_mat_pts,np.sum(mask_RP_all))
         else: 
             mask_RP_all = mask_e_all

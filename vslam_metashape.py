@@ -161,7 +161,10 @@ if __name__ == '__main__':
     Frame_metashape.fig2.canvas.mpl_connect('key_press_event', onKey)
     Frame_metashape.initialize_VSLAM(fr1, fr2)
     
-    factor_graph = iSAM2Wrapper(pose0=np.eye(4), K=np.eye(3), **config_dict['iSAM2_settings'])    
+    range_1t2 = np.linalg.norm(fr2.T_groundtruth[:3,-1] - fr1.T_groundtruth[:3,-1])
+    
+    factor_graph = iSAM2Wrapper(pose0=fr1.T_groundtruth, K=np.eye(3), 
+                                pose0_to_pose1_range = range_1t2, **config_dict['iSAM2_settings'])    
     factor_graph.add_PoseEstimate(fr2.frame_id, fr2.T_pnp)      
     
     plt.pause(0.001)
@@ -198,7 +201,7 @@ if __name__ == '__main__':
             ft = time.time()
             
             if USE_GTSAM:
-                factor_graph.add_keyframe_factors(fr_curr)
+                factor_graph.add_keyframe_factors_metashape(fr_curr)
                             
                 factor_graph.update(1)
                 

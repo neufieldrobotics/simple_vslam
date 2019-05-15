@@ -14,7 +14,7 @@ import gtsam.utils.plot as gtsam_plot
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W0611
 from matplotlib import pyplot as plt
 import cv2
-from helper_functions.frame import Frame
+from helper_functions.frame_metashape import Frame_metashape
 
 class iSAM2Wrapper():
     def __init__(self,pose0=np.eye(4),pose0_to_pose1_range = 1.0, K=np.eye(3),
@@ -270,4 +270,36 @@ class iSAM2Wrapper():
         ## Add estiamates
         self.add_PoseEstimate(fr_j.frame_id, fr_j.T_pnp)  
         Frame.frlog.info("GTSAM add factors: existing(>3 obs): {}   new (3 obs): {}".format(exist_lm_fact, new_lm_fact))
+        
+    def add_keyframe_factors_metashape(self, fr_j):         
+        new_lm_fact = 0
+        exist_lm_fact = 0
+        for l,l_id in zip(Frame_metashape.landmark_array[fr_j.lm_ind], fr_j.lm_ind):
+            if len(l.observed_kps) == 3:
+                ## Add new landmarks to GTSAM when they have been observed in 3 frames
+                # Add from frame j to landmark
+                self.add_GenericProjectionFactorCal3_S2_factor(l.keypoint_in_frame(fr_j.frame_id), 
+                                                               fr_j.frame_id,
+                                                               [l_id])
+                # Add from frame i to landmark
+                self.add_GenericProjectionFactorCal3_S2_factor(l.keypoint_in_frame(fr_j.frame_id -1), 
+                                                               fr_j.frame_id - 1,
+                                                               [l_id])
+                # Add from frame h to landmark
+                self.add_GenericProjectionFactorCal3_S2_factor(l.keypoint_in_frame(fr_j.frame_id -2), 
+                                                               fr_j.frame_id - 2,
+                                                               [l_id])                
+                # Add landmark estimates for the newly created landmarks
+                self.add_LandmarkEstimate([l_id], l.coord_3d)
+                new_lm_fact += 1
+                
+            elif len(l.observed_kps) > 3:
+                #  Add projection factors only to frame j  for landmarks already added to GTSAM before
+                self.add_GenericProjectionFactorCal3_S2_factor(l.keypoint_in_frame(fr_j.frame_id), 
+                                                               fr_j.frame_id,
+                                                               [l_id])
+                exist_lm_fact += 1
+        ## Add estiamates
+        self.add_PoseEstimate(fr_j.frame_id, fr_j.T_pnp)  
+        Frame_metashape.frlog.info("GTSAM add factors: existing(>3 obs): {}   new (3 obs): {}".format(exist_lm_fact, new_lm_fact))
                 

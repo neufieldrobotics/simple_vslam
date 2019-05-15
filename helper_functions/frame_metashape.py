@@ -182,7 +182,7 @@ class Frame_metashape ():
         Frame_metashape.ax2.set_aspect('equal')         # important!
         Frame_metashape.fig2.suptitle('Frame 1')
         plt.figtext(0.1,0.05, "Press: s - Toggle Pause, p - Toggle Pause after every frame, q - quit", figure = Frame_metashape.fig2)
-        Frame_metashape.ax2.view_init(0, -90)
+        Frame_metashape.ax2.view_init(0, 90)
         
         
     @staticmethod
@@ -281,8 +281,7 @@ class Frame_metashape ():
         pts_3d_world_hom_norm = np.delete(pts_3d_world_hom_norm,rows_to_del,axis=0)
         pts_3d_world = pts_3d_world_hom_norm[:, :3]
         return pts_3d_world, mask
-  
-    @staticmethod
+
     def match_and_propagate_keypoints(fr_i, fr_j, initialization=False):
         '''
         This function:
@@ -304,6 +303,63 @@ class Frame_metashape ():
         fr_i: kp_lm_ind, lm_ind, kp_cand_ind
         fr_j: kp_m_prev_lm_ind, kp_m_prev_cand_ind
         ''' 
+        # matches for features which are candidates from previous image and 
+        # not associated with landmarks
+        if initialization:
+            #des_i_cand = fr_i.des
+            track_ids_i_cand = fr_i.track_ids
+        else:            
+            #des_i_cand = fr_i.des[fr_i.kp_cand_ind]
+            track_ids_i_cand = fr_i.track_ids[fr_i.kp_cand_ind]
+            
+        #matches_cand = knn_match_and_lowe_ratio_filter(Frame.matcher, des_i_cand, fr_j.des,
+        #                                               Frame.config_dict['lowe_ratio_test_threshold'])
+        matches_cand = match_metashape_track_ids(track_ids_i_cand, fr_j.track_ids)
+        dbg_str = "Found {} / {} prev candidates".format(len(matches_cand),len(track_ids_i_cand))
+            
+        l_i = []    
+        l_j = []    
+        for m in matches_cand:
+            l_i += [m.queryIdx]
+            l_j += [m.trainIdx]
+        
+        if initialization:
+            fr_i.kp_cand_ind = np.array(l_i)
+        else:            
+            fr_i.kp_cand_ind = fr_i.kp_cand_ind[l_i]
+        
+        fr_j.kp_m_prev_cand_ind = np.array(l_j)
+        
+        #Frame.frlog.debug("No of fr_i.kp_cand_ind: {}, fr_j.kp_m_prev_cand_ind: {}".format(
+        #                   len(fr_i.kp_cand_ind),len(fr_j.kp_m_prev_cand_ind)))
+    
+        #matches for features which were previously tracked and had landmarks
+        if not initialization:
+            #des_i_lm = fr_i.des[fr_i.kp_lm_ind]
+            track_ids_i_lm = fr_i.track_ids[fr_i.kp_lm_ind]
+            
+            #matches_lm = knn_match_and_lowe_ratio_filter(Frame.matcher, des_i_lm, fr_j.des, 
+            #                                             Frame.config_dict['lowe_ratio_test_threshold'])
+            matches_lm = match_metashape_track_ids(track_ids_i_lm, fr_j.track_ids)
+            
+            
+            dbg_str += "\t{} / {} existing landmarks".format(len(matches_lm),len(track_ids_i_lm))
+            l_i = []    
+            l_j = []
+            for m in matches_lm:
+                l_i += [m.queryIdx] 
+                l_j += [m.trainIdx]                 
+    
+            fr_i.kp_lm_ind = fr_i.kp_lm_ind[l_i]   # l_i_1 is index of matched lm keypoints into fr_i.kp
+                                                   # this has to be done this way since des_i_lm is a subset of fr1.des
+            fr_i.lm_ind = fr_i.lm_ind[l_i]
+            fr_j.kp_m_prev_lm_ind = np.array(l_j)      # fr_j.des is the full list, so m.train gives us index into fr_j.kp
+        
+        Frame_metashape.frlog.info(dbg_str)
+            #Frame.frlog.debug("No of fr_i.kp_lm_ind: {}, fr_i.lm_ind: {}, fr_j.kp_m_prev_lm_ind: {}".format(
+            #                  len(fr_i.kp_lm_ind),len(fr_i.lm_ind),len(fr_j.kp_m_prev_lm_ind)))     
+        
+        '''  
         # matches for features which are candidates from previous image and 
         # not associated with landmarks
         if initialization:
@@ -354,7 +410,7 @@ class Frame_metashape ():
         Frame_metashape.frlog.info(dbg_str)
             #Frame_metashape.frlog.debug("No of fr_i.kp_lm_ind: {}, fr_i.lm_ind: {}, fr_j.kp_m_prev_lm_ind: {}".format(
             #                  len(fr_i.kp_lm_ind),len(fr_i.lm_ind),len(fr_j.kp_m_prev_lm_ind)))     
-        
+        '''        
     @staticmethod
     def combine_and_filter(fr_i, fr_j):
         '''
@@ -378,26 +434,29 @@ class Frame_metashape ():
         kp_i_all_ind = np.concatenate((fr_i.kp_lm_ind, fr_i.kp_cand_ind))
         kp_j_all_ind = np.concatenate((fr_j.kp_m_prev_lm_ind, fr_j.kp_m_prev_cand_ind))
                 
-        # Compute undisorted points from the complete list 
+        # Compute undisorted points from the complete list
         kp_i_all_ud = cv2.undistortPoints(np.expand_dims(fr_i.kp[kp_i_all_ind],1),Frame_metashape.K,Frame_metashape.D)[:,0,:]
         kp_j_all_ud = cv2.undistortPoints(np.expand_dims(fr_j.kp[kp_j_all_ind],1),Frame_metashape.K,Frame_metashape.D)[:,0,:]
+        
+        kp_i_all_ud_norm = fr_i.kp_ud_norm[kp_i_all_ind]
+        kp_j_all_ud_norm = fr_j.kp_ud_norm[kp_j_all_ind]
                 
         # getting the first mask for filter using essential matrix method
         essmat_time = time.time()
-        E, mask_e_all = cv2.findEssentialMat(kp_i_all_ud, kp_j_all_ud, 
+        E, mask_e_all = cv2.findEssentialMat(kp_i_all_ud_norm, kp_j_all_ud_norm, 
                                              focal=1.0, pp=(0., 0.), 
                                              method=cv2.RANSAC, **Frame_metashape.config_dict['findEssential_settings'])
         Frame_metashape.frlog.info("Time to perform essential mat filter: {:.4f}".format(time.time()-essmat_time))
 
         essen_mat_pts = np.sum(mask_e_all)  
         
-        dbg_str = "Total -> Ess matrix : {} -> {}".format(len(kp_j_all_ud),essen_mat_pts)
+        dbg_str = "Total -> Ess matrix : {} -> {}".format(len(kp_j_all_ud_norm),essen_mat_pts)
         
         # getting the second mask for filtering using recover pose
         
         if Frame_metashape.config_dict['use_RecoverPose_Filter']:
             # Recover Pose filtering is breaking under certain conditions. Leave out for now.
-            _, _, _, mask_RP_all = cv2.recoverPose(E, kp_i_all_ud, kp_j_all_ud, mask=mask_e_all)
+            _, _, _, mask_RP_all = cv2.recoverPose(E, kp_i_all_ud_norm, kp_j_all_ud_norm, mask=mask_e_all)
             dbg_str += "\t Rec pose: {} -> {}".format(essen_mat_pts,np.sum(mask_RP_all))
         else: 
             mask_RP_all = mask_e_all
@@ -500,7 +559,7 @@ class Frame_metashape ():
         pose_2T1 = compose_T(rot_2R1,trans_2t1_scaled)
         pose_1T2 = T_inv(pose_2T1)
         pose_wT2 = pose_wT1 @ pose_1T2
-        fr2.T_pnp = pose_1T2
+        fr2.T_pnp = pose_wT2
         Frame_metashape.frlog.info("1T2 :\t"+str(pose_1T2[:3,:]).replace('\n','\n\t\t'))
                     
         img12 = draw_point_tracks(fr1.kp[fr1.kp_cand_ind], fr2.gr,
@@ -512,8 +571,12 @@ class Frame_metashape ():
         plot_pose3_on_axes(Frame_metashape.ax2,pose_wT1, axis_length=0.5)
         Frame_metashape.cam_pose = plot_pose3_on_axes(Frame_metashape.ax2, pose_wT2, axis_length=1.0)
         
-        Frame_metashape.cam_trail_pts = pose_1T2[:3,[-1]].T
+        Frame_metashape.cam_trail_pts = pose_wT2[:3,[-1]].T
         Frame_metashape.cam_pose_trail = plot_3d_points(Frame_metashape.ax2, Frame_metashape.cam_trail_pts, linestyle="", color='g', marker=".", markersize=2)
+        
+        Frame_metashape.cam_trail_gt_pts = fr2.T_groundtruth[:3,[-1]].T
+        Frame_metashape.cam_pose_trail_gt = plot_3d_points(Frame_metashape.ax2, Frame_metashape.cam_trail_pts, linestyle="", color='orange', marker=".", markersize=2)
+        
         
         #input("Press [enter] to continue.\n")
         
@@ -631,8 +694,15 @@ class Frame_metashape ():
         plot_pose3_on_axes(Frame_metashape.ax2, fr_j.T_pnp, axis_length=2.0, center_plot=True, line_obj_list=Frame_metashape.cam_pose)
         
         Frame_metashape.cam_trail_pts = np.append(Frame_metashape.cam_trail_pts,fr_j.T_pnp[:3,[-1]].T,axis=0)
-        plot_3d_points(Frame_metashape.ax2,Frame_metashape.cam_trail_pts , line_obj=Frame_metashape.cam_pose_trail, linestyle="", color='g', marker=".", markersize=2)
-                    
+        plot_3d_points(Frame_metashape.ax2,Frame_metashape.cam_trail_pts , line_obj=Frame_metashape.cam_pose_trail)
+        
+        Frame_metashape.cam_trail_gt_pts = np.append(Frame_metashape.cam_trail_pts,fr_j.T_groundtruth[:3,[-1]].T,axis=0)
+        plot_3d_points(Frame_metashape.ax2,Frame_metashape.cam_trail_gt_pts , line_obj=Frame_metashape.cam_pose_trail_gt)
+
+        #Frame_metashape.cam_trail_gt_pts = fr2.T_groundtruth[:3,[-1]].T
+        #Frame_metashape.cam_pose_trail_gt = plot_3d_points(Frame_metashape.ax2, Frame_metashape.cam_trail_pts, linestyle="", color='g', marker=".", markersize=2)
+
+            
         fr_i.lm_ind = fr_i.lm_ind[mask_pnp[:,0].astype(bool)] 
         fr_i.kp_lm_ind = fr_i.kp_lm_ind[mask_pnp[:,0].astype(bool)] 
         fr_j.kp_m_prev_lm_ind = fr_j.kp_m_prev_lm_ind[mask_pnp[:,0].astype(bool)] 
@@ -714,8 +784,11 @@ class Frame_metashape ():
         
         # partition kp_m into two sets        
         fr_j.partition_kp_cand()
-        img_cand_pts = draw_points(img_rej_pts,fr_j.kp[fr_j.kp_cand_ind], 
-                                  color=[255,255,0])
+        if Frame_metashape.config_dict['display_candidates']:
+            img_cand_pts = draw_points(img_rej_pts,fr_j.kp[fr_j.kp_cand_ind], 
+                                      color=[255,255,0])
+        else:
+            img_cand_pts = img_rej_pts        
         Frame_metashape.fig_frame_image.set_data(img_cand_pts)
         Frame_metashape.ax1.set_title('Frame {}'.format(fr_j.frame_id))
         Frame_metashape.fig1.canvas.draw_idle(); #plt.pause(0.01)

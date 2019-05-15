@@ -5,7 +5,7 @@ linux_data_folder: '/home/vik748/data/Lars2_081018_project_files/'
 data_pkl_file: 'metashape_export.pkl'
 image_ext: 'JPG'
 
-init_image_indxs: [100, 110]  #[1215, 1225] 
+init_image_indxs: [1200, 1210]  #[1215, 1225] 
 image_step: 5
 use_masks: False
 plot_landmarks: True
@@ -13,6 +13,7 @@ masks_ext: 'png'
 use_RecoverPose_Filter: False
 pause_every_iteration: True
 use_gtsam: True
+display_candidates: False
 
 use_tiling_non_max_supression: False
 tiling_non_max_tile_y: 17 
@@ -27,7 +28,7 @@ Triangulation_settings:
 
 findEssential_settings:
  prob: 0.9999
- threshold: 0.001
+ threshold: 0.0001
 
 solvePnPRansac_settings:
   iterationsCount: 250
@@ -35,7 +36,7 @@ solvePnPRansac_settings:
   confidence: 0.9999
 
 iSAM2_settings:
- pose0_to_pose1_range: 1.0
+# pose0_to_pose1_range: 1.0
  relinearizeThreshold: 0.1
  relinearizeSkip: 1
  proj_noise_val: 0.0017  # 1/376
