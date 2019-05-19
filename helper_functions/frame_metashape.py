@@ -671,7 +671,8 @@ class Frame_metashape ():
         fr_j.img_track_all = draw_point_tracks(fr_i.kp[fr_i.kp_cand_ind],
                                           img_track_lm,
                                           fr_j.kp[fr_j.kp_m_prev_cand_ind],
-                                          None, False, color=[255,255,0])
+    
+                                      None, False, color=[255,255,0])
         
         Frame_metashape.fig_frame_image.set_data(fr_j.img_track_all)
     
@@ -696,8 +697,12 @@ class Frame_metashape ():
         Frame_metashape.cam_trail_pts = np.append(Frame_metashape.cam_trail_pts,fr_j.T_pnp[:3,[-1]].T,axis=0)
         plot_3d_points(Frame_metashape.ax2,Frame_metashape.cam_trail_pts , line_obj=Frame_metashape.cam_pose_trail)
         
-        Frame_metashape.cam_trail_gt_pts = np.append(Frame_metashape.cam_trail_pts,fr_j.T_groundtruth[:3,[-1]].T,axis=0)
+        Frame_metashape.cam_trail_gt_pts = np.append(Frame_metashape.cam_trail_gt_pts,fr_j.T_groundtruth[:3,[-1]].T,axis=0)
         plot_3d_points(Frame_metashape.ax2,Frame_metashape.cam_trail_gt_pts , line_obj=Frame_metashape.cam_pose_trail_gt)
+        
+        gt_trans_error = np.linalg.norm(fr_j.T_groundtruth[:3,-1]-fr_j.T_pnp[:3,-1])
+        gt_rot_error = rotation_distance(fr_j.T_groundtruth[:3,:3], fr_j.T_pnp[:3,:3])
+        Frame_metashape.frlog.info("Ground truth error: Trans: {:.5f} rot angle: {:.4f} deg".format(gt_trans_error,gt_rot_error))
 
         #Frame_metashape.cam_trail_gt_pts = fr2.T_groundtruth[:3,[-1]].T
         #Frame_metashape.cam_pose_trail_gt = plot_3d_points(Frame_metashape.ax2, Frame_metashape.cam_trail_pts, linestyle="", color='g', marker=".", markersize=2)

@@ -7,6 +7,8 @@ Created on Mon May 13 17:25:57 2019
 """
 import pickle
 import xml.etree.ElementTree as ET
+import sys
+import numpy as np
 
 
 if sys.platform == 'darwin':
@@ -27,6 +29,6 @@ D_string = root.getchildren()[4].getchildren()[3].text
 D = np.fromstring(D_string, dtype=float,sep=" ")
 
 with open(pkl_file, 'rb') as input:
-    frames, points = pickle.load(input)
+    frames, points,K,D = pickle.load(input)
     
 
