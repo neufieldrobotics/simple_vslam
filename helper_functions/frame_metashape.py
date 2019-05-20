@@ -655,9 +655,14 @@ class Frame_metashape ():
         Frame_metashape.match_and_propagate_keypoints(fr_i, fr_j)
         Frame_metashape.frlog.debug("Time elapsed in match and prop keypoints: {:.4f}".format(time.time()-time_start))
         
+        parallax = np.linalg.norm ( fr_i.kp[fr_i.kp_lm_ind] - fr_j.kp[fr_j.kp_m_prev_lm_ind], axis=1)
+        Frame_metashape.frlog.info("Parallax:\tMean: {:.3f} \t Median: {:.3f}".format(np.mean(parallax),np.median(parallax)))
+       
         time_start = time.time()
         Frame_metashape.combine_and_filter(fr_i, fr_j)
         Frame_metashape.frlog.debug("Time elapsed in combine and filter: {:.4f}".format(time.time()-time_start))
+        
+        
 
         
         time_start = time.time()

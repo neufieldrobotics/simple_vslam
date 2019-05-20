@@ -229,9 +229,7 @@ if __name__ == '__main__':
             
             
             
-            st = time.time()
-            
-            fr_prev=fr_curr
+            st = time.time()            
             
             if PAUSES: paused=True
 
@@ -246,6 +244,8 @@ if __name__ == '__main__':
                     break
                 time.sleep(0.2)
             
+            if not cue_to_exit:
+                fr_prev=fr_curr
             i+= 1
         else: time.sleep(0.2)            
     
