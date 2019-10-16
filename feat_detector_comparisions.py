@@ -12,6 +12,7 @@ from matplotlib import pyplot as plt
 import os
 import glob
 from zernike.zernike import MultiHarrisZernike
+from matlab_imresize.imresize import imresize
 
 def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
                         max_y=np.inf):
@@ -109,6 +110,16 @@ def read_metashape_poses(file):
             pose_array[i] = T
     return img_names, pose_array
 
+def read_image_list(img_names, resize_ratio=1):
+    images = []
+    for name in img_names:
+        img = cv2.imread(name, cv2.IMREAD_GRAYSCALE)
+        if resize_ratio != 1:
+            img = imresize(img, resize_ratio, method='bicubic')
+        images.append(img)
+        
+    return images
+
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/data'
 else:
@@ -119,49 +130,38 @@ test_set = 'set_1'
 
 img_folder = os.path.join(path,sets_folder,test_set)
 
-raw_images = sorted(glob.glob(img_folder+'/*.JPG'))
-clahe_images = sorted(glob.glob(img_folder+'/*.tif'))
+raw_image_names = sorted(glob.glob(img_folder+'/*.JPG'))
+clahe_image_names = sorted(glob.glob(img_folder+'/*.tif'))
 poses_txt = os.path.join(path,sets_folder,test_set,'poses.txt')
 
-assert match_image_names(raw_images, clahe_images), "Images names of raw and clahe_images don't match"
-assert len(raw_images) == 2, "Number of images in set is not 2 per type"
-
-
-img = cv2.imread(path+'data/kitti/00/image_0/000000.png',0) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
-#img = cv2.imread(path+'data/test_set/GOPR1429.JPG',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
-
-    
-gray = img #cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-# create a mask image filled with zeros, the size of original image
-
-tiley = 17
-tilex = 4
-total_feat = 25000
-
-# defailts: int nfeatures=500, float scaleFactor=1.2f, int nlevels=8, int edgeThreshold=31, 
-# int firstLevel=0, int WTA_K=2, int scoreType=ORB::HARRIS_SCORE, 
-# int patchSize=31, int fastThreshold=20)
+assert match_image_names(raw_image_names, clahe_image_names), "Images names of raw and clahe_images don't match"
+assert len(raw_image_names) == 2, "Number of images in set is not 2 per type"
 
 orb_detector = cv2.ORB_create(nfeatures=1000, edgeThreshold=125, patchSize=125, nlevels=8, 
-                     fastThreshold=20, scaleFactor=1.2, WTA_K=2,
-                     scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
+                              fastThreshold=20, scaleFactor=1.2, WTA_K=2,
+                              scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
 
 zernike_detector = MultiHarrisZernike(Nfeats=600,like_matlab=True)
 
+raw_images = read_image_list(raw_image_names, resize_ratio=1/5)
+clahe_images = read_image_list(clahe_image_names, resize_ratio=1/5)
 
-# find the keypoints and descriptors with ORB
-#kp1 = detector1.detect(img,mask)
-kp2 = detector2.detect(img,mask)
-kp2p = tiled_features(kp2, gray, tiley, tilex)
+zernike_kp_0, zernike_des_0 = zernike_detector.detectAndCompute(raw_images[0], mask=None, timing=False)
+zernike_kp_1, zernike_des_1 = zernike_detector.detectAndCompute(raw_images[1], mask=None, timing=False)
 
-img1 = draw_keypoints(cv2.cvtColor(img, cv2.COLOR_GRAY2RGB),kp2)
-img2 = draw_markers(img1,kp2p)
+zernike_kp_0 = sorted(zernike_kp_0, key = lambda x: x.response, reverse=True)
+zernike_kp_img_0 = cv2.drawKeypoints(raw_images[0], zernike_kp_0[:50], cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2BGR),color=[255,255,0],
+                                     flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+plt.imshow(zernike_kp_img_0)
+
+#img2 = draw_markers(img1,kp2p)
 #cv2.namedWindow('image', cv2.WINDOW_NORMAL)
 #cv2.resizeWindow('image', (800,600))
 #cv2.imshow('image', img)
 #cv2.waitKey()
 
-fig2 = plt.figure(2)
-plt.axis("off")
-plt.imshow(img2)
-plt.show()
+#fig2 = plt.figure(2)
+#plt.axis("off")
+#plt.imshow(img2, cmap='gray')
+#plt.show()

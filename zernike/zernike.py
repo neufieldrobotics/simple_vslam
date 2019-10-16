@@ -476,15 +476,15 @@ class MultiHarrisZernike (cv2.Feature2D):
             raise ValueError("Input image is not a 2D array, possibile non-grayscale")
         if timing: st=time.time()    
         P = self.generate_pyramid(gr_img,mask=mask)
-        if timing: print("Generate pyramid - ", time.time()-st); st=time.time()
+        if timing: print("Generate pyramid - {:0.4f}".format(time.time()-st)); st=time.time()
         F = self.feat_extract_p2(P)
-        if timing: print("Extract features - ", time.time()-st); st=time.time()
+        if timing: print("Extract features - {:0.4f}".format(time.time()-st)); st=time.time()
         Ft = self.feat_thresh_sec(F,*gr_img.shape)
-        if timing: print("Feature Threshold - ", time.time()-st); st=time.time()
+        if timing: print("Feature Threshold - {:0.4f}".format(time.time()-st)); st=time.time()
         JA,JB = self.z_jet_p2(P,Ft)
-        if timing: print("Feature jets - ", time.time()-st); st=time.time()
+        if timing: print("Feature jets - {:0.4f}".format(time.time()-st)); st=time.time()
         V,alpha,A = self.zinvariants4(JA, JB)
-        if timing: print("Feature invariants - ", time.time()-st); st=time.time
+        if timing: print("Feature invariants - {:0.4f}".format(time.time()-st)); st=time.time()
         kp = [cv2.KeyPoint(x,y,self.zrad*(sc+1)*2,_angle=ang,_response=res,_octave=sc) 
               for x,y,ang,res,sc in zip(Ft['jvec'], Ft['ivec'], np.rad2deg(alpha),
                                         Ft['evec'],Ft['svec'])]
