@@ -128,6 +128,10 @@ else:
 sets_folder = 'feature_descriptor_comparision'
 test_set = 'set_1'
 
+
+'''
+LOAD DATA
+'''
 img_folder = os.path.join(path,sets_folder,test_set)
 
 raw_image_names = sorted(glob.glob(img_folder+'/*.JPG'))
@@ -137,31 +141,52 @@ poses_txt = os.path.join(path,sets_folder,test_set,'poses.txt')
 assert match_image_names(raw_image_names, clahe_image_names), "Images names of raw and clahe_images don't match"
 assert len(raw_image_names) == 2, "Number of images in set is not 2 per type"
 
-orb_detector = cv2.ORB_create(nfeatures=1000, edgeThreshold=125, patchSize=125, nlevels=8, 
+'''
+Detect Features
+'''
+orb_detector = cv2.ORB_create(nfeatures=1000, edgeThreshold=125, patchSize=125, nlevels=6, 
                               fastThreshold=20, scaleFactor=1.2, WTA_K=2,
                               scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
 
-zernike_detector = MultiHarrisZernike(Nfeats=600,like_matlab=True)
+zernike_detector = MultiHarrisZernike(Nfeats= 600, seci= 4, secj= 3, levels= 6, ratio= 1/1.2, 
+                                      sigi= 2.75, sigd= 1.0, nmax= 8, like_matlab= False, lmax_nd= 3)
 
 raw_images = read_image_list(raw_image_names, resize_ratio=1/5)
 clahe_images = read_image_list(clahe_image_names, resize_ratio=1/5)
 
 zernike_kp_0, zernike_des_0 = zernike_detector.detectAndCompute(raw_images[0], mask=None, timing=False)
 zernike_kp_1, zernike_des_1 = zernike_detector.detectAndCompute(raw_images[1], mask=None, timing=False)
+orb_kp_0, orb_des_0 = orb_detector.compute(raw_images[0], zernike_kp_0)
+orb_kp_1, orb_des_1 = orb_detector.compute(raw_images[1], zernike_kp_1)
+
 
 zernike_kp_0 = sorted(zernike_kp_0, key = lambda x: x.response, reverse=True)
-zernike_kp_img_0 = cv2.drawKeypoints(raw_images[0], zernike_kp_0[:50], cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2BGR),color=[255,255,0],
+zernike_kp_1 = sorted(zernike_kp_1, key = lambda x: x.response, reverse=True)
+orb_kp_0 = sorted(orb_kp_0, key = lambda x: x.response, reverse=True)
+orb_kp_1 = sorted(orb_kp_1, key = lambda x: x.response, reverse=True)
+
+zernike_kp_img_0 = cv2.drawKeypoints(raw_images[0], zernike_kp_0[:25], cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB),color=[255,255,0],
+                                     flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+zernike_kp_img_1 = cv2.drawKeypoints(raw_images[1], zernike_kp_1[:25], cv2.cvtColor(raw_images[1], cv2.COLOR_GRAY2RGB),color=[255,255,0],
+                                     flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+orb_kp_img_0 = cv2.drawKeypoints(raw_images[0], orb_kp_0[:25], cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB),color=[255,255,0],
+                                 flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+orb_kp_img_1 = cv2.drawKeypoints(raw_images[1], orb_kp_1[:25], cv2.cvtColor(raw_images[1], cv2.COLOR_GRAY2RGB),color=[255,255,0],
                                      flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
-plt.imshow(zernike_kp_img_0)
+fig1, fig1_axes = plt.subplots(2,2)
+fig1.suptitle('800x600 Images Zernike Top 25 features')
+fig1_axes[0,0].axis("off")
+fig1_axes[0,0].imshow(zernike_kp_img_0)
+fig1_axes[1,0].axis("off")
+fig1_axes[1,0].imshow(zernike_kp_img_1)
+fig1_axes[0,1].axis("off")
+fig1_axes[0,1].imshow(orb_kp_img_0)
+fig1_axes[1,1].axis("off")
+fig1_axes[1,1].imshow(orb_kp_img_1)
+#fig1.subplots_adjust(0,0,1,1,0.0,0.0)
+plt.show()
 
-#img2 = draw_markers(img1,kp2p)
-#cv2.namedWindow('image', cv2.WINDOW_NORMAL)
-#cv2.resizeWindow('image', (800,600))
-#cv2.imshow('image', img)
-#cv2.waitKey()
-
-#fig2 = plt.figure(2)
-#plt.axis("off")
-#plt.imshow(img2, cmap='gray')
-#plt.show()
+'''
+Detect Features
+'''
