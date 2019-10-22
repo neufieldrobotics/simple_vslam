@@ -13,6 +13,7 @@ import os
 import glob
 from zernike.zernike import MultiHarrisZernike
 from matlab_imresize.imresize import imresize
+from vslam_helper import knn_match_and_lowe_ratio_filter, draw_feature_tracks
 
 def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
                         max_y=np.inf):
@@ -120,6 +121,26 @@ def read_image_list(img_names, resize_ratio=1):
         
     return images
 
+def draw_matches_vertical(img_top, kp1,img_bottom,kp2, matches, mask, display_invalid=False, color=(0, 255, 0)):
+    '''
+    This function extracts takes a 2 images, set of keypoints and a mask of valid
+    (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
+    The mask should be the same length as matches
+    '''
+    assert img_top.shape == img_bottom.shape
+    out_img = np.vstack((img_top, img_bottom))
+    bool_mask = mask.astype(bool)
+    valid_bottom_matches = np.array([kp2[mat.trainIdx].pt for is_match, mat in zip(bool_mask, matches) if is_match])
+    valid_top_matches = np.array([kp1[mat.queryIdx].pt for is_match, mat in zip(bool_mask, matches) if is_match])
+    img_height = img_top.shape[0]
+
+    if len(out_img.shape) == 2: out_img = cv2.cvtColor(out_img,cv2.COLOR_GRAY2RGB)
+
+    for p1,p2 in zip(valid_top_matches, valid_bottom_matches):
+        cv2.line(out_img, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1]+img_height)), color=color, thickness=1)
+    return out_img
+
+
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/data'
 else:
@@ -132,6 +153,12 @@ test_set = 'set_1'
 '''
 LOAD DATA
 '''
+K = np.array([[3523.90252470728501, 0.0, 2018.22833167806152],
+              [0.0, 3569.92180686745451, 1473.25249541175890],
+              [0.0, 0.0, 1.0]])
+
+D = np.array([-2.81360302828763176e-01, 1.38000456840603303e-01, 4.87629635176304053e-05, -6.01560125682630380e-05, -4.34666626743886730e-02])
+
 img_folder = os.path.join(path,sets_folder,test_set)
 
 raw_image_names = sorted(glob.glob(img_folder+'/*.JPG'))
@@ -145,48 +172,86 @@ assert len(raw_image_names) == 2, "Number of images in set is not 2 per type"
 Detect Features
 '''
 orb_detector = cv2.ORB_create(nfeatures=1000, edgeThreshold=125, patchSize=125, nlevels=6, 
-                              fastThreshold=20, scaleFactor=1.2, WTA_K=2,
+                              fastThreshold=9, scaleFactor=1.2, WTA_K=2,
                               scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
 
 zernike_detector = MultiHarrisZernike(Nfeats= 600, seci= 4, secj= 3, levels= 6, ratio= 1/1.2, 
                                       sigi= 2.75, sigd= 1.0, nmax= 8, like_matlab= False, lmax_nd= 3)
+
+sift_detector = cv2.xfeatures2d.SIFT_create(nfeatures = 600, nOctaveLayers = 3, contrastThreshold = 0.01, 
+                                            edgeThreshold = 20, sigma = 1.6)
 
 raw_images = read_image_list(raw_image_names, resize_ratio=1/5)
 clahe_images = read_image_list(clahe_image_names, resize_ratio=1/5)
 
 zernike_kp_0, zernike_des_0 = zernike_detector.detectAndCompute(raw_images[0], mask=None, timing=False)
 zernike_kp_1, zernike_des_1 = zernike_detector.detectAndCompute(raw_images[1], mask=None, timing=False)
-orb_kp_0, orb_des_0 = orb_detector.compute(raw_images[0], zernike_kp_0)
-orb_kp_1, orb_des_1 = orb_detector.compute(raw_images[1], zernike_kp_1)
+orb_kp_0, orb_des_0 = orb_detector.detectAndCompute(raw_images[0], None)
+orb_kp_1, orb_des_1 = orb_detector.detectAndCompute(raw_images[1], None)
+sift_kp_0, sift_des_0 = sift_detector.detectAndCompute(raw_images[0], None)
+sift_kp_1, sift_des_1 = sift_detector.detectAndCompute(raw_images[1], None)
 
+zernike_kp_0_sort = sorted(zernike_kp_0, key = lambda x: x.response, reverse=True)
+zernike_kp_1_sort = sorted(zernike_kp_1, key = lambda x: x.response, reverse=True)
+orb_kp_0_sort = sorted(orb_kp_0, key = lambda x: x.response, reverse=True)
+orb_kp_1_sort = sorted(orb_kp_1, key = lambda x: x.response, reverse=True)
+sift_kp_0_sort = sorted(sift_kp_0, key = lambda x: x.response, reverse=True)
+sift_kp_1_sort = sorted(sift_kp_1, key = lambda x: x.response, reverse=True)
 
-zernike_kp_0 = sorted(zernike_kp_0, key = lambda x: x.response, reverse=True)
-zernike_kp_1 = sorted(zernike_kp_1, key = lambda x: x.response, reverse=True)
-orb_kp_0 = sorted(orb_kp_0, key = lambda x: x.response, reverse=True)
-orb_kp_1 = sorted(orb_kp_1, key = lambda x: x.response, reverse=True)
-
-zernike_kp_img_0 = cv2.drawKeypoints(raw_images[0], zernike_kp_0[:25], cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB),color=[255,255,0],
+zernike_kp_img_0 = cv2.drawKeypoints(raw_images[0], zernike_kp_0_sort[:25], cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB),color=[255,255,0],
                                      flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-zernike_kp_img_1 = cv2.drawKeypoints(raw_images[1], zernike_kp_1[:25], cv2.cvtColor(raw_images[1], cv2.COLOR_GRAY2RGB),color=[255,255,0],
+zernike_kp_img_1 = cv2.drawKeypoints(raw_images[1], zernike_kp_1_sort[:25], cv2.cvtColor(raw_images[1], cv2.COLOR_GRAY2RGB),color=[255,255,0],
                                      flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-orb_kp_img_0 = cv2.drawKeypoints(raw_images[0], orb_kp_0[:25], cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB),color=[255,255,0],
+orb_kp_img_0 = cv2.drawKeypoints(raw_images[0], orb_kp_0_sort[:25], cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB),color=[255,255,0],
                                  flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-orb_kp_img_1 = cv2.drawKeypoints(raw_images[1], orb_kp_1[:25], cv2.cvtColor(raw_images[1], cv2.COLOR_GRAY2RGB),color=[255,255,0],
-                                     flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+orb_kp_img_1 = cv2.drawKeypoints(raw_images[1], orb_kp_1_sort[:25], cv2.cvtColor(raw_images[1], cv2.COLOR_GRAY2RGB),color=[255,255,0],
+                                 flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+sift_kp_img_0 = cv2.drawKeypoints(raw_images[0], sift_kp_0_sort, cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB),color=[255,255,0],
+                                  flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+sift_kp_img_1 = cv2.drawKeypoints(raw_images[1], sift_kp_1_sort, cv2.cvtColor(raw_images[1], cv2.COLOR_GRAY2RGB),color=[255,255,0],
+                                  flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
-fig1, fig1_axes = plt.subplots(2,2)
+fig1, fig1_axes = plt.subplots(2,3)
 fig1.suptitle('800x600 Images Zernike Top 25 features')
-fig1_axes[0,0].axis("off")
+fig1_axes[0,0].axis("off"); fig1_axes[0,0].set_title("Zernike Features")
 fig1_axes[0,0].imshow(zernike_kp_img_0)
 fig1_axes[1,0].axis("off")
 fig1_axes[1,0].imshow(zernike_kp_img_1)
 fig1_axes[0,1].axis("off")
 fig1_axes[0,1].imshow(orb_kp_img_0)
-fig1_axes[1,1].axis("off")
+fig1_axes[1,1].axis("off"); fig1_axes[0,1].set_title("Orb Features")
 fig1_axes[1,1].imshow(orb_kp_img_1)
+fig1_axes[0,2].axis("off")
+fig1_axes[0,2].imshow(sift_kp_img_0)
+fig1_axes[1,2].axis("off"); fig1_axes[0,2].set_title("Sift Features")
+fig1_axes[1,2].imshow(sift_kp_img_1)
 #fig1.subplots_adjust(0,0,1,1,0.0,0.0)
+fig1.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.0)
 plt.show()
 
 '''
-Detect Features
+Match and find inliers
 '''
+matcher_norm = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
+matcher_hamming = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
+
+zernike_matches_01 = knn_match_and_lowe_ratio_filter(matcher_norm, zernike_des_0, zernike_des_1, threshold=0.9)
+
+zernike_kp0_match_01 = np.array([zernike_kp_0[mat.queryIdx].pt for mat in zernike_matches_01])
+zernike_kp1_match_01 = np.array([zernike_kp_1[mat.trainIdx].pt for mat in zernike_matches_01])
+
+zernike_kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(zernike_kp0_match_01,axis=1),K,D)
+zernike_kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(zernike_kp1_match_01,axis=1),K,D)
+
+zernike_E_12, zernike_mask_e_12 = cv2.findEssentialMat(zernike_kp0_match_01_ud, zernike_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
+                                                       method=cv2.RANSAC, prob=0.9999, threshold=0.001)
+
+print("After essential: ", np.sum(zernike_mask_e_12))
+
+zernike_valid_matches_img = draw_matches_vertical(raw_images[0],zernike_kp_0, raw_images[1],zernike_kp_1, zernike_matches_01, 
+                                              zernike_mask_e_12, display_invalid=True, color=(0, 255, 0))
+
+
+fig2, fig2_axes = plt.subplots(1,3)
+fig2_axes[0].axis("off"); fig2_axes[0].set_title("Zernike Features")
+fig2_axes[0].imshow(zernike_valid_matches_img)
