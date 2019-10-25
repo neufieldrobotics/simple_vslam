@@ -3,8 +3,8 @@ clear all
 
 %find the images
 
-fold = '/Users/vik748/Google Drive/data/Lars2_081018_clahe_masks2_out' 
-d=dir(fullfile(fold,'*.png'));
+fold = '/data/Lars/Lars1_080818' 
+d=dir(fullfile(fold,'*.JPG'));
 d = d(not([d.isdir]));
 d = d(arrayfun(@(x) x.name(1), d) ~= '.');
 
@@ -21,11 +21,11 @@ parfor (count_ind = 1:size(d,1), 12) %404:size(d,1)
 %for count_ind = 1:100
     count_ind
     X  = imread(fullfile(d(count_ind).folder,d(count_ind).name));
-    
+    X  = rgb2gray(X)
     X = imresize(X, 1/5, 'bicubic', 'Antialiasing', true);
 
-    
-    imwrite(X,strcat(d(count_ind).folder,'_800x600_test/',d(count_ind).name,'.png'),'png')
+    [filepath,name,ext] = fileparts(d(count_ind).name)
+    imwrite(X,strcat(d(count_ind).folder,'_800x600_test/',name,'.png'),'png')
     
 end
 
