@@ -13,6 +13,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 #from vslam_helper import *
 from zernike.zernike import MultiHarrisZernike
+from matplotlib import pyplot as plt
 
 
 def knn_match_and_filter(matcher, kp1, kp2, des1, des2,threshold=0.9):
@@ -47,6 +48,9 @@ gr1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
 gr2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
 a = MultiHarrisZernike(Nfeats=600,like_matlab=False)
+a.plot_zernike(a.ZstrucZ)
+
+
 m1 = cv2.imread(path+'data/time_lapse_5_cervino_800x600_masks_out/G0057821_mask.png',cv2.IMREAD_GRAYSCALE)
 m2 = cv2.imread(path+'data/time_lapse_5_cervino_800x600_masks_out/G0057826_mask.png',cv2.IMREAD_GRAYSCALE)
 
@@ -69,69 +73,4 @@ kp1_pts = np.array([k.pt for k in kp1],dtype=np.float32)
 matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
 
 
-a,b,matches = knn_match_and_filter(matcher, kp1, kp2, des1, des2,threshold=0.9)
-
-
-
-def track_keypoints(kp1, des1, kp2, des2, matches):
-    '''
-    track_keypoints accepts 2 list of keypoints and descriptors and a list of 
-    matches and returns, matched lists of keypoints and descriptors. Also returns
-    a set of candidate keypoints from 2 which didn't have matches in 1
-    
-    Parameters
-    ----------
-    kp1 : list of cv2.KeyPoint objects
-        Keypoints from frame 1
-    des1 : NxD array
-        NxD array of descriptors where N = len(kp1) and D is length of descriptor
-    kp2 : list of cv2.KeyPoint objects
-        Keypoints from frame 2
-    des2 : NxD array
-        NxD array of descriptors where N = len(kp2) and D is length of descriptor        
-    matches : list of cv2.DMatch objects
-        List of matches between 1 and 2. (single matches only not KNN)
-    '''
-    kp1_matched = []    
-    kp2_matched = []
-    des1_matched = np.zeros((len(kp1),des1.shape[1]),des1.dtype)
-    des2_matched = np.zeros((len(kp2),des2.shape[1]),des2.dtype)
-    matched_kp2_indx = []
-
-    # Go through matches and create subsets of kp1 and kp2 which matched
-    for i,m in enumerate(matches):
-        kp1_matched += [kp1[m.queryIdx]]
-        kp2_matched += [kp2[m.trainIdx]]
-        des1_matched[i,:] = des1[m.queryIdx,:]
-        des2_matched[i,:] = des2[m.trainIdx,:]
-        matched_kp2_indx += [m.trainIdx]
-
-    kp2_cand=[]
-    cand_indx = []
-    for i,k in enumerate(kp2):
-        if i not in matched_kp2_indx:
-            kp2_cand += [k]
-            cand_indx += [i]
-    des2_cand = des2[cand_indx,:]
-    
-    return kp1_matched, des1_matched, kp2_matched, des2_matched, kp2_cand, des2_cand
-
-def track_matched_kp_and_filter_cand(kp1,kp2, matches):
-    m_qid_vals = []
-    kp1_pts = np.zeros((len(matches),1,2),dtype='float32')
-    kp2_pts = np.zeros((len(matches),1,2),dtype='float32')
-    # Create dictionary of kp1 to kp2 indexes and list of matched kp2 indexes
-    for i,m in enumerate(matches):
-        kp1_pts[i,1,:] = kp1[m.queryIdx].pt
-        kp2_pts[i,1,:] = kp2[m.trainIdx].pt
-        m_qid_vals += [m.trainIdx]
-        
-    kp2_cand=[]    
-    for i,v in enumerate(kp2):
-        if i not in m_qid_vals:
-            kp2_cand += [v]
-            
-    
-    #kp_pts = np.expand_dims(np.array([o.pt for o in kp],dtype='float32'),1)
-    
-    return kp1_pts, kp2_pts, kp2_cand_pts
+_,_,matches = knn_match_and_filter(matcher, kp1, kp2, des1, des2,threshold=0.9)

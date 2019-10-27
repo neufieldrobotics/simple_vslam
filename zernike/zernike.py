@@ -12,6 +12,7 @@ from scipy.ndimage import convolve
 from scipy.ndimage.filters import maximum_filter, gaussian_filter
 import cv2
 import time
+from matplotlib import pyplot as plt
 
 class MultiHarrisZernike (cv2.Feature2D):
     '''
@@ -148,8 +149,8 @@ class MultiHarrisZernike (cv2.Feature2D):
         '''
         nm=len(Z)
         f, axes = plt.subplots(nm, nm, sharey=True)
-        #f.subplots_adjust(0,0,1,1)
-        f.subplots_adjust(wspace=0, hspace=0)
+        f.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=1.0, wspace=0.0, hspace=0.0)
+
     
         w, h = Z[0][0].shape
         for n in range(nm):
