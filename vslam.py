@@ -55,20 +55,32 @@ def writer(imgnames, masknames, config_dict, queue):
     #TILE_KP = config_dict['use_tiling_non_max_supression']
     USE_MASKS = config_dict['use_masks']
     USE_CLAHE = config_dict['use_clahe']
-    ZERNIKE_settings = config_dict['ZERNIKE_settings']
+    FEATURE_DETECTOR_TYPE = config_dict['feature_detector_type']
     USE_CACHING = False
     #RADIAL_NON_MAX = config_dict['radial_non_max']
     
     #detector = cv2.ORB_create(**config_dict['ORB_settings'])
     Frame.K = np.array(config_dict['K'])
     Frame.D = np.array(config_dict['D'])
-    Frame.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
     Frame.config_dict = config_dict
 
-    Frame.detector = MultiHarrisZernike(**ZERNIKE_settings)
-    
+    if FEATURE_DETECTOR_TYPE == 'orb':
+        Frame.matcher = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
+        Frame.detector = cv2.ORB_create(**config_dict['ORB_settings'])
+        feature_detector_config = config_dict['ORB_settings']
+    else:
+        Frame.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
+        if FEATURE_DETECTOR_TYPE == 'zernike':
+            Frame.detector = MultiHarrisZernike(**config_dict['ZERNIKE_settings'])
+            feature_detector_config = config_dict['ZERNIKE_settings']
+        elif FEATURE_DETECTOR_TYPE == 'sift':
+            Frame.detector = cv2.xfeatures2d.SIFT_create(**config_dict['SIFT_settings'])
+            feature_detector_config = config_dict['SIFT_settings']
+        else:
+            assert False, "Specified feture detector not available"
+
     #settings_hash_string = str(hash(frozenset(a.items()))).replace('-','z')
-    settings_string = ''.join(['_%s' % ZERNIKE_settings[k] for k in sorted(ZERNIKE_settings.keys())])
+    settings_string = ''.join(['_%s' % feature_detector_config[k] for k in sorted(feature_detector_config.keys())])
     local_temp_dir = os.path.dirname(os.path.abspath(__file__))+'/temp_data'
     img_folder_name = os.path.dirname(imgnames[0]).replace('/','_')[1:]
     
@@ -128,7 +140,7 @@ if __name__ == '__main__':
     # passing arguments from the terminal
     parser = argparse.ArgumentParser(description='This is the simple VSLAM pipeline')
     parser.add_argument('-c', '--config', help='location of config file in yaml format',
-                        default='config/kitti_config.yaml') #go_pro_icebergs_config.yaml
+                        default='config/go_pro_Stingray2_800x600.yaml') #go_pro_icebergs_config.yaml
     args = parser.parse_args()
      
     # Inputs, images and camera info

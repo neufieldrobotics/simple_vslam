@@ -11,13 +11,6 @@ K:
 D: 
 - [0.0, 0.0, 0.0, 0.0, 0.0]
 
-tiling_non_max_tile_y: 17 
-tiling_non_max_tile_x: 8 
-use_tiling_non_max_supression: False
-
-radial_non_max: False
-radial_non_max_radius: 5
-
 osx_image_folder: '/Users/vik748/Google Drive/data/kitti/00/image_0'
 linux_image_folder: '/home/vik748/data/kitti/00/image_0'
 image_ext: 'png'
@@ -31,6 +24,13 @@ lowe_ratio_test_threshold: 0.9
 use_RecoverPose_Filter: True
 pause_every_iteration: False
 use_gtsam: True
+
+use_tiling_non_max_supression: False
+tiling_non_max_tile_y: 17 
+tiling_non_max_tile_x: 8 
+
+radial_non_max: False
+radial_non_max_radius: 5
 
 Triangulation_settings:
  z_threshold: 60 # In units set by frame 1 and 2
@@ -50,7 +50,7 @@ CLAHE_settings:
  tileGridSize: !!python/tuple [8,6]
 
 ZERNIKE_settings:
- Nfeats: 1200
+ Nfeats: 2400
  seci: 2 
  secj: 3
  levels: 6
