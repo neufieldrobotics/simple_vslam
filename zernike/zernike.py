@@ -456,7 +456,7 @@ class MultiHarrisZernike (cv2.Feature2D):
     
     def detectAndCompute(self, gr_img, mask=None, timing=False):
         '''
-        cv2.Feature2D stype detectAndCompute.  Takes a grayscale image and
+        cv2.Feature2D style detectAndCompute.  Takes a grayscale image and
         optionally a mask and returns OpenCV keypoints and descriptors
         
         Parameters
@@ -489,4 +489,55 @@ class MultiHarrisZernike (cv2.Feature2D):
         kp = [cv2.KeyPoint(x,y,self.zrad*(sc+1)*2,_angle=ang,_response=res,_octave=sc) 
               for x,y,ang,res,sc in zip(Ft['jvec'], Ft['ivec'], np.rad2deg(alpha),
                                         Ft['evec'],Ft['svec'])]
-        return kp, V#, F, Ft, JA, JB, alpha, A
+        return kp, V, #Ft, F, Ft, JA, JB, alpha, A
+    
+    def compute(self, gr_img, keypoints, timing=False, mask=None):
+        '''
+        cv2.Feature2D style compute.  Takes a grayscale image and keypoints
+        and returns OpenCV keypoints and descriptors
+        
+        Parameters
+        ----------
+        gr_img : 2D-array (image)    
+            The input grayscale image
+        keypoints : 2D-array, optional 
+            Image mask with 1s where keypoints are permissible
+        timing : bool, optional 
+            Display timing in various parts of algorithm
+    
+        ----------
+        Example usage:
+            kp, des = a.detectAndCompute(gr, mask=m1)
+            
+        '''
+        ivec = []
+        jvec = []
+        evec = []
+        svec = []
+        sivec = []
+        sjvec = []        
+        
+        for kp in keypoints:
+            jvec.append(kp.pt[0])
+            ivec.append(kp.pt[1])
+            evec.append(kp.response)
+            svec.append(kp.octave)
+            sjvec.append(int(np.round(kp.pt[0]*self.ratio**kp.octave)))
+            sivec.append(int(np.round(kp.pt[1]*self.ratio**kp.octave)))
+        
+        Ft = {'ivec':np.array(ivec), 'jvec':np.array(jvec), 'svec':np.array(svec), 
+              'sivec':np.array(sivec), 'sjvec':np.array(sjvec), 'evec':np.array(evec)}
+
+        if len(gr_img.shape)!=2:
+            raise ValueError("Input image is not a 2D array, possibile non-grayscale")
+        if timing: st=time.time()    
+        P = self.generate_pyramid(gr_img,mask=mask)
+        if timing: print("Generate pyramid - {:0.4f}".format(time.time()-st)); st=time.time()
+        
+        JA,JB = self.z_jet_p2(P,Ft)
+        if timing: print("Feature jets - {:0.4f}".format(time.time()-st)); st=time.time()
+        V,alpha,A = self.zinvariants4(JA, JB)
+        if timing: print("Feature invariants - {:0.4f}".format(time.time()-st)); st=time.time()
+        return keypoints, V#, F, Ft, JA, JB, alpha, A
+    
+    
