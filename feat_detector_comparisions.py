@@ -13,68 +13,7 @@ import os
 import glob
 from zernike.zernike import MultiHarrisZernike
 from matlab_imresize.imresize import imresize
-from vslam_helper import knn_match_and_lowe_ratio_filter, draw_feature_tracks
-
-def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
-                        max_y=np.inf):
-    """ Compute a bounding_box filter on the given points
-
-    Parameters
-    ----------                        
-    points: (n,2) array
-        The array containing all the points's coordinates. Expected format:
-            array([
-                [x1,y1],
-                ...,
-                [xn,yn]])
-
-    min_i, max_i: float
-        The bounding box limits for each coordinate. If some limits are missing,
-        the default values are -infinite for the min_i and infinite for the max_i.
-
-    Returns
-    -------
-    bb_filter : boolean array
-        The boolean mask indicating wherever a point should be keept or not.
-        The size of the boolean mask will be the same as the number of given points.
-
-    """
-
-    bound_x = np.logical_and(points[:, 0] > min_x, points[:, 0] < max_x)
-    bound_y = np.logical_and(points[:, 1] > min_y, points[:, 1] < max_y)
-
-    bb_filter = np.logical_and(bound_x, bound_y)
-
-    return bb_filter
-
-
-def tiled_features(kp, img, tiley, tilex):
-    feat_per_cell = int(len(kp)/(tilex*tiley))
-    HEIGHT, WIDTH = img.shape
-    assert WIDTH%tiley == 0, "Width is not a multiple of tilex"
-    assert HEIGHT%tilex == 0, "Height is not a multiple of tiley"
-    w_width = int(WIDTH/tiley)
-    w_height = int(HEIGHT/tilex)
-        
-    xx = np.linspace(0,HEIGHT-w_height,tilex,dtype='int')
-    print(xx)
-    yy = np.linspace(0,WIDTH-w_width,tiley,dtype='int')
-    print(yy)
-        
-    kps = np.array([])
-    pts = np.array([keypoint.pt for keypoint in kp])
-    kp = np.array(kp)
-    
-    for ix in xx:
-        for iy in yy:
-            inbox_mask = bounding_box(pts, iy,iy+w_height, ix,ix+w_height)
-            inbox = kp[inbox_mask]
-            inbox_sorted = sorted(inbox, key = lambda x:x.response, reverse = True)
-            inbox_sorted_out = inbox_sorted[:feat_per_cell]
-            print(np.shape(inbox), ' and ', np.shape(inbox_sorted_out))
-            kps = np.append(kps,inbox_sorted_out)
-            #print(kps)
-    return kps.tolist()
+from vslam_helper import knn_match_and_lowe_ratio_filter, draw_feature_tracks, tiled_features
 
 def match_image_names(set1, set2):
     '''Return true if images in set2 start with the same name as images in set1'''
@@ -149,6 +88,9 @@ else:
 sets_folder = 'feature_descriptor_comparision'
 test_set = 'set_1'
 
+TILE_KP = True
+tiling = (4,3)
+NO_OF_FEATURES = 600
 
 '''
 LOAD DATA
@@ -171,14 +113,14 @@ assert len(raw_image_names) == 2, "Number of images in set is not 2 per type"
 '''
 Detect Features
 '''
-orb_detector = cv2.ORB_create(nfeatures=1000, edgeThreshold=125, patchSize=125, nlevels=6, 
-                              fastThreshold=9, scaleFactor=1.2, WTA_K=2,
+orb_detector = cv2.ORB_create(nfeatures=2 * NO_OF_FEATURES, edgeThreshold=125, patchSize=125, nlevels=6, 
+                              fastThreshold=3, scaleFactor=1.2, WTA_K=2,
                               scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
 
-zernike_detector = MultiHarrisZernike(Nfeats= 600, seci= 4, secj= 3, levels= 6, ratio= 1/1.2, 
+zernike_detector = MultiHarrisZernike(Nfeats= NO_OF_FEATURES, seci= 2, secj= 3, levels= 6, ratio= 1/1.2, 
                                       sigi= 2.75, sigd= 1.0, nmax= 8, like_matlab= False, lmax_nd= 3)
 
-sift_detector = cv2.xfeatures2d.SIFT_create(nfeatures = 600, nOctaveLayers = 3, contrastThreshold = 0.01, 
+sift_detector = cv2.xfeatures2d.SIFT_create(nfeatures = 2 * NO_OF_FEATURES, nOctaveLayers = 3, contrastThreshold = 0.01, 
                                             edgeThreshold = 20, sigma = 1.6)
 
 raw_images = read_image_list(raw_image_names, resize_ratio=1/5)
@@ -186,10 +128,19 @@ clahe_images = read_image_list(clahe_image_names, resize_ratio=1/5)
 
 zernike_kp_0, zernike_des_0 = zernike_detector.detectAndCompute(raw_images[0], mask=None, timing=False)
 zernike_kp_1, zernike_des_1 = zernike_detector.detectAndCompute(raw_images[1], mask=None, timing=False)
-orb_kp_0, orb_des_0 = orb_detector.detectAndCompute(raw_images[0], None)
-orb_kp_1, orb_des_1 = orb_detector.detectAndCompute(raw_images[1], None)
+orb_kp_0 = orb_detector.detect(raw_images[0], None)
+orb_kp_1 = orb_detector.detect(raw_images[1], None)
 sift_kp_0, sift_des_0 = sift_detector.detectAndCompute(raw_images[0], None)
 sift_kp_1, sift_des_1 = sift_detector.detectAndCompute(raw_images[1], None)
+print ("Points before tiling supression: ",len(orb_kp_0))
+
+if TILE_KP:
+    orb_kp_0 = tiled_features(orb_kp_0, raw_images[0].shape, tiling[0], tiling[1], no_features= 1000)
+    orb_kp_1 = tiled_features(orb_kp_1, raw_images[1].shape, tiling[0], tiling[1], no_features= 1000)
+    print ("Points after tiling supression: ",len(orb_kp_0))
+
+orb_kp_0, orb_des_0 = orb_detector.compute(raw_images[0], orb_kp_0)
+orb_kp_1, orb_des_1 = orb_detector.compute(raw_images[1], orb_kp_1)
 
 zernike_kp_0_sort = sorted(zernike_kp_0, key = lambda x: x.response, reverse=True)
 zernike_kp_1_sort = sorted(zernike_kp_1, key = lambda x: x.response, reverse=True)
