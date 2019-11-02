@@ -294,13 +294,16 @@ def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
     return bb_filter
 
 
-def tiled_features(kp, img_shape, tiley, tilex):
+def tiled_features(kp, img_shape, tiley, tilex, no_features = None):
     '''
     Given a set of keypoints, this divides the image into a grid and returns 
     len(kp)/(tilex*tiley) maximum responses within each tell. If that cell doesn't 
     have enough points it will return all of them.
     '''
-    feat_per_cell = int(len(kp)/(tilex*tiley))
+    if no_features:
+        feat_per_cell = int(no_features/(tilex*tiley))
+    else:
+        feat_per_cell = int(len(kp)/(tilex*tiley))
     HEIGHT, WIDTH = img_shape
     assert WIDTH%tiley == 0, "Width is not a multiple of tilex"
     assert HEIGHT%tilex == 0, "Height is not a multiple of tiley"
