@@ -81,7 +81,7 @@ def draw_matches_vertical(img_top, kp1,img_bottom,kp2, matches, mask, display_in
         cv2.line(out_img, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1]+img_height)), color=color, thickness=1)
     return out_img
 
-def analyze_image_pair(image_0, image_1, settings): 
+def analyze_image_pair(image_0, image_1, settings, plotMatches=True): 
     K = settings['K']
     D = settings['D']
     TILE_KP = settings['TILE_KP']
@@ -96,25 +96,14 @@ def analyze_image_pair(image_0, image_1, settings):
     orb_kp_1_ut = orb_detector.detect(image_1, None)
     sift_kp_0_ut = sift_detector.detect(image_0, None)
     sift_kp_1_ut = sift_detector.detect(image_1, None)
-    print ("Points before tiling supression: ",len(orb_kp_0_ut))
-    
-    zernike_kp_img_0 = draw_markers(image_0, zernike_kp_0, color=[255,255,0])
-    zernike_kp_img_1 = draw_markers(image_1, zernike_kp_1, color=[255,255,0])
-    orb_kp_img_0 = draw_markers(image_0, orb_kp_0_ut, color=[255,255,0])
-    orb_kp_img_1 = draw_markers(image_1, orb_kp_1_ut, color=[255,255,0])
-    sift_kp_img_0 = draw_markers(image_0, sift_kp_0_ut, color=[255,255,0])
-    sift_kp_img_1 = draw_markers(image_1, sift_kp_1_ut, color=[255,255,0])
-    
+    #print ("Points before tiling supression: ",len(orb_kp_0_ut))
+        
     
     if TILE_KP:
         orb_kp_0 = tiled_features(orb_kp_0_ut, image_0.shape, tiling[0], tiling[1], no_features= 1000)
         orb_kp_1 = tiled_features(orb_kp_1_ut, image_1.shape, tiling[0], tiling[1], no_features= 1000)
-        orb_kp_img_0 = draw_markers(orb_kp_img_0, orb_kp_0, color=[0,255,0])
-        orb_kp_img_1 = draw_markers(orb_kp_img_1, orb_kp_1, color=[0,255,0])
         sift_kp_0 = tiled_features(sift_kp_0_ut, image_0.shape, tiling[0], tiling[1], no_features= 1000)
         sift_kp_1 = tiled_features(sift_kp_1_ut, image_1.shape, tiling[0], tiling[1], no_features= 1000)
-        sift_kp_img_0 = draw_markers(sift_kp_img_0, sift_kp_0, color=[0,255,0])
-        sift_kp_img_1 = draw_markers(sift_kp_img_1, sift_kp_1, color=[0,255,0])
         
     else:
         orb_kp_0 = orb_kp_0_ut
@@ -122,31 +111,47 @@ def analyze_image_pair(image_0, image_1, settings):
         sift_kp_0 = sift_kp_0_ut
         sift_kp_1 = sift_kp_1_ut
     
-        print ("Points after tiling supression: ",len(orb_kp_0))
+        #print ("Points after tiling supression: ",len(orb_kp_0))
     
+    
+    if plotMatches:
+        zernike_kp_img_0 = draw_markers(image_0, zernike_kp_0, color=[255,255,0])
+        zernike_kp_img_1 = draw_markers(image_1, zernike_kp_1, color=[255,255,0])
+        orb_kp_img_0 = draw_markers(image_0, orb_kp_0_ut, color=[255,255,0])
+        orb_kp_img_1 = draw_markers(image_1, orb_kp_1_ut, color=[255,255,0])
+        sift_kp_img_0 = draw_markers(image_0, sift_kp_0_ut, color=[255,255,0])
+        sift_kp_img_1 = draw_markers(image_1, sift_kp_1_ut, color=[255,255,0])
+
+        if TILE_KP:
+            orb_kp_img_0 = draw_markers(orb_kp_img_0, orb_kp_0, color=[0,255,0])
+            orb_kp_img_1 = draw_markers(orb_kp_img_1, orb_kp_1, color=[0,255,0])
+            sift_kp_img_0 = draw_markers(sift_kp_img_0, sift_kp_0, color=[0,255,0])
+            sift_kp_img_1 = draw_markers(sift_kp_img_1, sift_kp_1, color=[0,255,0])                
+        
+        fig1 = plt.figure(1); plt.clf()
+        fig1, fig1_axes = plt.subplots(2,3, num=1)
+        fig1.suptitle(settings['set_title'] + ' features')
+        fig1_axes[0,0].axis("off"); fig1_axes[0,0].set_title("Zernike Features \n{:d} features".format(len(zernike_kp_0)))
+        fig1_axes[0,0].imshow(zernike_kp_img_0)
+        fig1_axes[1,0].axis("off"); fig1_axes[1,0].set_title("{:d} features".format(len(zernike_kp_1)))
+        fig1_axes[1,0].imshow(zernike_kp_img_1)
+        fig1_axes[0,1].axis("off"); fig1_axes[0,1].set_title("Orb Features\nBefore tiling:{:d} after tiling {:d}".format(len(orb_kp_0_ut),len(orb_kp_0)))
+        fig1_axes[0,1].imshow(orb_kp_img_0)
+        fig1_axes[1,1].axis("off"); fig1_axes[1,1].set_title("Before tiling:{:d} after tiling {:d}".format(len(orb_kp_1_ut),len(orb_kp_1))) 
+        fig1_axes[1,1].imshow(orb_kp_img_1)
+        fig1_axes[0,2].axis("off"); fig1_axes[0,2].set_title("Sift Features\nBefore tiling:{:d} after tiling {:d}".format(len(sift_kp_0_ut),len(sift_kp_0)))
+        fig1_axes[0,2].imshow(sift_kp_img_0)
+        fig1_axes[1,2].axis("off"); fig1_axes[1,2].set_title("Before tiling:{:d} after tiling {:d}".format(len(sift_kp_1_ut),len(sift_kp_1))) 
+        fig1_axes[1,2].imshow(sift_kp_img_1)
+        #fig1.subplots_adjust(0,0,1,1,0.0,0.0)
+        fig1.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.1)
+        plt.pause(.1)
+        #plt.show()
+
     orb_kp_0, orb_des_0 = orb_detector.compute(image_0, orb_kp_0)
     orb_kp_1, orb_des_1 = orb_detector.compute(image_1, orb_kp_1)
     sift_kp_0, sift_des_0 = sift_detector.compute(image_0, sift_kp_0)
     sift_kp_1, sift_des_1 = sift_detector.compute(image_1, sift_kp_1)
-    
-    fig1 = plt.figure(1); plt.clf()
-    fig1, fig1_axes = plt.subplots(2,3, num=1)
-    fig1.suptitle(settings['set_title'] + ' features')
-    fig1_axes[0,0].axis("off"); fig1_axes[0,0].set_title("Zernike Features \n{:d} features".format(len(zernike_kp_0)))
-    fig1_axes[0,0].imshow(zernike_kp_img_0)
-    fig1_axes[1,0].axis("off"); fig1_axes[1,0].set_title("{:d} features".format(len(zernike_kp_1)))
-    fig1_axes[1,0].imshow(zernike_kp_img_1)
-    fig1_axes[0,1].axis("off"); fig1_axes[0,1].set_title("Orb Features\nBefore tiling:{:d} after tiling {:d}".format(len(orb_kp_0_ut),len(orb_kp_0)))
-    fig1_axes[0,1].imshow(orb_kp_img_0)
-    fig1_axes[1,1].axis("off"); fig1_axes[1,1].set_title("Before tiling:{:d} after tiling {:d}".format(len(orb_kp_1_ut),len(orb_kp_1))) 
-    fig1_axes[1,1].imshow(orb_kp_img_1)
-    fig1_axes[0,2].axis("off"); fig1_axes[0,2].set_title("Sift Features\nBefore tiling:{:d} after tiling {:d}".format(len(sift_kp_0_ut),len(sift_kp_0)))
-    fig1_axes[0,2].imshow(sift_kp_img_0)
-    fig1_axes[1,2].axis("off"); fig1_axes[1,2].set_title("Before tiling:{:d} after tiling {:d}".format(len(sift_kp_1_ut),len(sift_kp_1))) 
-    fig1_axes[1,2].imshow(sift_kp_img_1)
-    #fig1.subplots_adjust(0,0,1,1,0.0,0.0)
-    fig1.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.1)
-    plt.show()
     
     '''
     Match and find inliers
@@ -165,10 +170,8 @@ def analyze_image_pair(image_0, image_1, settings):
     zernike_E_12, zernike_mask_e_12 = cv2.findEssentialMat(zernike_kp0_match_01_ud, zernike_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
                                                            method=cv2.RANSAC, prob=0.9999, threshold=0.001)
     
-    print("Zernike After essential: ", np.sum(zernike_mask_e_12))
+    #print("Zernike After essential: ", np.sum(zernike_mask_e_12))
     
-    zernike_valid_matches_img = draw_matches_vertical(image_0,zernike_kp_0, image_1,zernike_kp_1, zernike_matches_01, 
-                                                  zernike_mask_e_12, display_invalid=True, color=(0, 255, 0))
     
     
     orb_matches_01 = knn_match_and_lowe_ratio_filter(matcher_hamming, orb_des_0, orb_des_1, threshold=0.9)
@@ -182,11 +185,7 @@ def analyze_image_pair(image_0, image_1, settings):
     orb_E_12, orb_mask_e_12 = cv2.findEssentialMat(orb_kp0_match_01_ud, orb_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
                                                    method=cv2.RANSAC, prob=0.9999, threshold=0.001)
     
-    print("Orb After essential: ", np.sum(orb_mask_e_12))
-    
-    orb_valid_matches_img = draw_matches_vertical(image_0,orb_kp_0, image_1,orb_kp_1, orb_matches_01, 
-                                                  orb_mask_e_12, display_invalid=True, color=(0, 255, 0))
-    
+    #print("Orb After essential: ", np.sum(orb_mask_e_12))
     
     sift_matches_01 = knn_match_and_lowe_ratio_filter(matcher_norm, sift_des_0, sift_des_1, threshold=0.90)
     
@@ -199,24 +198,34 @@ def analyze_image_pair(image_0, image_1, settings):
     sift_E_12, sift_mask_e_12 = cv2.findEssentialMat(sift_kp0_match_01_ud, sift_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
                                                    method=cv2.RANSAC, prob=0.9999, threshold=0.001)
     
-    print("sift After essential: ", np.sum(sift_mask_e_12))
-    
-    sift_valid_matches_img = draw_matches_vertical(image_0,sift_kp_0, image_1,sift_kp_1, sift_matches_01, 
-                                                  sift_mask_e_12, display_invalid=True, color=(0, 255, 0))
+    #print("sift After essential: ", np.sum(sift_mask_e_12))
     
     no_zernike_matches = np.sum(zernike_mask_e_12)
     no_orb_matches = np.sum(orb_mask_e_12)
     no_sift_matches = np.sum(sift_mask_e_12)
     
-    fig2 = plt.figure(2); plt.clf()
-    fig2, fig2_axes = plt.subplots(1,3, num=2)
-    fig2.suptitle(settings['set_title'] + ' Feature Matching')
-    fig2_axes[0].axis("off"); fig2_axes[0].set_title("Zernike Features\n{:d} matches".format(no_zernike_matches))
-    fig2_axes[0].imshow(zernike_valid_matches_img)
-    fig2_axes[1].axis("off"); fig2_axes[1].set_title("Orb Features\n{:d} matches".format(no_orb_matches))
-    fig2_axes[1].imshow(orb_valid_matches_img)
-    fig2_axes[2].axis("off"); fig2_axes[2].set_title("Sift Features\n{:d} matches".format(no_sift_matches))
-    fig2_axes[2].imshow(sift_valid_matches_img)
-    fig2.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.0)
+    if plotMatches:
     
+        zernike_valid_matches_img = draw_matches_vertical(image_0,zernike_kp_0, image_1,zernike_kp_1, zernike_matches_01, 
+                                                          zernike_mask_e_12, display_invalid=True, color=(0, 255, 0))
+    
+        orb_valid_matches_img = draw_matches_vertical(image_0,orb_kp_0, image_1,orb_kp_1, orb_matches_01, 
+                                                      orb_mask_e_12, display_invalid=True, color=(0, 255, 0))
+        
+        sift_valid_matches_img = draw_matches_vertical(image_0,sift_kp_0, image_1,sift_kp_1, sift_matches_01, 
+                                                       sift_mask_e_12, display_invalid=True, color=(0, 255, 0))
+            
+        fig2 = plt.figure(2); plt.clf()
+        fig2, fig2_axes = plt.subplots(1,3, num=2)
+        fig2.suptitle(settings['set_title'] + ' Feature Matching')
+        fig2_axes[0].axis("off"); fig2_axes[0].set_title("Zernike Features\n{:d} matches".format(no_zernike_matches))
+        fig2_axes[0].imshow(zernike_valid_matches_img)
+        fig2_axes[1].axis("off"); fig2_axes[1].set_title("Orb Features\n{:d} matches".format(no_orb_matches))
+        fig2_axes[1].imshow(orb_valid_matches_img)
+        fig2_axes[2].axis("off"); fig2_axes[2].set_title("Sift Features\n{:d} matches".format(no_sift_matches))
+        fig2_axes[2].imshow(sift_valid_matches_img)
+        fig2.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.0)
+        plt.pause(.1)
+        input("Enter to continue")
+
     return {'zernike_matches':no_zernike_matches, 'orb_matches':no_orb_matches, 'sift_matches':no_sift_matches}
