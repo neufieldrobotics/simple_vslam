@@ -20,7 +20,7 @@ from datetime import datetime
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/data'
 else:
-    path = '/home/vik748/data'
+    path = '/data/Lars'
     
 raw_sets_folder = 'Lars1_080818_800x600'
 clahe_sets_folder = 'Lars1_080818_clahe_800x600'
@@ -49,7 +49,7 @@ D = np.array([-2.81360302828763176e-01, 1.38000456840603303e-01, 4.8762963517630
 raw_img_folder = os.path.join(path,raw_sets_folder)
 clahe_img_folder = os.path.join(path,clahe_sets_folder)
 
-raw_image_names = sorted(glob.glob(raw_img_folder+'/*.png'))[:20]
+raw_image_names = sorted(glob.glob(raw_img_folder+'/*.png'))
 clahe_image_names = sorted(glob.glob(clahe_img_folder+'/*.tif'))
 #poses_txt = os.path.join(path,sets_folder,test_set,'poses.txt')
 
@@ -76,23 +76,31 @@ sift_detector = cv2.xfeatures2d.SIFT_create(nfeatures = NO_OF_UT_FEATURES, nOcta
 config_settings = {'set_title': 'Lars1 800x600 Raw Images',
                    'K':K, 'D':D, 'TILE_KP':TILE_KP, 'tiling':tiling , 
                    'zernike_detector': zernike_detector, 'orb_detector': orb_detector, 'sift_detector': sift_detector} 
-
-results_list = []
-
-for img0_name, img1_name in progressbar.progressbar(zip(raw_image_names[:-BASELINE_STEP_SIZE], raw_image_names[BASELINE_STEP_SIZE:]),max_value=len(raw_image_names[:-BASELINE_STEP_SIZE])):
-    image_0 = cv2.imread(img0_name, cv2.IMREAD_GRAYSCALE)
-    image_1 = cv2.imread(img1_name, cv2.IMREAD_GRAYSCALE)
+for BASELINE_STEP_SIZE in (1, 2, 5, 10, 15, 20):
     
-    results = analyze_image_pair(image_0, image_1, config_settings, plotMatches = False)
-    results_list.append([results['zernike_matches'], results['orb_matches'], results['sift_matches']])    
+    results_list = []
+    
+    for img0_name, img1_name in progressbar.progressbar(zip(raw_image_names[:-BASELINE_STEP_SIZE], raw_image_names[BASELINE_STEP_SIZE:]),max_value=len(raw_image_names[:-BASELINE_STEP_SIZE])):
+        image_0 = cv2.imread(img0_name, cv2.IMREAD_GRAYSCALE)
+        image_1 = cv2.imread(img1_name, cv2.IMREAD_GRAYSCALE)
+        
+        results = analyze_image_pair(image_0, image_1, config_settings, plotMatches = False)
+        results_list.append([results['zernike_matches'], results['orb_matches'], results['sift_matches']])    
+    
+    results_array = np.array(results_list)
+    np.savetxt("results_array_baseline_"+str(BASELINE_STEP_SIZE)+'_'+datetime.now().strftime("%Y%m%d%H%M%S")+".csv", results_array, delimiter=",", header="zernike, orb, sift")
+    
+    fig3 = plt.figure(3)
+    plt.clf()
+    bins = np.linspace(10, 250, 25)
+    
+    plt.hist(results_array, bins=bins, alpha=0.5, label=['Zernike','ORB','SIFT'])
+    plt.legend(loc='upper right')
+    plt.suptitle(config_settings['set_title'] + '\n Baseline: {:d}'.format(BASELINE_STEP_SIZE))
+    plt.xlabel('Bins (Number of matches)')
+    plt.ylabel('Occurances (Image pairs)')
+    plt.axes().set_ylim([0, 750])
+    plt.draw()
+    save_fig2pdf(fig3)
 
-results_array = np.array(results_list)
-np.savetxt("results_array_"+datetime.now().strftime("%Y%m%d%H%M%S")+".csv", results_array, delimiter=",", header="zernike, orb, sift")
-
-plt.figure(3)
-bins = np.linspace(60, 140, 32)
-
-plt.hist(results_array, alpha=0.5, label=['Zernike','ORB','SIFT'])
-plt.legend(loc='upper right')
-plt.show()
 

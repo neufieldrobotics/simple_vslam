@@ -11,9 +11,26 @@ from matlab_imresize.imresize import imresize
 import numpy as np
 from vslam_helper import tiled_features, knn_match_and_lowe_ratio_filter
 from matplotlib import pyplot as plt
+from datetime import datetime
+import re
 
 
+def save_fig2pdf(fig, folder=None, fname=None):
+    plt._pylab_helpers.Gcf.figs.get(fig.number, None).window.showMaximized()
+    plt.pause(.1)
+    if fname is None:
+        if fig._suptitle is None:
+            fname = 'figure_{:d}'.format(fig.number)
+        else:
+            ttl = fig._suptitle.get_text()
+            ttl = ttl.replace('$','').replace('\n','_').replace(' ','_')
+            fname = re.sub(r"\_\_+", "_", ttl) 
+    if folder:
+        plt.savefig(os.path.join(folder, fname +'_'+datetime.now().strftime("%Y%m%d%H%M%S") +'.pdf'),format='pdf', dpi=1200,  orientation='landscape', papertype='letter')
+    else:
+        plt.savefig(fname +'_'+datetime.now().strftime("%Y%m%d%H%M%S") +'.pdf',format='pdf', dpi=1200,  orientation='landscape', papertype='letter')
 
+    plt._pylab_helpers.Gcf.figs.get(fig.number, None).window.showNormal()
 
 def match_image_names(set1, set2):
     '''Return true if images in set2 start with the same name as images in set1'''
