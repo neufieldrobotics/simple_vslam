@@ -98,7 +98,7 @@ def draw_matches_vertical(img_top, kp1,img_bottom,kp2, matches, mask, display_in
         cv2.line(out_img, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1]+img_height)), color=color, thickness=1)
     return out_img
 
-def analyze_image_pair(image_0, image_1, settings, plotMatches=True): 
+def analyze_image_pair_zer_orb_sift(image_0, image_1, settings, plotMatches=True): 
     K = settings['K']
     D = settings['D']
     TILE_KP = settings['TILE_KP']
@@ -162,8 +162,7 @@ def analyze_image_pair(image_0, image_1, settings, plotMatches=True):
         fig1_axes[1,2].imshow(sift_kp_img_1)
         #fig1.subplots_adjust(0,0,1,1,0.0,0.0)
         fig1.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.1)
-        plt.pause(.1)
-        #plt.show()
+        plt.draw(); plt.show(block=False)
 
     orb_kp_0, orb_des_0 = orb_detector.compute(image_0, orb_kp_0)
     orb_kp_1, orb_des_1 = orb_detector.compute(image_1, orb_kp_1)
@@ -242,7 +241,7 @@ def analyze_image_pair(image_0, image_1, settings, plotMatches=True):
         fig2_axes[2].axis("off"); fig2_axes[2].set_title("Sift Features\n{:d} matches".format(no_sift_matches))
         fig2_axes[2].imshow(sift_valid_matches_img)
         fig2.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.0)
-        plt.pause(.1)
+        plt.draw(); plt.show(block=False)
         input("Enter to continue")
 
     return {'zernike_matches':no_zernike_matches, 'orb_matches':no_orb_matches, 'sift_matches':no_sift_matches}

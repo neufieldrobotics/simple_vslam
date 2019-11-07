@@ -84,7 +84,7 @@ for BASELINE_STEP_SIZE in (1, 2, 5, 10, 15, 20):
         image_0 = cv2.imread(img0_name, cv2.IMREAD_GRAYSCALE)
         image_1 = cv2.imread(img1_name, cv2.IMREAD_GRAYSCALE)
         
-        results = analyze_image_pair(image_0, image_1, config_settings, plotMatches = False)
+        results = analyze_image_pair_zer_orb_sift(image_0, image_1, config_settings, plotMatches = True)
         results_list.append([results['zernike_matches'], results['orb_matches'], results['sift_matches']])    
     
     results_array = np.array(results_list)
