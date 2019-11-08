@@ -245,3 +245,136 @@ def analyze_image_pair_zer_orb_sift(image_0, image_1, settings, plotMatches=True
         input("Enter to continue")
 
     return {'zernike_matches':no_zernike_matches, 'orb_matches':no_orb_matches, 'sift_matches':no_sift_matches}
+
+def analyze_image_pair_zer_orb_orbhc(image_0, image_1, settings, plotMatches=True): 
+    K = settings['K']
+    D = settings['D']
+    TILE_KP = settings['TILE_KP']
+    tiling = settings['tiling']
+    zernike_detector = settings['zernike_detector']
+    orb_detector = settings['orb_detector']
+
+    zernike_kp_0, zernike_des_0 = zernike_detector.detectAndCompute(image_0, mask=None, timing=False)
+    zernike_kp_1, zernike_des_1 = zernike_detector.detectAndCompute(image_1, mask=None, timing=False)
+    orb_kp_0_ut = orb_detector.detect(image_0, None)
+    orb_kp_1_ut = orb_detector.detect(image_1, None)
+    # Use Harris corners from zernike for ORB
+    orbhc_kp_0 = zernike_kp_0.copy()   
+    orbhc_kp_1 = zernike_kp_1.copy()  
+    orbhc_kp_0, orbhc_des_0 = orb_detector.compute(image_0, orbhc_kp_0)
+    orbhc_kp_1, orbhc_des_1 = orb_detector.compute(image_1, orbhc_kp_1)
+    
+    if TILE_KP:
+        orb_kp_0 = tiled_features(orb_kp_0_ut, image_0.shape, tiling[0], tiling[1], no_features= 1000)
+        orb_kp_1 = tiled_features(orb_kp_1_ut, image_1.shape, tiling[0], tiling[1], no_features= 1000)
+        
+    else:
+        orb_kp_0 = orb_kp_0_ut
+        orb_kp_1 = orb_kp_1_ut
+        
+    if plotMatches:
+        zernike_kp_img_0 = draw_markers(image_0, zernike_kp_0, color=[255,255,0])
+        zernike_kp_img_1 = draw_markers(image_1, zernike_kp_1, color=[255,255,0])
+        orb_kp_img_0 = draw_markers(image_0, orb_kp_0_ut, color=[255,255,0])
+        orb_kp_img_1 = draw_markers(image_1, orb_kp_1_ut, color=[255,255,0])
+        orbhc_kp_img_0 = draw_markers(image_0, orbhc_kp_0, color=[255,255,0])
+        orbhc_kp_img_1 = draw_markers(image_1, orbhc_kp_1, color=[255,255,0])
+        
+
+        if TILE_KP:
+            orb_kp_img_0 = draw_markers(orb_kp_img_0, orb_kp_0, color=[0,255,0])
+            orb_kp_img_1 = draw_markers(orb_kp_img_1, orb_kp_1, color=[0,255,0])
+        
+        fig1 = plt.figure(1); plt.clf()
+        fig1, fig1_axes = plt.subplots(2,3, num=1)
+        fig1.suptitle(settings['set_title'] + ' features')
+        fig1_axes[0,0].axis("off"); fig1_axes[0,0].set_title("Zernike Features \n{:d} features".format(len(zernike_kp_0)))
+        fig1_axes[0,0].imshow(zernike_kp_img_0)
+        fig1_axes[1,0].axis("off"); fig1_axes[1,0].set_title("{:d} features".format(len(zernike_kp_1)))
+        fig1_axes[1,0].imshow(zernike_kp_img_1)
+        fig1_axes[0,1].axis("off"); fig1_axes[0,1].set_title("Orb Features\nBefore tiling:{:d} after tiling {:d}".format(len(orb_kp_0_ut),len(orb_kp_0)))
+        fig1_axes[0,1].imshow(orb_kp_img_0)
+        fig1_axes[1,1].axis("off"); fig1_axes[1,1].set_title("Before tiling:{:d} after tiling {:d}".format(len(orb_kp_1_ut),len(orb_kp_1))) 
+        fig1_axes[1,1].imshow(orb_kp_img_1)
+        fig1_axes[0,2].axis("off"); fig1_axes[0,2].set_title("ORB Harris Corner Features\n{:d} features".format(len(orbhc_kp_0)))
+        fig1_axes[0,2].imshow(orbhc_kp_img_0)
+        fig1_axes[1,2].axis("off"); fig1_axes[1,2].set_title("{:d} features".format(len(orbhc_kp_1))) 
+        fig1_axes[1,2].imshow(orbhc_kp_img_1)
+        #fig1.subplots_adjust(0,0,1,1,0.0,0.0)
+        fig1.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.1)
+        plt.draw(); plt.show(block=False)
+
+    orb_kp_0, orb_des_0 = orb_detector.compute(image_0, orb_kp_0)
+    orb_kp_1, orb_des_1 = orb_detector.compute(image_1, orb_kp_1)
+    
+    '''
+    Match and find inliers
+    '''
+    matcher_norm = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
+    matcher_hamming = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
+    
+    zernike_matches_01 = knn_match_and_lowe_ratio_filter(matcher_norm, zernike_des_0, zernike_des_1, threshold=0.9)
+    
+    zernike_kp0_match_01 = np.array([zernike_kp_0[mat.queryIdx].pt for mat in zernike_matches_01])
+    zernike_kp1_match_01 = np.array([zernike_kp_1[mat.trainIdx].pt for mat in zernike_matches_01])
+    
+    zernike_kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(zernike_kp0_match_01,axis=1),K,D)
+    zernike_kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(zernike_kp1_match_01,axis=1),K,D)
+    
+    zernike_E_12, zernike_mask_e_12 = cv2.findEssentialMat(zernike_kp0_match_01_ud, zernike_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
+                                                           method=cv2.RANSAC, prob=0.9999, threshold=0.001)    
+
+    
+    orb_matches_01 = knn_match_and_lowe_ratio_filter(matcher_hamming, orb_des_0, orb_des_1, threshold=0.9)
+    
+    orb_kp0_match_01 = np.array([orb_kp_0[mat.queryIdx].pt for mat in orb_matches_01])
+    orb_kp1_match_01 = np.array([orb_kp_1[mat.trainIdx].pt for mat in orb_matches_01])
+    
+    orb_kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(orb_kp0_match_01,axis=1),K,D)
+    orb_kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(orb_kp1_match_01,axis=1),K,D)
+    
+    orb_E_12, orb_mask_e_12 = cv2.findEssentialMat(orb_kp0_match_01_ud, orb_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
+                                                   method=cv2.RANSAC, prob=0.9999, threshold=0.001)
+       
+    
+    orbhc_matches_01 = knn_match_and_lowe_ratio_filter(matcher_hamming, orbhc_des_0, orbhc_des_1, threshold=0.9)
+    
+    orbhc_kp0_match_01 = np.array([orbhc_kp_0[mat.queryIdx].pt for mat in orbhc_matches_01])
+    orbhc_kp1_match_01 = np.array([orbhc_kp_1[mat.trainIdx].pt for mat in orbhc_matches_01])
+    
+    orbhc_kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(orbhc_kp0_match_01,axis=1),K,D)
+    orbhc_kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(orbhc_kp1_match_01,axis=1),K,D)
+    
+    orbhc_E_12, orbhc_mask_e_12 = cv2.findEssentialMat(orbhc_kp0_match_01_ud, orbhc_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
+                                                       method=cv2.RANSAC, prob=0.9999, threshold=0.001)
+    
+    
+    no_zernike_matches = np.sum(zernike_mask_e_12)
+    no_orb_matches = np.sum(orb_mask_e_12)
+    no_orbhc_matches = np.sum(orbhc_mask_e_12)
+    
+    if plotMatches:
+    
+        zernike_valid_matches_img = draw_matches_vertical(image_0,zernike_kp_0, image_1,zernike_kp_1, zernike_matches_01, 
+                                                          zernike_mask_e_12, display_invalid=True, color=(0, 255, 0))
+    
+        orb_valid_matches_img = draw_matches_vertical(image_0,orb_kp_0, image_1,orb_kp_1, orb_matches_01, 
+                                                      orb_mask_e_12, display_invalid=True, color=(0, 255, 0))
+        
+        orbhc_valid_matches_img = draw_matches_vertical(image_0,orbhc_kp_0, image_1,orbhc_kp_1, orbhc_matches_01, 
+                                                        orbhc_mask_e_12, display_invalid=True, color=(0, 255, 0))
+            
+        fig2 = plt.figure(2); plt.clf()
+        fig2, fig2_axes = plt.subplots(1,3, num=2)
+        fig2.suptitle(settings['set_title'] + ' Feature Matching')
+        fig2_axes[0].axis("off"); fig2_axes[0].set_title("Zernike Features\n{:d} matches".format(no_zernike_matches))
+        fig2_axes[0].imshow(zernike_valid_matches_img)
+        fig2_axes[1].axis("off"); fig2_axes[1].set_title("Orb Features\n{:d} matches".format(no_orb_matches))
+        fig2_axes[1].imshow(orb_valid_matches_img)
+        fig2_axes[2].axis("off"); fig2_axes[2].set_title("Orb Harris Corner Features\n{:d} matches".format(no_orbhc_matches))
+        fig2_axes[2].imshow(orbhc_valid_matches_img)
+        fig2.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.0)
+        plt.draw(); plt.show(block=False)
+        input("Enter to continue")
+
+    return {'zernike_matches':no_zernike_matches, 'orb_matches':no_orb_matches, 'orbhc_matches':no_orbhc_matches}
