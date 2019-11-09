@@ -9,7 +9,7 @@ import numpy as np
 from matlab_imresize.imresize import imresize
 np.set_printoptions(precision=5,suppress=True)
 from scipy.ndimage import convolve
-from scipy.ndimage.filters import maximum_filter, gaussian_filter
+#from scipy.ndimage.filters import maximum_filter, gaussian_filter
 import cv2
 import time
 from matplotlib import pyplot as plt
@@ -74,9 +74,10 @@ class MultiHarrisZernike (cv2.Feature2D):
         self.sigd    = sigd          # derivation scale
         self.nmax    = nmax          # zernike order
         self.exact   = like_matlab   # Flag to replicate Oscar's Matlab version (slower) 
-        self.lmax_nd = lmax_nd       # Feature neighborhood size for local maximum filter
+        #self.lmax_nd = lmax_nd       # Feature neighborhood size for local maximum filter
         self.zrad    = np.ceil(self.sigi*8).astype(int) # radius for zernike disk  
         self.brad    = np.ceil(0.5*self.zrad).astype(int)    # radius for secondary zernike disk
+        self.non_max_kernel = np.ones((lmax_nd,lmax_nd), np.uint8)
 
         if self.exact:
             self.Gi     = MultiHarrisZernike.fspecial_gauss(11,self.sigi)
@@ -93,6 +94,17 @@ class MultiHarrisZernike (cv2.Feature2D):
         x, y = np.mgrid[-size//2 + 1:size//2 + 1, -size//2 + 1:size//2 + 1]
         g = np.exp(-((x**2 + y**2)/(2.0*sigma**2)))
         return g/g.sum()
+    
+    @staticmethod
+    def xy_gradients(img):
+        '''
+        Return x and y gradients of an image. Similar to np.gradient
+        '''
+        kernelx = 1/2*np.array([[-1,0,1]])
+        kernely = 1/2*np.array([[-1],[0],[1]])
+        fx = cv2.filter2D(img,cv2.CV_32F,kernelx)
+        fy = cv2.filter2D(img,cv2.CV_32F,kernely)
+        return fy, fx
     
     @staticmethod
     def zernike_generate(nmax,radius,verbose=False):
@@ -176,24 +188,28 @@ class MultiHarrisZernike (cv2.Feature2D):
         if self.exact:
             lpimages = [convolve(images[0],self.pyrlpf,mode='constant')]
         else:
-            lpimages = [gaussian_filter(images[0],sigma=self.sigd,mode='constant',truncate=3.0)]
+            #lpimages = [gaussian_filter(images[0],sigma=self.sigd,mode='constant',truncate=3.0)]
+            lpimages = [cv2.GaussianBlur(images[0], ksize=(7,7), sigmaX=self.sigd, sigmaY=self.sigd, borderType = cv2.BORDER_CONSTANT)]
 
-        for k in range(1,self.levels):
-            # CV2 version of imresize is faster but doesn't have antialiasing
-            # so results in fewer matches
-            #images += [cv2.resize(images[-1], (0,0), fx=self.ratio,
-            #                          fy=self.ratio, interpolation=cv2.INTER_AREA)]
-            images += [imresize(images[-1], self.ratio, method='bilinear')]
-            
+        for k in range(1,self.levels):            
+            if self.exact:
+            		# CV2 version of imresize is faster but doesn't have antialiasing
+            		# so results in fewer matches		
+                images += [imresize(images[-1], self.ratio, method='bilinear').astype('float32')]
+                
+                # convolve matches matlb version better, filter is 3 times faster
+
+                lpimages += [convolve(images[-1],self.pyrlpf,mode='constant')]
+            else:
+                images += [cv2.resize(images[-1], (0,0), fx=self.ratio,
+                           fy=self.ratio, interpolation=cv2.INTER_AREA)]
+                #lpimages += [gaussian_filter(images[-1],sigma=self.sigd,mode='constant',truncate=3.0)]
+                # kzise = 11,11 matches best with exact version, lower size more efficient
+                lpimages += [cv2.GaussianBlur(images[-1], ksize=(5,5), sigmaX=self.sigd, sigmaY=self.sigd, borderType = cv2.BORDER_CONSTANT)]
+                
             if mask is not None:
                 masks += [cv2.resize(masks[-1], images[-1].shape[::-1],
                                      interpolation=cv2.INTER_NEAREST)]
-
-            # convolve matches matlb version better, filter is 3 times faster
-            if self.exact:
-                lpimages += [convolve(images[-1],self.pyrlpf,mode='constant')]
-            else:                
-                lpimages += [gaussian_filter(images[-1],sigma=self.sigd,mode='constant',truncate=3.0)]
 
             sigd_list += [sigd_list[-1]/self.ratio] #equivalent sigdec at max res
             sigi_list += [sigi_list[-1]/self.ratio] 
@@ -208,10 +224,10 @@ class MultiHarrisZernike (cv2.Feature2D):
         lpf smoothed by the detection scale gaussian
         Gi = fspecial('gaussian',ceil(7*sigi),sigi);
         '''
-        [fy,fx] = np.gradient(lpf)
+        [fy,fx] = MultiHarrisZernike.xy_gradients(lpf)
     
-        [fxy,fxx] = np.gradient(fx)
-        [fyy,fyx] = np.gradient(fy)
+        [fxy,fxx] = MultiHarrisZernike.xy_gradients(fx)
+        [fyy,fyx] = MultiHarrisZernike.xy_gradients(fy)
         nL = scale**(-2)*np.abs(fxx+fyy)
         
         if self.exact:
@@ -219,17 +235,21 @@ class MultiHarrisZernike (cv2.Feature2D):
             Mfxy = convolve(fx*fy,self.Gi,mode='constant')
             Mfyy = convolve(np.square(fy),self.Gi,mode='constant')
         else: 
-            #Significantly Faster than convolve
-            Mfxx = gaussian_filter(np.square(fx),sigma=self.sigi,mode='constant',truncate=1.9)
-            Mfxy = gaussian_filter(fx*fy,sigma=self.sigi,mode='constant',truncate=1.9)
-            Mfyy = gaussian_filter(np.square(fy),sigma=self.sigi,mode='constant',truncate=1.9)
+            # Significantly Faster than convolve
+            # kzise = 11,11 matches best with exact version, lower size more efficient
+            Mfxx = cv2.GaussianBlur(np.square(fx), ksize=(5,5), sigmaX=self.sigi, 
+                                    sigmaY=self.sigi, borderType = cv2.BORDER_CONSTANT)
+            Mfxy = cv2.GaussianBlur(fx * fy, ksize=(5,5), sigmaX=self.sigi, 
+                                    sigmaY=self.sigi, borderType = cv2.BORDER_CONSTANT)
+            Mfyy = cv2.GaussianBlur(np.square(fy), ksize=(5,5), sigmaX=self.sigi, 
+                                    sigmaY=self.sigi, borderType = cv2.BORDER_CONSTANT)
         
         Tr = Mfxx+Mfyy
         Det = Mfxx*Mfyy-np.square(Mfxy)
         sqrterm = np.sqrt(np.square(Tr)-4*Det)
     
         ef2 = scale**(-2)*0.5*(Tr - sqrterm)
-        return ef2,nL     
+        return np.nan_to_num(ef2),nL
 
     def feat_extract_p2 (self, ImgPyramid):
         '''
@@ -257,7 +277,7 @@ class MultiHarrisZernike (cv2.Feature2D):
             border_mask[k] = np.zeros_like(eig[k],dtype=bool)
             border_mask[k][border:-border,border:-border]=True
     
-            regmask[k] = maximum_filter(eig[k],size=self.lmax_nd)<=eig[k]
+            regmask[k] = cv2.dilate(eig[k], self.non_max_kernel, iterations=1) <= eig[k]
     
             regmask[k] = np.logical_and(regmask[k],border_mask[k])
             
@@ -429,6 +449,36 @@ class MultiHarrisZernike (cv2.Feature2D):
                     JBcoeff[n][m][k] = Wb_rav.dot(self.BstrucZ_rav[n][m])
 
         return JAcoeff, JBcoeff
+    
+    def corner_angle(self,ImgPyramid,F):
+        '''
+        Determine feature angle
+        '''  
+        feats = len(F['ivec'])        
+        Fsvec = F['svec']
+        Fsivec = F['sivec']
+        Fsjvec = F['sjvec']
+        images = ImgPyramid['images']
+               
+        #initialize
+        JAcoeff = np.zeros(feats,dtype=np.complex64)
+        
+        for k in range(feats): #(feats+1):
+            sk = Fsvec[k] #scale of feature
+            i_s = Fsivec[k]
+            j_s = Fsjvec[k]
+            # window size
+            # [size(P(sk).im) is-zrad is+zrad js-zrad js+zrad]
+            W = images[sk][i_s-self.zrad:i_s+self.zrad+1,
+                           j_s-self.zrad:j_s+self.zrad+1]                    
+            Wh = W-np.mean(W,dtype='uint')#np.mean(W)
+            W = np.divide(Wh, np.sum(Wh**2)**0.5, dtype=np.float32)
+            W_rav = W.ravel()
+        
+            JAcoeff[k] = W_rav.dot(self.ZstrucZ_rav[1][1])
+            alpha = np.angle(JAcoeff)
+
+        return alpha
 
     def zinvariants4(self, JA, JB):
         '''
@@ -490,6 +540,43 @@ class MultiHarrisZernike (cv2.Feature2D):
               for x,y,ang,res,sc in zip(Ft['jvec'], Ft['ivec'], np.rad2deg(alpha),
                                         Ft['evec'],Ft['svec'])]
         return kp, V, #Ft, F, Ft, JA, JB, alpha, A
+    
+    def detect(self, gr_img, mask=None, timing=False):
+        '''
+        cv2.Feature2D style detectAndCompute.  Takes a grayscale image and
+        optionally a mask and returns OpenCV keypoints and descriptors
+        
+        Parameters
+        ----------
+        gr_img : 2D-array (image)    
+            The input grayscale image
+        mask : 2D-array, optional 
+            Image mask with 1s where keypoints are permissible
+        timing : bool, optional 
+            Display timing in various parts of algorithm
+    
+        ----------
+        Example usage:
+            kp, des = a.detectAndCompute(gr, mask=m1)
+            
+        '''
+        if len(gr_img.shape)!=2:
+            raise ValueError("Input image is not a 2D array, possibile non-grayscale")
+        if timing: st=time.time()    
+        P = self.generate_pyramid(gr_img,mask=mask)
+        if timing: print("Generate pyramid - {:0.4f}".format(time.time()-st)); st=time.time()
+        F = self.feat_extract_p2(P)
+        if timing: print("Extract features - {:0.4f}".format(time.time()-st)); st=time.time()
+        Ft = self.feat_thresh_sec(F,*gr_img.shape)
+        if timing: print("Feature Threshold - {:0.4f}".format(time.time()-st)); st=time.time()
+        alpha = self.corner_angle(P, Ft)
+        if timing: print("Angle computation - {:0.4f}".format(time.time()-st)); st=time.time()
+        kp = [cv2.KeyPoint(x,y,self.zrad*(sc+1)*2,_angle=ang,_response=res,_octave=sc) 
+              for x,y,ang,res,sc in zip(Ft['jvec'], Ft['ivec'], np.rad2deg(alpha),
+                                        Ft['evec'],Ft['svec'])]
+        if timing: print("Keypoint export - {:0.4f}".format(time.time()-st)); st=time.time()
+
+        return kp
     
     def compute(self, gr_img, keypoints, timing=False, mask=None):
         '''
