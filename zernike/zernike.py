@@ -246,7 +246,8 @@ class MultiHarrisZernike (cv2.Feature2D):
         
         Tr = Mfxx+Mfyy
         Det = Mfxx*Mfyy-np.square(Mfxy)
-        sqrterm = np.sqrt(np.square(Tr)-4*Det)
+        with np.errstate(invalid='ignore'):
+            sqrterm = np.sqrt(np.square(Tr)-4*Det)
     
         ef2 = scale**(-2)*0.5*(Tr - sqrterm)
         return np.nan_to_num(ef2),nL
