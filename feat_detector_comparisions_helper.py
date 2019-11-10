@@ -378,3 +378,141 @@ def analyze_image_pair_zer_orb_orbhc(image_0, image_1, settings, plotMatches=Tru
         input("Enter to continue")
 
     return {'zernike_matches':no_zernike_matches, 'orb_matches':no_orb_matches, 'orbhc_matches':no_orbhc_matches}
+
+def analyze_image_pair_zer_surf_orbsf(image_0, image_1, settings, plotMatches=True): 
+    K = settings['K']
+    D = settings['D']
+    TILE_KP = settings['TILE_KP']
+    tiling = settings['tiling']
+    zernike_detector = settings['zernike_detector']
+    orb_detector = settings['orb_detector']
+    surf_detector = settings['surf_detector']
+
+    zernike_kp_0, zernike_des_0 = zernike_detector.detectAndCompute(image_0, mask=None, timing=False)
+    zernike_kp_1, zernike_des_1 = zernike_detector.detectAndCompute(image_1, mask=None, timing=False)
+    surf_kp_0_ut = surf_detector.detect(image_0, mask=None)
+    surf_kp_1_ut = surf_detector.detect(image_1, mask=None)
+    # Use Harris corners from zernike for ORB
+    
+    if TILE_KP:
+        surf_kp_0 = tiled_features(surf_kp_0_ut, image_0.shape, tiling[0], tiling[1], no_features= 1000)
+        surf_kp_1 = tiled_features(surf_kp_1_ut, image_1.shape, tiling[0], tiling[1], no_features= 1000)
+        
+    else:
+        surf_kp_0 = surf_kp_0_ut
+        surf_kp_1 = surf_kp_1_ut
+        
+    orbsf_kp_0 = surf_kp_0.copy()   
+    orbsf_kp_1 = surf_kp_1.copy()  
+    orbsf_kp_0, orbsf_des_0 = orb_detector.compute(image_0, orbsf_kp_0)
+    orbsf_kp_1, orbsf_des_1 = orb_detector.compute(image_1, orbsf_kp_1)
+    surf_kp_0, surf_des_0 = surf_detector.compute(image_0, surf_kp_0)
+    surf_kp_1, surf_des_1 = surf_detector.compute(image_1, surf_kp_1)
+    
+
+    if plotMatches:
+        zernike_kp_img_0 = draw_markers(image_0, zernike_kp_0, color=[255,255,0])
+        zernike_kp_img_1 = draw_markers(image_1, zernike_kp_1, color=[255,255,0])
+        surf_kp_img_0 = draw_markers(image_0, surf_kp_0_ut, color=[255,255,0])
+        surf_kp_img_1 = draw_markers(image_1, surf_kp_1_ut, color=[255,255,0])
+        orbsf_kp_img_0 = draw_markers(image_0, surf_kp_0_ut, color=[255,255,0])
+        orbsf_kp_img_1 = draw_markers(image_1, surf_kp_1_ut, color=[255,255,0])
+        
+
+        if TILE_KP:
+            surf_kp_img_0 = draw_markers(surf_kp_img_0, surf_kp_0, color=[0,255,0])
+            surf_kp_img_1 = draw_markers(surf_kp_img_1, surf_kp_1, color=[0,255,0])
+            orbsf_kp_img_0 = draw_markers(orbsf_kp_img_0, orbsf_kp_0, color=[0,255,0])
+            orbsf_kp_img_1 = draw_markers(orbsf_kp_img_1, orbsf_kp_1, color=[0,255,0])
+        
+        fig1 = plt.figure(1); plt.clf()
+        fig1, fig1_axes = plt.subplots(2,3, num=1)
+        fig1.suptitle(settings['set_title'] + ' features')
+        fig1_axes[0,0].axis("off"); fig1_axes[0,0].set_title("Zernike Features \n{:d} features".format(len(zernike_kp_0)))
+        fig1_axes[0,0].imshow(zernike_kp_img_0)
+        fig1_axes[1,0].axis("off"); fig1_axes[1,0].set_title("{:d} features".format(len(zernike_kp_1)))
+        fig1_axes[1,0].imshow(zernike_kp_img_1)
+        fig1_axes[0,1].axis("off"); fig1_axes[0,1].set_title("SURF Features\nBefore tiling:{:d} after tiling {:d}".format(len(surf_kp_0_ut),len(surf_kp_0)))
+        fig1_axes[0,1].imshow(surf_kp_img_0)
+        fig1_axes[1,1].axis("off"); fig1_axes[1,1].set_title("Before tiling:{:d} after tiling {:d}".format(len(surf_kp_1_ut),len(surf_kp_1))) 
+        fig1_axes[1,1].imshow(surf_kp_img_1)
+        fig1_axes[0,2].axis("off"); fig1_axes[0,2].set_title("ORB SURF Corners Features\n{:d} features".format(len(orbsf_kp_0)))
+        fig1_axes[0,2].imshow(orbsf_kp_img_0)
+        fig1_axes[1,2].axis("off"); fig1_axes[1,2].set_title("{:d} features".format(len(orbsf_kp_1))) 
+        fig1_axes[1,2].imshow(orbsf_kp_img_1)
+        #fig1.subplots_adjust(0,0,1,1,0.0,0.0)
+        fig1.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.1)
+        plt.draw(); plt.show(block=False)
+
+    
+    '''
+    Match and find inliers
+    '''
+    matcher_norm = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
+    matcher_hamming = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
+    
+    zernike_matches_01 = knn_match_and_lowe_ratio_filter(matcher_norm, zernike_des_0, zernike_des_1, threshold=0.9)
+    
+    zernike_kp0_match_01 = np.array([zernike_kp_0[mat.queryIdx].pt for mat in zernike_matches_01])
+    zernike_kp1_match_01 = np.array([zernike_kp_1[mat.trainIdx].pt for mat in zernike_matches_01])
+    
+    zernike_kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(zernike_kp0_match_01,axis=1),K,D)
+    zernike_kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(zernike_kp1_match_01,axis=1),K,D)
+    
+    zernike_E_12, zernike_mask_e_12 = cv2.findEssentialMat(zernike_kp0_match_01_ud, zernike_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
+                                                           method=cv2.RANSAC, prob=0.9999, threshold=0.001)    
+
+    
+    surf_matches_01 = knn_match_and_lowe_ratio_filter(matcher_norm, surf_des_0, surf_des_1, threshold=0.9)
+    
+    surf_kp0_match_01 = np.array([surf_kp_0[mat.queryIdx].pt for mat in surf_matches_01])
+    surf_kp1_match_01 = np.array([surf_kp_1[mat.trainIdx].pt for mat in surf_matches_01])
+    
+    surf_kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(surf_kp0_match_01,axis=1),K,D)
+    surf_kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(surf_kp1_match_01,axis=1),K,D)
+    
+    surf_E_12, surf_mask_e_12 = cv2.findEssentialMat(surf_kp0_match_01_ud, surf_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
+                                                   method=cv2.RANSAC, prob=0.9999, threshold=0.001)
+       
+    
+    orbsf_matches_01 = knn_match_and_lowe_ratio_filter(matcher_hamming, orbsf_des_0, orbsf_des_1, threshold=0.9)
+    
+    orbsf_kp0_match_01 = np.array([orbsf_kp_0[mat.queryIdx].pt for mat in orbsf_matches_01])
+    orbsf_kp1_match_01 = np.array([orbsf_kp_1[mat.trainIdx].pt for mat in orbsf_matches_01])
+    
+    orbsf_kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(orbsf_kp0_match_01,axis=1),K,D)
+    orbsf_kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(orbsf_kp1_match_01,axis=1),K,D)
+    
+    orbsf_E_12, orbsf_mask_e_12 = cv2.findEssentialMat(orbsf_kp0_match_01_ud, orbsf_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
+                                                       method=cv2.RANSAC, prob=0.9999, threshold=0.001)
+    
+    
+    no_zernike_matches = np.sum(zernike_mask_e_12)
+    no_surf_matches = np.sum(surf_mask_e_12)
+    no_orbsf_matches = np.sum(orbsf_mask_e_12)
+    
+    if plotMatches:
+    
+        zernike_valid_matches_img = draw_matches_vertical(image_0,zernike_kp_0, image_1,zernike_kp_1, zernike_matches_01, 
+                                                          zernike_mask_e_12, display_invalid=True, color=(0, 255, 0))
+    
+        surf_valid_matches_img = draw_matches_vertical(image_0,surf_kp_0, image_1,surf_kp_1, surf_matches_01, 
+                                                      surf_mask_e_12, display_invalid=True, color=(0, 255, 0))
+        
+        orbsf_valid_matches_img = draw_matches_vertical(image_0,orbsf_kp_0, image_1,orbsf_kp_1, orbsf_matches_01, 
+                                                        orbsf_mask_e_12, display_invalid=True, color=(0, 255, 0))
+            
+        fig2 = plt.figure(2); plt.clf()
+        fig2, fig2_axes = plt.subplots(1,3, num=2)
+        fig2.suptitle(settings['set_title'] + ' Feature Matching')
+        fig2_axes[0].axis("off"); fig2_axes[0].set_title("Zernike Features\n{:d} matches".format(no_zernike_matches))
+        fig2_axes[0].imshow(zernike_valid_matches_img)
+        fig2_axes[1].axis("off"); fig2_axes[1].set_title("surf Features\n{:d} matches".format(no_surf_matches))
+        fig2_axes[1].imshow(surf_valid_matches_img)
+        fig2_axes[2].axis("off"); fig2_axes[2].set_title("Orb SURF Corner Features\n{:d} matches".format(no_orbsf_matches))
+        fig2_axes[2].imshow(orbsf_valid_matches_img)
+        fig2.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.0)
+        plt.draw(); plt.show(block=False)
+        input("Enter to continue")
+
+    return {'zernike_matches':no_zernike_matches, 'surf_matches':no_surf_matches, 'orbsf_matches':no_orbsf_matches}

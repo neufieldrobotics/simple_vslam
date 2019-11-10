@@ -123,6 +123,8 @@ zernike_detector = MultiHarrisZernike(Nfeats= NO_OF_FEATURES, seci= 2, secj= 3, 
 sift_detector = cv2.xfeatures2d.SIFT_create(nfeatures = 2 * NO_OF_FEATURES, nOctaveLayers = 3, contrastThreshold = 0.01, 
                                             edgeThreshold = 20, sigma = 1.6)
 
+surf_detector = cv2.xfeatures2d.SURF_create(hessianThreshold = 50, nOctaves = 6)
+
 raw_images = read_image_list(raw_image_names, resize_ratio=1/5)
 clahe_images = read_image_list(clahe_image_names, resize_ratio=1/5)
 
@@ -132,15 +134,23 @@ orb_kp_0 = orb_detector.detect(raw_images[0], None)
 orb_kp_1 = orb_detector.detect(raw_images[1], None)
 sift_kp_0, sift_des_0 = sift_detector.detectAndCompute(raw_images[0], None)
 sift_kp_1, sift_des_1 = sift_detector.detectAndCompute(raw_images[1], None)
-print ("Points before tiling supression: ",len(orb_kp_0))
+surf_kp_0 = surf_detector.detect(raw_images[0], None)
+surf_kp_1 = surf_detector.detect(raw_images[1], None)
+
+print ("Points before tiling supression: ",len(surf_kp_0))
 
 if TILE_KP:
     orb_kp_0 = tiled_features(orb_kp_0, raw_images[0].shape, tiling[0], tiling[1], no_features= 1000)
     orb_kp_1 = tiled_features(orb_kp_1, raw_images[1].shape, tiling[0], tiling[1], no_features= 1000)
-    print ("Points after tiling supression: ",len(orb_kp_0))
+    surf_kp_0 = tiled_features(surf_kp_0, raw_images[0].shape, tiling[0], tiling[1], no_features= 1000)
+    surf_kp_1 = tiled_features(surf_kp_1, raw_images[1].shape, tiling[0], tiling[1], no_features= 1000)
 
-orb_kp_0, orb_des_0 = orb_detector.compute(raw_images[0], zernike_kp_0)
-orb_kp_1, orb_des_1 = orb_detector.compute(raw_images[1], zernike_kp_1)
+    print ("Points after tiling supression: ",len(surf_kp_0))
+
+orb_kp_0, orb_des_0 = orb_detector.compute(raw_images[0], surf_kp_0)
+orb_kp_1, orb_des_1 = orb_detector.compute(raw_images[1], surf_kp_1)
+surf_kp_0, surf_des_0 = surf_detector.compute(raw_images[0], surf_kp_0)
+surf_kp_1, surf_des_1 = surf_detector.compute(raw_images[1], surf_kp_1)
 
 zernike_kp_0_sort = sorted(zernike_kp_0, key = lambda x: x.response, reverse=True)
 zernike_kp_1_sort = sorted(zernike_kp_1, key = lambda x: x.response, reverse=True)
@@ -153,12 +163,10 @@ zernike_kp_img_0 = draw_markers (cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB)
 zernike_kp_img_1 = draw_markers (cv2.cvtColor(raw_images[1], cv2.COLOR_GRAY2RGB), zernike_kp_1 ,color=[255,255,0])
 orb_kp_img_0 = draw_markers(cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB), orb_kp_0, color=[255,255,0])
 orb_kp_img_1 = draw_markers(cv2.cvtColor(raw_images[1], cv2.COLOR_GRAY2RGB), orb_kp_1, color=[255,255,0])
-sift_kp_img_0 = cv2.drawKeypoints(raw_images[0], sift_kp_0_sort, cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB),color=[255,255,0],
-                                  
-                flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-sift_kp_img_1 = cv2.drawKeypoints(raw_images[1], sift_kp_1_sort, cv2.cvtColor(raw_images[1], cv2.COLOR_GRAY2RGB),color=[255,255,0],
-                                  flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+surf_kp_img_0 = draw_markers(cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB), surf_kp_0,color=[255,255,0])
+surf_kp_img_1 = draw_markers(cv2.cvtColor(raw_images[1], cv2.COLOR_GRAY2RGB), surf_kp_1,color=[255,255,0])
 
+    
 fig1, fig1_axes = plt.subplots(2,3)
 fig1.suptitle('800x600 Raw Images Top 25 features')
 fig1_axes[0,0].axis("off"); fig1_axes[0,0].set_title("Zernike Features")
@@ -170,9 +178,9 @@ fig1_axes[0,1].imshow(orb_kp_img_0)
 fig1_axes[1,1].axis("off"); fig1_axes[0,1].set_title("Orb Features")
 fig1_axes[1,1].imshow(orb_kp_img_1)
 fig1_axes[0,2].axis("off")
-fig1_axes[0,2].imshow(sift_kp_img_0)
-fig1_axes[1,2].axis("off"); fig1_axes[0,2].set_title("Sift Features")
-fig1_axes[1,2].imshow(sift_kp_img_1)
+fig1_axes[0,2].imshow(surf_kp_img_0)
+fig1_axes[1,2].axis("off"); fig1_axes[0,2].set_title("SURF Features")
+fig1_axes[1,2].imshow(surf_kp_img_1)
 #fig1.subplots_adjust(0,0,1,1,0.0,0.0)
 fig1.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.0)
 plt.show()
@@ -200,7 +208,7 @@ zernike_valid_matches_img = draw_matches_vertical(raw_images[0],zernike_kp_0, ra
                                               zernike_mask_e_12, display_invalid=True, color=(0, 255, 0))
 
 
-orb_matches_01 = knn_match_and_lowe_ratio_filter(matcher_hamming, orb_des_0, orb_des_1, threshold=0.95)
+orb_matches_01 = knn_match_and_lowe_ratio_filter(matcher_hamming, orb_des_0, orb_des_1, threshold=0.9)
 
 orb_kp0_match_01 = np.array([orb_kp_0[mat.queryIdx].pt for mat in orb_matches_01])
 orb_kp1_match_01 = np.array([orb_kp_1[mat.trainIdx].pt for mat in orb_matches_01])
@@ -217,21 +225,21 @@ orb_valid_matches_img = draw_matches_vertical(raw_images[0],orb_kp_0, raw_images
                                               orb_mask_e_12, display_invalid=True, color=(0, 255, 0))
 
 
-sift_matches_01 = knn_match_and_lowe_ratio_filter(matcher_norm, sift_des_0, sift_des_1, threshold=0.90)
+surf_matches_01 = knn_match_and_lowe_ratio_filter(matcher_norm, surf_des_0, surf_des_1, threshold=0.90)
 
-sift_kp0_match_01 = np.array([sift_kp_0[mat.queryIdx].pt for mat in sift_matches_01])
-sift_kp1_match_01 = np.array([sift_kp_1[mat.trainIdx].pt for mat in sift_matches_01])
+surf_kp0_match_01 = np.array([surf_kp_0[mat.queryIdx].pt for mat in surf_matches_01])
+surf_kp1_match_01 = np.array([surf_kp_1[mat.trainIdx].pt for mat in surf_matches_01])
 
-sift_kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(sift_kp0_match_01,axis=1),K,D)
-sift_kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(sift_kp1_match_01,axis=1),K,D)
+surf_kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(surf_kp0_match_01,axis=1),K,D)
+surf_kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(surf_kp1_match_01,axis=1),K,D)
 
-sift_E_12, sift_mask_e_12 = cv2.findEssentialMat(sift_kp0_match_01_ud, sift_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
+surf_E_12, surf_mask_e_12 = cv2.findEssentialMat(surf_kp0_match_01_ud, surf_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
                                                method=cv2.RANSAC, prob=0.9999, threshold=0.001)
 
-print("sift After essential: ", np.sum(sift_mask_e_12))
+print("surf After essential: ", np.sum(surf_mask_e_12))
 
-sift_valid_matches_img = draw_matches_vertical(raw_images[0],sift_kp_0, raw_images[1],sift_kp_1, sift_matches_01, 
-                                              sift_mask_e_12, display_invalid=True, color=(0, 255, 0))
+surf_valid_matches_img = draw_matches_vertical(raw_images[0],surf_kp_0, raw_images[1],surf_kp_1, surf_matches_01, 
+                                              surf_mask_e_12, display_invalid=True, color=(0, 255, 0))
 
 
 fig2, fig2_axes = plt.subplots(1,3)
@@ -240,6 +248,6 @@ fig2_axes[0].axis("off"); fig2_axes[0].set_title("Zernike Features\n{:d} matches
 fig2_axes[0].imshow(zernike_valid_matches_img)
 fig2_axes[1].axis("off"); fig2_axes[1].set_title("Orb Features\n{:d} matches".format(np.sum(orb_mask_e_12)))
 fig2_axes[1].imshow(orb_valid_matches_img)
-fig2_axes[2].axis("off"); fig2_axes[2].set_title("Sift Features\n{:d} matches".format(np.sum(sift_mask_e_12)))
-fig2_axes[2].imshow(sift_valid_matches_img)
+fig2_axes[2].axis("off"); fig2_axes[2].set_title("surf Features\n{:d} matches".format(np.sum(surf_mask_e_12)))
+fig2_axes[2].imshow(surf_valid_matches_img)
 fig2.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.0)
