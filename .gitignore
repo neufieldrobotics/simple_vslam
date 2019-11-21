@@ -1,6 +1,7 @@
 # python cache
 __pycache__/
 temp_data/
+results/
 .ipynb_checkpoints/
 *.pyc
 \#*#

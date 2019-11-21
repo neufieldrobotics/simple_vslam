@@ -7,17 +7,44 @@ Created on Tue Nov  5 11:58:28 2019
 """
 import numpy as np
 from matplotlib import pyplot as plt
+import glob
+import re
 
-name = 'results_array_baseline_20_20191105175448.csv'
-results_array = np.genfromtxt('/Users/vik748/Google Drive/data/feature_descriptor_comparision/results/clahe_images/'+name, delimiter=',')
+def save_fig2png(fig, folder=None, fname=None):
+    plt._pylab_helpers.Gcf.figs.get(fig.number, None).window.showMaximized()
+    plt.pause(.1)
+    if fname is None:
+        if fig._suptitle is None:
+            fname = 'figure_{:d}'.format(fig.number)
+        else:
+            ttl = fig._suptitle.get_text()
+            ttl = ttl.replace('$','').replace('\n','_').replace(' ','_')
+            fname = re.sub(r"\_\_+", "_", ttl) 
+    if folder:
+        plt.savefig(os.path.join(folder, fname +'_'+datetime.now().strftime("%Y%m%d%H%M%S") +'.png'))
+    else:
+        plt.savefig(file +'.png',format='png')
 
-plt.figure(3); plt.cla()
+    plt._pylab_helpers.Gcf.figs.get(fig.number, None).window.showNormal()
+
+
+files = sorted(glob.glob('/Users/vik748/Google Drive/data/feature_descriptor_comparision/results/raw_images_orbsf/*.csv'))
 bins = np.linspace(10, 250, 25)
 
-plt.hist(results_array, bins=bins, alpha=0.5, label=['Zernike','ORB','SIFT'])
-plt.suptitle("Lars 1 800x600 CLAHE - Baseline - 20 secs apart")
-plt.legend(loc='upper right')
-#plt.axes().set_ylim([0, 750])
-plt.xlabel('Bins (Number of matches)')
-plt.ylabel('Occurances (Image pairs)')
-plt.show()
+for file in files:
+    results_array = np.genfromtxt(file, delimiter=',')
+    lbl = ' '.join(os.path.splitext(os.path.basename(file))[0].split('_')[2:4])
+    
+    fig3 = plt.figure(3); plt.cla()
+    
+    plt.hist(results_array, bins=bins, alpha=0.5, label=['Zernike','SURF','ORB-SURF'])
+    plt.suptitle("Lars 1 800x600 Raw, ORB with SURF Corners - "+ lbl + " secs apart")
+    plt.legend(loc='upper right')
+    #plt.axes().set_ylim([0, 750])
+    plt.xlabel('Bins (Number of matches)')
+    plt.ylabel('Occurances (Image pairs)')
+    plt.axes().set_ylim([0, 750])
+
+    plt.show()
+    
+    save_fig2png(fig3)
