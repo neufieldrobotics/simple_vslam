@@ -71,7 +71,7 @@ def undistortKeyPoints(kps, K, D):
     #kp_pts_cont = np.ascontiguousarray(kp_pts[:,:2]).reshape((kp_pts.shape[0],1,2))
     # this version returns normalized points with F=1 and centered at 0,0
     # cv2.undistortPoints(kp_pts_cont, K, D,  noArray(), K) would return unnormalized output
-    return	cv2.undistortPoints(np.expand_dims(kps, axis=1), 
+    return cv2.undistortPoints(np.expand_dims(kps, axis=1), 
                                cameraMatrix=K, distCoeffs=D)[:,0,:]
 
 def displayMatches(img_left,kp1,img_right,kp2, matches, mask, display_invalid, in_image=None, color=(0, 255, 0)):
@@ -294,38 +294,107 @@ def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
     return bb_filter
 
 
-def tiled_features(kp, img_shape, tiley, tilex, no_features = None):
+def tiled_features(kp, img_shape, tiles_hor, tiles_ver, no_features = None):
     '''
     Given a set of keypoints, this divides the image into a grid and returns 
-    len(kp)/(tilex*tiley) maximum responses within each tell. If that cell doesn't 
+    len(kp)/(tiles_ver*tiles_hor) maximum responses within each tell. If that cell doesn't 
     have enough points it will return all of them.
     '''
     if no_features:
-        feat_per_cell = int(no_features/(tilex*tiley))
+        feat_per_cell = np.ceil(no_features/(tiles_ver*tiles_hor)).astype(int)
     else:
-        feat_per_cell = int(len(kp)/(tilex*tiley))
+        feat_per_cell = np.ceil(len(kp)/(tiles_ver*tiles_hor)).astype(int)
     HEIGHT, WIDTH = img_shape
-    assert WIDTH%tiley == 0, "Width is not a multiple of tilex"
-    assert HEIGHT%tilex == 0, "Height is not a multiple of tiley"
-    w_width = int(WIDTH/tiley)
-    w_height = int(HEIGHT/tilex)
-        
-    xx = np.linspace(0,HEIGHT-w_height,tilex,dtype='int')
-    yy = np.linspace(0,WIDTH-w_width,tiley,dtype='int')
+    assert WIDTH%tiles_hor == 0, "Width is not a multiple of tiles_ver"
+    assert HEIGHT%tiles_ver == 0, "Height is not a multiple of tiles_hor"
+    w_width = int(WIDTH/tiles_hor)
+    w_height = int(HEIGHT/tiles_ver)
         
     kps = np.array([])
-    pts = np.array([keypoint.pt for keypoint in kp])
+    #pts = np.array([keypoint.pt for keypoint in kp])
+    pts = cv2.KeyPoint_convert(kp)
     kp = np.array(kp)
     
-    for ix in xx:
-        for iy in yy:
+    #img_keypoints = draw_markers( cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB), kp, color = ( 0, 255, 0 ))
+
+    
+    for ix in range(0,HEIGHT, w_height):
+        for iy in range(0,WIDTH, w_width):
             inbox_mask = bounding_box(pts, iy, iy+w_height, ix, ix+w_height)
             inbox = kp[inbox_mask]
             inbox_sorted = sorted(inbox, key = lambda x:x.response, reverse = True)
             inbox_sorted_out = inbox_sorted[:feat_per_cell]
             kps = np.append(kps,inbox_sorted_out)
+            
+            #img_keypoints = draw_markers(img_keypoints, kps.tolist(), color = [255, 0, 0] )
+            #cv2.imshow("Selected Keypoints", img_keypoints )
+            #print("Size of Tiled Keypoints: " ,len(kps))
+            #cv2.waitKey(); 
     return kps.tolist()
 
+'''
+def tiled_features2(kp_list, img_shape, tiles_hor, tiles_ver, no_features = None):
+    rows = img_shape[0]
+    cols = img_shape[1]
+    if no_features:
+        feat_per_cell = int(no_features/(tiles_hor*tiles_ver))
+    else:
+        feat_per_cell = int(len(kp_list)/(tiles_hor*tiles_ver))
+    
+    assert cols%tiles_hor == 0, "Width is not a multiple of tiles_hor"
+    assert rows%tiles_ver == 0, "Height is not a multiple of tiles_ver"
+
+    tile_width = int(cols/tiles_hor)
+    tile_height = int(rows/tiles_ver)
+    
+    kp_xy_arr = cv2.KeyPoint_convert(kp_list)
+    tiled_keypoints = []
+    unsel_keypoints = []
+    #img_keypoints = draw_markers( cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB), kp_list, color = ( 0, 255, 0 ))
+
+    for min_row in range(0, rows,tile_height):
+        for min_col in range(0, cols, tile_width):
+            max_row = min_row + tile_height
+            max_col = min_col + tile_width
+            
+            sel_keypoints = []
+
+            for i, (kp, kp_xy) in enumerate(zip(kp_list, kp_xy_arr)):
+                if (kp_xy[0] > min_col and kp_xy[0] <= max_col and
+                    kp_xy[1] > min_row and kp_xy[1] <= max_row ):
+                        
+                        sel_keypoints.append(kp)
+                        #keypoints.erase(next(begin(keypoints), i));
+
+            #print("Keypoints in BB: ", len(sel_keypoints))  
+
+            #draw_markers( img_keypoints, sel_keypoints, img_keypoints, ( 0, 255, 0 ) );
+            #img_keypoints = draw_markers(img_keypoints, cv2.COLOR_GRAY2RGB), sel_keypoints, color=[255,255,0])
+            #cv2.imshow("Selected Keypoints", img_keypoints );
+            #cv2.waitKey();    
+
+            if len(sel_keypoints) > feat_per_cell:
+                sel_keypoints = sorted(sel_keypoints, key = lambda x:x.response, reverse = True)
+                tiled_keypoints.extend(sel_keypoints[:feat_per_cell])
+                unsel_keypoints.extend(sel_keypoints[feat_per_cell:]) 
+            else:
+                tiled_keypoints.extend(sel_keypoints)
+            
+            #img_keypoints = draw_markers(img_keypoints, tiled_keypoints, color = [255, 0, 0] )
+            #cv2.imshow("Selected Keypoints", img_keypoints )
+            #print("Size of Tiled Keypoints: " ,len(tiled_keypoints), "Size of unsel keypoints: ", len(unsel_keypoints))
+            #cv2.waitKey();   
+
+    
+    if len(tiled_keypoints) < no_features:
+        unsel_keypoints = sorted(unsel_keypoints, key = lambda x:x.response, reverse = True)
+        tiled_keypoints.extend(unsel_keypoints[:(no_features - len(tiled_keypoints))])
+    
+    #img_keypoints = draw_markers(img_keypoints, tiled_keypoints, color = [255, 0, 0] )
+    #cv2.imshow("Selected Keypoints", img_keypoints )  
+    #print("Size of Tiled Keypoints: ", len(tiled_keypoints), " Size of unsel keypoints: ", len(unsel_keypoints))
+    #cv2.waitKey()
+'''
 
 def draw_keypoints(vis, keypoints, color = (0, 255, 255)):
     for kp in keypoints:
@@ -393,7 +462,7 @@ def move_figure(position="top-right"):
     elif position == "bottom-right":
         mgr.window.setGeometry(px/2 + d, py/2 + 5*d, px/2 - 2*d, py/2 - 4*d)
 
-def radial_non_max(kp_list, dist):
+def radial_non_max_kd(kp_list, dist):
     ''' 
     Given a set of Keypoints this finds the maximum response within radial 
     distance from each other 
@@ -413,6 +482,29 @@ def radial_non_max(kp_list, dist):
             for kp_i in idx:
                 kp_mask[kp_i] = False 
     return kp[kp_mask].tolist()
+
+def radial_non_max(kp_list, image_size, kernel_size = (3,3)):
+    ''' 
+    Given a set of Keypoints this finds the maximum response within radial 
+    distance from each other 
+    '''
+    resp = np.zeros(image_size)
+    kp_map = np.zeros(image_size,dtype=int)
+    non_max_kernel = np.ones(kernel_size, np.uint8)
+    kp_xy = np.rint(cv2.KeyPoint_convert(kp_list)).astype(int)
+    
+    #print ("len of kp1:",len(kp))
+    for i, (k, kp_loc) in enumerate(zip(kp_list,kp_xy)):
+        #kp_loc = np.rint(k.pt).astype(int)
+        kp_map[kp_loc[1], kp_loc[0]] = i
+        resp[kp_loc[1], kp_loc[0]] = k.response
+    
+    non_max_locs = cv2.dilate(resp, non_max_kernel, iterations=1) > resp
+    kp_ind = kp_map[np.logical_and(kp_map,~non_max_locs)]
+    
+    return [kp_list[i] for i in kp_ind]
+
+
 
 def remove_redundant_newkps(kp_new, kp_old, dist):
     old_feat_pts = kp_old[:,0,:]

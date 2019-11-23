@@ -64,7 +64,7 @@ class MultiHarrisZernike (cv2.Feature2D):
     
     '''
     def __init__(self,  Nfeats= 600, seci = 2, secj = 3, levels = 6, ratio = 0.75, 
-                 sigi = 2.75, sigd = 1.0, nmax = 8, like_matlab=False, lmax_nd = 3):       
+                 sigi = 2.75, sigd = 1.0, nmax = 8, like_matlab=False, lmax_nd = 3, harris_threshold = None):       
         self.Nfeats  = Nfeats        # number of features per image
         self.seci    = seci          # number of vertical sectors 
         self.secj    = secj          # number of horizontal sectors
@@ -78,6 +78,7 @@ class MultiHarrisZernike (cv2.Feature2D):
         self.zrad    = np.ceil(self.sigi*8).astype(int) # radius for zernike disk  
         self.brad    = np.ceil(0.5*self.zrad).astype(int)    # radius for secondary zernike disk
         self.non_max_kernel = np.ones((lmax_nd,lmax_nd), np.uint8)
+        self.harris_threshold = harris_threshold # Minimum harris threshold for a keypoint
 
         if self.exact:
             self.Gi     = MultiHarrisZernike.fspecial_gauss(11,self.sigi)
@@ -266,6 +267,7 @@ class MultiHarrisZernike (cv2.Feature2D):
         eig = [None] * scales
         nL = [None] * scales
         border_mask = [None] * scales 
+        threshold_mask = [None] * scales
         regmask=[None] * scales 
         ivec= [None] * scales 
         jvec= [None] * scales
@@ -277,10 +279,14 @@ class MultiHarrisZernike (cv2.Feature2D):
             # generate mask for border
             border_mask[k] = np.zeros_like(eig[k],dtype=bool)
             border_mask[k][border:-border,border:-border]=True
-    
+            
             regmask[k] = cv2.dilate(eig[k], self.non_max_kernel, iterations=1) <= eig[k]
     
-            regmask[k] = np.logical_and(regmask[k],border_mask[k])
+            regmask[k] = np.logical_and(regmask[k], border_mask[k])
+
+            if self.harris_threshold is not None:
+                threshold_mask[k] = eig[k] >= 0.1
+                regmask[k] = np.logical_and(regmask[k], threshold_mask[k])                    
             
             if masks is not None:
                 regmask[k] = np.logical_and(masks[k],regmask[k])
