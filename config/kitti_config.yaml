@@ -23,7 +23,7 @@ use_clahe: False
 lowe_ratio_test_threshold: 0.9
 use_RecoverPose_Filter: True
 pause_every_iteration: False
-use_gtsam: True
+use_gtsam: False
 
 use_tiling_non_max_supression: False
 tiling_non_max_tile_y: 17 
@@ -42,12 +42,15 @@ findEssential_settings:
 
 solvePnPRansac_settings:
   iterationsCount: 250
-  reprojectionError: 0.0018  # Using normalized coordinates, this is 1/width * (error in pixels) so 1/1241 * 2 rounded to 0.0009
+  reprojectionError: 0.002  # Using normalized coordinates, this is 1/width * (error in pixels) so 1/1241 * 2 rounded to 0.0009
   confidence: 0.9999
 
 CLAHE_settings:
  clipLimit: 10.0
  tileGridSize: !!python/tuple [8,6]
+
+feature_detector_type: zernike
+feature_descriptor_type: orb
 
 ZERNIKE_settings:
  Nfeats: 2400
@@ -60,6 +63,7 @@ ZERNIKE_settings:
  nmax: 8
  like_matlab: False
  lmax_nd: 3
+ harris_threshold: 0.1
 
 iSAM2_settings:
  pose0_to_pose1_range: 1.0
@@ -73,7 +77,7 @@ ORB_settings:
  patchSize: 31
  fastThreshold: 5
  firstLevel: 0
- nfeatures: 10000
+ nfeatures: 2400
  nlevels: 8
  scaleFactor: 1.2
  scoreType: 0

@@ -16,51 +16,72 @@ D:
 - [-3.745594e-01, 2.049385e-01, 1.110145e-03, 1.379375e-03, -7.084798e-02]
 #- [0.0, 0.0, 0.0, 0.0, 0.0]
 
-tiling_non_max_tile_y: 17 
-tiling_non_max_tile_x: 8 
-use_tiling_non_max_supression: False
-
-radial_non_max: False
-radial_non_max_radius: 5
-
 osx_image_folder: '/Users/vik748/Google Drive/data/kitti/image_00/data'
 linux_image_folder: '/home/vik748/data/kitti/image_00/data'
 image_ext: 'png'
-chessboard: False
 init_image_indxs: [1, 3]
 image_step: 1
 plot_landmarks: False
 use_masks: False
 use_clahe: False
 lowe_ratio_test_threshold: 0.9
+use_RecoverPose_Filter: True
+pause_every_iteration: False
+use_gtsam: False
+
+use_tiling_non_max_supression: False
+tiling_non_max_tile_y: 12 
+tiling_non_max_tile_x: 4 
+
+radial_non_max: False
+radial_non_max_radius: 5
+
+Triangulation_settings:
+ z_threshold: 60 # In units set by frame 1 and 2
+ subtended_angle_threshold: 0.25 # In degrees
 
 findEssential_settings:
  prob: 0.9999
- threshold: 0.01
+ threshold: 0.0004
+
+solvePnPRansac_settings:
+  iterationsCount: 250
+  reprojectionError: 0.002  # Using normalized coordinates, this is 1/width * (error in pixels) so 1/1241 * 2 rounded to 0.0009
+  confidence: 0.9999
 
 CLAHE_settings:
  clipLimit: 10.0
  tileGridSize: !!python/tuple [8,6]
 
+feature_detector_type: zernike
+feature_descriptor_type: orb
+
 ZERNIKE_settings:
- Nfeats: 1200
+ Nfeats: 2400
  seci: 2 
  secj: 3
  levels: 6
- ratio: 0.75
+ ratio: 0.83333334
  sigi: 2.75
  sigd: 1.0
  nmax: 8
  like_matlab: False
  lmax_nd: 3
+ harris_threshold: 0.1
+
+iSAM2_settings:
+ pose0_to_pose1_range: 1.0
+ relinearizeThreshold: 0.1
+ relinearizeSkip: 10
+ proj_noise_val: 0.00081 # 0.0027 = 1/376 0.00081 = 1/1241
 
 ORB_settings:
  WTA_K: 4
  edgeThreshold: 31
  patchSize: 31
- fastThreshold: 5
+ fastThreshold: 1
  firstLevel: 0
- nfeatures: 10000
+ nfeatures: 5000
  nlevels: 8
  scaleFactor: 1.2
  scoreType: 0

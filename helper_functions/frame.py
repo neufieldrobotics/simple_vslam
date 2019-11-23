@@ -131,16 +131,22 @@ class Frame ():
     
         if Frame.clahe_obj is not None: self.gr = Frame.clahe_obj.apply(self.gr)
         
-        self.kp_objs,self.des = Frame.detector.detectAndCompute(self.gr,self.mask)
+        detector_kp_objs = Frame.detector.detect(self.gr,self.mask)
                 
+        #detector_kp_objs = radial_non_max(detector_kp_objs,self.gr.shape, kernel_size=(3,3))
+        
+        #detector_kp_objs = tiled_features(detector_kp_objs, self.gr.shape, 6, 2, no_features=2400 )
+
+        
         '''
+        if rnm_radius is not None:
+            kp = radial_non_max(kp,rnm_radius)
+            pbf += " > radial supression: "+str(len(kp))
+        
         if tiling is not None:
             kp = tiled_features(kp, gr.shape, *tiling)
             pbf += " > tiling supression: "+str(len(kp))
         
-        if rnm_radius is not None:
-            kp = radial_non_max(kp,rnm_radius)
-            pbf += " > radial supression: "+str(len(kp))
             
         # Display translucent mask on image.
         # if mask_j is not None:
@@ -148,6 +154,8 @@ class Frame ():
         # else: gr_j_masked = gr_j
 
         '''
+        
+        self.kp_objs, self.des = Frame.descriptor.compute(self.gr, detector_kp_objs)
         
         self.kp = cv2.KeyPoint_convert(self.kp_objs)
         self.kp_ud = cv2.undistortPoints(np.expand_dims(self.kp,1), 
@@ -343,7 +351,8 @@ class Frame ():
             des_i_cand = fr_i.des
         else:            
             des_i_cand = fr_i.des[fr_i.kp_cand_ind]
-            
+        
+        print ("\n\nFrame.matcher: ", Frame.matcher)
         matches_cand = knn_match_and_lowe_ratio_filter(Frame.matcher, des_i_cand, fr_j.des,
                                                        Frame.config_dict['lowe_ratio_test_threshold'])
         dbg_str = "Found {} / {} prev candidates".format(len(matches_cand),len(des_i_cand))

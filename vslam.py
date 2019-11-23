@@ -56,6 +56,8 @@ def writer(imgnames, masknames, config_dict, queue):
     USE_MASKS = config_dict['use_masks']
     USE_CLAHE = config_dict['use_clahe']
     FEATURE_DETECTOR_TYPE = config_dict['feature_detector_type']
+    FEATURE_DESCRIPTOR_TYPE = config_dict['feature_descriptor_type']
+    print("FEATURE_DETECTOR_TYPE: ",FEATURE_DETECTOR_TYPE," FEATURE_DESCRIPTOR_TYPE: ",FEATURE_DESCRIPTOR_TYPE)
     USE_CACHING = False
     #RADIAL_NON_MAX = config_dict['radial_non_max']
     
@@ -65,20 +67,39 @@ def writer(imgnames, masknames, config_dict, queue):
     Frame.config_dict = config_dict
 
     if FEATURE_DETECTOR_TYPE == 'orb':
-        Frame.matcher = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
         Frame.detector = cv2.ORB_create(**config_dict['ORB_settings'])
         feature_detector_config = config_dict['ORB_settings']
+    elif FEATURE_DETECTOR_TYPE == 'zernike':
+        Frame.detector = MultiHarrisZernike(**config_dict['ZERNIKE_settings'])
+        feature_detector_config = config_dict['ZERNIKE_settings']
+    elif FEATURE_DETECTOR_TYPE == 'sift':
+        Frame.detector = cv2.xfeatures2d.SIFT_create(**config_dict['SIFT_settings'])
+        feature_detector_config = config_dict['SIFT_settings']
+    elif FEATURE_DETECTOR_TYPE == 'surf':
+        Frame.detector = cv2.xfeatures2d.SURF_create(**config_dict['SURF_settings'])
+        feature_detector_config = config_dict['SURF_settings']        
+    else:
+        assert False, "Specified feture detector not available"
+        
+    if FEATURE_DESCRIPTOR_TYPE == 'orb':        
+        Frame.matcher = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
+        Frame.descriptor = cv2.ORB_create(**config_dict['ORB_settings'])
+        feature_descriptor_config = config_dict['ORB_settings']
     else:
         Frame.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
-        if FEATURE_DETECTOR_TYPE == 'zernike':
-            Frame.detector = MultiHarrisZernike(**config_dict['ZERNIKE_settings'])
-            feature_detector_config = config_dict['ZERNIKE_settings']
-        elif FEATURE_DETECTOR_TYPE == 'sift':
-            Frame.detector = cv2.xfeatures2d.SIFT_create(**config_dict['SIFT_settings'])
-            feature_detector_config = config_dict['SIFT_settings']
+        if FEATURE_DESCRIPTOR_TYPE == 'zernike':
+            Frame.descriptor = MultiHarrisZernike(**config_dict['ZERNIKE_settings'])
+            feature_descriptor_config = config_dict['ZERNIKE_settings']
+        elif FEATURE_DESCRIPTOR_TYPE == 'sift':
+            Frame.descriptor = cv2.xfeatures2d.SIFT_create(**config_dict['SIFT_settings'])
+            feature_descriptor_config = config_dict['SIFT_settings']
+        elif FEATURE_DESCRIPTOR_TYPE == 'surf':
+            Frame.descriptor = cv2.xfeatures2d.SURF_create(**config_dict['SURF_settings'])
+            feature_descriptor_config = config_dict['SURF_settings']
         else:
-            assert False, "Specified feture detector not available"
-
+            print ("Asserting")
+            assert False, "Specified feture descriptor not available"
+            
     #settings_hash_string = str(hash(frozenset(a.items()))).replace('-','z')
     settings_string = ''.join(['_%s' % feature_detector_config[k] for k in sorted(feature_detector_config.keys())])
     local_temp_dir = os.path.dirname(os.path.abspath(__file__))+'/temp_data'
@@ -145,7 +166,6 @@ if __name__ == '__main__':
      
     # Inputs, images and camera info
     config_dict = yaml.load(open(args.config))
-    CHESSBOARD = config_dict['chessboard']
     USE_MASKS = config_dict['use_masks']
     #RADIAL_NON_MAX_RADIUS = config_dict['radial_non_max_radius']
     image_ext = config_dict['image_ext']
@@ -203,8 +223,14 @@ if __name__ == '__main__':
     # Configure settings for Frame object
     Frame.K = np.array(config_dict['K'])
     Frame.D = np.array(config_dict['D'])
+    
     Frame.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
-    Frame.config_dict = config_dict
+    Frame.config_dict = config_dict    
+            
+    if config_dict['feature_descriptor_type'] == 'orb':
+        Frame.matcher = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
+    else:
+        Frame.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
 
     # Launch the pre-processing thread                
     mp.set_start_method('spawn',force=True)
