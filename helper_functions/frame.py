@@ -292,7 +292,7 @@ class Frame ():
         rows_to_del = []
         
         ANGLE_THRESHOLD = np.deg2rad(Frame.config_dict["Triangulation_settings"]["subtended_angle_threshold"])
-        Z_THRESHOLD = Frame.config_dict["Triangulation_settings"]["z_threshold"] / Frame.scale
+        Z_THRESHOLD = Frame.config_dict["Triangulation_settings"]["z_threshold"] * Frame.scale
         
         for i,mask_val in enumerate(mask):
             if mask_val==1:                
@@ -318,7 +318,7 @@ class Frame ():
                 # This eliminates points that lie beyond the circle where trans_1T2 is the a cord 
                 # and the circle represents the locus of all points subtending angle_threshold to the cord
                 if pt_2X[2]<=0 or \
-                   pt_2X[2]>Z_THRESHOLD: #or \
+                   pt_2X[2]>Z_THRESHOLD or \
                    beta < ANGLE_THRESHOLD:
                    #parallax < .01: 
                    #dist > 50.0:                    

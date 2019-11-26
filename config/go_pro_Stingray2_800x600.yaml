@@ -37,7 +37,7 @@ plot_landmarks: True
 osx_masks_folder: '/Users/vik748/Google Drive/data/Stingray2_080718_800x600_masks_out'
 linux_masks_folder: '/home/vik748/data/Stingray2_080718_800x600_masks_out'
 masks_ext: 'png'
-lowe_ratio_test_threshold: 0.95
+lowe_ratio_test_threshold: 0.9
 use_RecoverPose_Filter: False
 pause_every_iteration: True
 use_gtsam: False
@@ -68,7 +68,7 @@ solvePnPRansac_settings:
   confidence: 0.9999
 
 iSAM2_settings:
- pose0_to_pose1_range: 1.0
+# pose0_to_pose1_range: 1.0
  relinearizeThreshold: 0.1
  relinearizeSkip: 10
  proj_noise_val: 0.00125  # 1/800
@@ -111,7 +111,7 @@ SIFT_settings:
  edgeThreshold: 20
  sigma: 1.6
 
-KLT_settings:
- criteria: !!python/tuple [3, 500, 0.001] #criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.03))
- maxLevel: 4
- winSize: !!python/tuple [15,15]
+#KLT_settings:
+# criteria: !!python/tuple [3, 500, 0.001] #criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.03))
+# maxLevel: 4
+# winSize: !!python/tuple [15,15]

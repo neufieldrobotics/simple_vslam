@@ -262,8 +262,8 @@ if __name__ == '__main__':
     Frame.fig2.canvas.mpl_connect('key_press_event', onKey)
     Frame.initialize_VSLAM(fr1, fr2)
     
-    factor_graph = iSAM2Wrapper(pose0=np.eye(4), K=np.eye(3), **config_dict['iSAM2_settings'])    
-    factor_graph.add_PoseEstimate(fr2.frame_id, fr2.T_pnp)      
+    factor_graph = iSAM2Wrapper(pose0=fr1.T_pnp, pose0_to_pose1_range = Frame.scale, K=np.eye(3), **config_dict['iSAM2_settings'])    
+    factor_graph.add_PoseEstimate(fr2.frame_id, fr2.T_pnp)
     
     plt.pause(0.001)
     
@@ -315,7 +315,7 @@ if __name__ == '__main__':
                 Frame.frlog.info("GTAM Landmark correction: Mean: {:.3f} Max: {:.3f}".format(mean_correction,max_correction))
                 
                 Frame.landmarks[gtsam_lm_ids] = corr_landmarks
-                trans_correction = np.linalg.norm(fr_curr.T_gtsam[:3,-1]-fr_curr.T_gtsam[:3,-1])
+                trans_correction = np.linalg.norm(fr_curr.T_gtsam[:3,-1]-fr_curr.T_pnp[:3,-1])
                 rot_correction = rotation_distance(fr_curr.T_gtsam[:3,:3], fr_curr.T_pnp[:3,:3])
                 Frame.frlog.info("GTSAM correction: Trans: {:.5f} rot angle: {:.4f} deg".format(trans_correction,rot_correction))
                 Frame.frlog.info("Time elapsed in iSAM optimization: {:.4f}".format(time.time()-ft))
