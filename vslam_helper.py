@@ -104,12 +104,12 @@ def draw_points(vis_orig, points, color = (0, 255, 0), thick = 3):
         cv2.circle(vis, (int(pt[0]), int(pt[1])), rad , color, thickness=thick)
     return vis
 
-def draw_arrows(vis_orig, points1, points2, color = (0, 255, 0), thick = 3):
+def draw_arrows(vis_orig, points1, points2, color = (0, 255, 0), tip_length = 0.25):
     if len(vis_orig.shape) == 2: vis = cv2.cvtColor(vis_orig,cv2.COLOR_GRAY2RGB)
     else: vis = vis_orig
-    thick = round(vis.shape[1]/1000)+1
+    thick = round(vis.shape[1]/1000)
     for p1,p2 in zip(points1,points2):
-        cv2.arrowedLine(vis, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1])), color=color, thickness=thick)
+        cv2.arrowedLine(vis, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1])), color=color, thickness=thick, tipLength = tip_length)
     return vis
 
 def draw_feature_tracks(img_left,kp1,img_right,kp2, matches, mask, display_invalid=False, color=(0, 255, 0)):

@@ -219,9 +219,9 @@ if __name__ == '__main__':
     fr2 = mpqueue.get()
     #gr2, mask2, kp2, des2 = fr2.gr,fr2.mask,fr2.kp,fr2.des
     
-    frame_queue = queue.Queue(maxsize=5)
-    frame_queue.put(fr1)
-    frame_queue.put(fr2)
+    #frame_queue = queue.Queue(maxsize=5)
+    #frame_queue.put(fr1)
+    #frame_queue.put(fr2)
     
     # Show image
     Frame.initialize_figures(window_xadj, window_yadj)

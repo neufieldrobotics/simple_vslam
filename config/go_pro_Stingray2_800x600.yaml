@@ -11,11 +11,23 @@ K:
 D: 
 - [-0.28272795, 0.1439448 , -0.00082586, 0.00006393, -0.0542582 ]
 
+#K:
+#- [704.78050494,   0.0       , 403.64566634]
+#- [  0.0       , 713.98436137, 294.65049908]
+#- [  0.0       ,   0.0       ,   1.0       ]
+
+#D: 
+#- [-0.2813603 , 0.13800046, 0.00004876, -0.00006016, -0.04346666]
+
 osx_image_folder: '/Users/vik748/Google Drive/data/Stingray2_080718_800x600'
 linux_image_folder: '/home/vik748/data/Stingray2_080718_800x600'
+#osx_image_folder: '/Users/vik748/Google Drive/data/Lars2_081018_800x600'
+#linux_image_folder: '/Users/vik748/Google Drive/data/Lars2_081018_800x600'
+#osx_image_folder: '/Users/vik748/Google Drive/data/Lars1_080818_800x600'
+#linux_image_folder: '/home/vik748/data/Lars1_080818_800x600'
 image_ext: 'png'
 chessboard: False
-init_image_indxs: [150, 160]  #[1215, 1225] 
+init_image_indxs: [420, 440]  #[1215, 1225] 
 image_step: 5
 use_masks: False
 plot_landmarks: True
@@ -40,8 +52,8 @@ CLAHE_settings:
  tileGridSize: !!python/tuple [8,6]
 
 Triangulation_settings:
- z_threshold: 60 # In units set by frame 1 and 2
- subtended_angle_threshold: .25 # In degrees
+ z_threshold: 120 # In units set by frame 1 and 2
+ subtended_angle_threshold: .01 # In degrees
 
 findEssential_settings:
  prob: 0.9999
