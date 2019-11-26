@@ -73,7 +73,9 @@ class Frame ():
     ax2 = None                            # Handle to axes in fig 2
     fig1 = None                           # Handle to fig 1
     fig2 = None                           # Handle to fig 2
-    lm_plot_handle = None                 # Handle to plot object for landmarks
+    new_lm_plot_handle = None             # Handle to plot object for landmarks
+    all_lm_plot_handle = None             # Handle to plot object for landmarks
+    unused_lm_plot_handle = None          # Handle to plot object for landmarks    
     landmarks = None                      # Full array of all 3D landmarks
     lm_obs_count = None                   # Number of times a landmark has been observed
     landmark_array = np.array([])         # NP Array of landmark objects
@@ -101,7 +103,7 @@ class Frame ():
         self.lm_ind = []                # Index of landmarks which match kp_lm_ind
         self.T_pnp = np.eye(4)          # Pose in world frame computed from PNP
         self.T_gtsam = np.eye(4)        # Pose in world frame after iSAM2 optimization
-        self.T_groundtruth = np.eye(4)  # Ground truth poses read from file
+        self.T_groundtruth = None  # Ground truth poses read from file
 
         # Variables used in processing frames and also passed to gtsam for optimisation
         self.kp_m_prev_lm_ind = None    # keypoint indices for pre-existing landmarks
@@ -544,8 +546,13 @@ class Frame ():
         # c. Set the scale for algorithm as unit length between fr1 and fr2
         Frame.frlog.info("Recover pose used {} of total matches in Essential matrix {}".format(np.sum(mask_RP_12),essen_mat_pts))
         
-        fr1.T_pnp = fr1.T_groundtruth
-        Frame.scale = np.linalg.norm(fr2.T_groundtruth[:3,-1] - fr1.T_groundtruth[:3,-1])
+        if fr1.T_groundtruth is not None:
+            fr1.T_pnp = fr1.T_groundtruth
+            Frame.scale = np.linalg.norm(fr2.T_groundtruth[:3,-1] - fr1.T_groundtruth[:3,-1])
+        else:
+            fr1.T_pnp = np.eye(4)
+            Frame.scale = 1.0
+            
         trans_2t1_scaled = trans_2t1 * Frame.scale
         
         pose_wT1 = fr1.T_pnp
@@ -564,12 +571,12 @@ class Frame ():
         Frame.fig_frame_image = Frame.ax1.imshow(img12)
         
         plot_pose3_on_axes(Frame.ax2, pose_wT1, axis_length=0.5)
-        Frame.cam_pose = plot_pose3_on_axes(Frame.ax2, pose_wT2, axis_length=1.0)
         
         Frame.cam_trail_pts = pose_wT2[:3,[-1]].T
         Frame.cam_pose_trail = plot_3d_points(Frame.ax2, Frame.cam_trail_pts, linestyle="", color='g', marker=".", markersize=2)
         
-        Frame.cam_trail_gt_pts = fr2.T_groundtruth[:3,[-1]].T
+        if fr2.T_groundtruth is not None:
+            Frame.cam_trail_gt_pts = fr2.T_groundtruth[:3,[-1]].T
         Frame.cam_pose_trail_gt = plot_3d_points(Frame.ax2, Frame.cam_trail_pts, linestyle="", color='orange', marker=".", markersize=2)
 
         #input("Press [enter] to continue.\n")
@@ -585,13 +592,19 @@ class Frame ():
         Frame.landmarks = landmarks_12
         
         Frame.frlog.info("Triangulation used {} of total matches {} matches".format(np.sum(mask_tri_12),len(mask_tri_12)))
-    
-        Frame.lm_plot_handle = plot_3d_points(Frame.ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='r')
+
+        if Frame.config_dict['plot_landmarks']:
+            Frame.all_lm_plot_handle = plot_3d_points(Frame.ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='darkgrey')    
+        Frame.unused_lm_plot_handle = plot_3d_points(Frame.ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='r')
+        Frame.new_lm_plot_handle = plot_3d_points(Frame.ax2, landmarks_12, linestyle="", marker=".", markersize=2, color='g')
+
         set_axes_equal(Frame.ax2)
+        Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)
+        Frame.cam_pose = plot_pose3_on_axes(Frame.ax2, pose_wT2, axis_length=1.0, center_plot=True, zoom_to_fit=True)
         Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)
         
         #input("Press [enter] to continue.\n")
-        #Frame.lm_plot_handle.remove()
+        #Frame.new_new_lm_plot_handle.remove()
 
         fr1.kp_cand_ind         = fr1.kp_cand_ind[mask_tri_12[:,0].astype(bool)]
         fr2.kp_m_prev_cand_ind  = fr2.kp_m_prev_cand_ind[mask_tri_12[:,0].astype(bool)]
@@ -689,12 +702,15 @@ class Frame ():
         Frame.cam_trail_pts = np.append(Frame.cam_trail_pts,fr_j.T_pnp[:3,[-1]].T,axis=0)
         plot_3d_points(Frame.ax2,Frame.cam_trail_pts , line_obj=Frame.cam_pose_trail, linestyle="", color='g', marker=".", markersize=2)
 
-        Frame.cam_trail_gt_pts = np.append(Frame.cam_trail_gt_pts,fr_j.T_groundtruth[:3,[-1]].T,axis=0)
-        plot_3d_points(Frame.ax2,Frame.cam_trail_gt_pts , line_obj=Frame.cam_pose_trail_gt)
-
-        gt_trans_error = np.linalg.norm(fr_j.T_groundtruth[:3,-1]-fr_j.T_pnp[:3,-1])
-        gt_rot_error = rotation_distance(fr_j.T_groundtruth[:3,:3], fr_j.T_pnp[:3,:3])
-        Frame.frlog.info("Ground truth error: Trans: {:.5f} rot angle: {:.4f} deg".format(gt_trans_error,gt_rot_error))
+        if fr_j.T_groundtruth is not None:
+            Frame.cam_trail_gt_pts = np.append(Frame.cam_trail_gt_pts,fr_j.T_groundtruth[:3,[-1]].T,axis=0)
+            plot_3d_points(Frame.ax2,Frame.cam_trail_gt_pts , line_obj=Frame.cam_pose_trail_gt)
+            gt_trans_error = np.linalg.norm(fr_j.T_groundtruth[:3,-1]-fr_j.T_pnp[:3,-1])
+            gt_rot_error = rotation_distance(fr_j.T_groundtruth[:3,:3], fr_j.T_pnp[:3,:3])
+            Frame.frlog.info("Ground truth error: Trans: {:.5f} rot angle: {:.4f} deg".format(gt_trans_error,gt_rot_error))
+        
+        
+        plot_3d_points(Frame.ax2, Frame.landmarks[fr_i.lm_ind[(mask_pnp[:,0]^1).astype(bool)]], line_obj=Frame.unused_lm_plot_handle)
                     
         fr_i.lm_ind = fr_i.lm_ind[mask_pnp[:,0].astype(bool)] 
         fr_i.kp_lm_ind = fr_i.kp_lm_ind[mask_pnp[:,0].astype(bool)] 
@@ -751,8 +767,10 @@ class Frame ():
         fr_i.kp_cand_ind = fr_i.kp_cand_ind[mask_tri[:,0].astype(bool)]
         fr_j.kp_m_prev_cand_ind = fr_j.kp_m_prev_cand_ind[mask_tri[:,0].astype(bool)]
         
-        plot_3d_points(Frame.ax2, lm_j_new, line_obj=Frame.lm_plot_handle, 
-                       linestyle="", color='g', marker=".", markersize=2)
+        
+        if Frame.config_dict['plot_landmarks']:
+            plot_3d_points(Frame.ax2, Frame.landmarks, line_obj=Frame.all_lm_plot_handle)
+        plot_3d_points(Frame.ax2, lm_j_new, line_obj=Frame.new_lm_plot_handle)
         
         Frame.fig2.suptitle('Frame {}'.format(fr_j.frame_id))
         Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)

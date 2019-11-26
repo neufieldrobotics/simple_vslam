@@ -68,7 +68,7 @@ solvePnPRansac_settings:
   confidence: 0.9999
 
 iSAM2_settings:
-# pose0_to_pose1_range: 1.0
+ pose0_to_pose1_range: 1.0
  relinearizeThreshold: 0.1
  relinearizeSkip: 10
  proj_noise_val: 0.00125  # 1/800

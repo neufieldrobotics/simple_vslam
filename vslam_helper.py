@@ -146,13 +146,18 @@ def draw_point_tracks(kp1,img_right,kp2, bool_mask=None, display_invalid=False, 
     
     return img_right_out
 
-def center_3d_plot_around_pt(ax, origin):
+def center_3d_plot_around_pt(ax, origin, zoom_to_fit = False):
     xmin,xmax = ax.get_xlim3d()
     ymin,ymax = ax.get_ylim3d()
     zmin,zmax = ax.get_xlim3d()
-    xrange = (xmax - xmin)/2
-    yrange = (ymax - ymin)/2
-    zrange = (zmax - zmin)/2
+    if zoom_to_fit:
+        xrange = (xmax - xmin)
+        yrange = (ymax - ymin)
+        zrange = (zmax - zmin)
+    else:
+        xrange = (xmax - xmin)/2
+        yrange = (ymax - ymin)/2
+        zrange = (zmax - zmin)/2        
     ax.set_xlim3d([origin[0] - xrange, origin[0] + xrange])
     ax.set_ylim3d([origin[1] - yrange, origin[1] + yrange])
     ax.set_zlim3d([origin[2] - zrange, origin[2] + zrange])
@@ -200,11 +205,11 @@ def plot_pose2_on_axes(axes, pose, axis_length=0.1):
     line = np.append(origin[np.newaxis], y_axis[np.newaxis], axis=0)
     axes.plot(line[:, 0], line[:, 1], 'g-')
 
-def plot_pose3_on_axes(axes, T, axis_length=0.1, center_plot=False, line_obj_list=None):
+def plot_pose3_on_axes(axes, T, axis_length=0.1, center_plot=False, line_obj_list=None, zoom_to_fit=False):
     """Plot a 3D pose 4x4 homogenous transform  on given axis 'axes' with given 'axis_length'."""
-    return plot_pose3RT_on_axes(axes, *decompose_T(T), axis_length, center_plot, line_obj_list)
+    return plot_pose3RT_on_axes(axes, *decompose_T(T), axis_length, center_plot, line_obj_list, zoom_to_fit=zoom_to_fit)
 
-def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1, center_plot=False, line_obj_list=None):
+def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1, center_plot=False, line_obj_list=None, zoom_to_fit=False):
     """Plot a 3D pose on given axis 'axes' with given 'axis_length'."""
     # draw the camera axes
     x_axis = origin + gRp[:, 0] * axis_length
@@ -223,7 +228,7 @@ def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1, center_plot=False, 
         zaplt = axes.plot(linez[:, 0], linez[:, 1], linez[:, 2], 'b-')
     
         if center_plot:
-            center_3d_plot_around_pt(axes,origin[0])
+            center_3d_plot_around_pt(axes,origin[0],zoom_to_fit=zoom_to_fit)
         return [xaplt, yaplt, zaplt]
     
     else:
@@ -237,7 +242,7 @@ def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1, center_plot=False, 
         line_obj_list[2][0].set_3d_properties(linez[:,2])
 
         if center_plot:
-            center_3d_plot_around_pt(axes,origin[0])
+            center_3d_plot_around_pt(axes,origin[0],zoom_to_fit=zoom_to_fit)
         return line_obj_list
 
 def plot_3d_points(axes, vals, line_obj=None, *args, **kwargs):

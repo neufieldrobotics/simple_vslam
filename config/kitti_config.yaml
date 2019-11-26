@@ -17,13 +17,13 @@ image_ext: 'png'
 chessboard: False
 init_image_indxs: [1, 3]
 image_step: 1
-plot_landmarks: False
+plot_landmarks: True
 use_masks: False
 use_clahe: False
 lowe_ratio_test_threshold: 0.9
 use_RecoverPose_Filter: True
 pause_every_iteration: False
-use_gtsam: False
+use_gtsam: True
 
 use_tiling_non_max_supression: False
 tiling_non_max_tile_y: 17 

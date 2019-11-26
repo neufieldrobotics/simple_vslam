@@ -57,7 +57,8 @@ def writer(imgnames, masknames, config_dict, queue):
     USE_CLAHE = config_dict['use_clahe']
     FEATURE_DETECTOR_TYPE = config_dict['feature_detector_type']
     FEATURE_DESCRIPTOR_TYPE = config_dict['feature_descriptor_type']
-    print("FEATURE_DETECTOR_TYPE: ",FEATURE_DETECTOR_TYPE," FEATURE_DESCRIPTOR_TYPE: ",FEATURE_DESCRIPTOR_TYPE)
+    vslog.info("FEATURE_DETECTOR_TYPE: {} FEATURE_DESCRIPTOR_TYPE: {}".format(FEATURE_DETECTOR_TYPE,FEATURE_DESCRIPTOR_TYPE))
+
     USE_CACHING = False
     #RADIAL_NON_MAX = config_dict['radial_non_max']
     
@@ -178,7 +179,7 @@ if __name__ == '__main__':
     image_ext = config_dict['image_ext']
     init_imgs_indx = config_dict['init_image_indxs']
     img_step = config_dict['image_step']
-    PLOT_LANDMARKS = config_dict['plot_landmarks']
+    #PLOT_LANDMARKS = config_dict['plot_landmarks']
     findEssential_set = config_dict['findEssential_settings']
     PAUSES = config_dict['pause_every_iteration']
     USE_GTSAM = config_dict['use_gtsam']
@@ -262,7 +263,10 @@ if __name__ == '__main__':
     Frame.fig2.canvas.mpl_connect('key_press_event', onKey)
     Frame.initialize_VSLAM(fr1, fr2)
     
-    factor_graph = iSAM2Wrapper(pose0=fr1.T_pnp, pose0_to_pose1_range = Frame.scale, K=np.eye(3), **config_dict['iSAM2_settings'])    
+    isam2_settings = config_dict['iSAM2_settings']
+    isam2_settings['pose0_to_pose1_range'] = Frame.scale
+    
+    factor_graph = iSAM2Wrapper(pose0=fr1.T_pnp, K=np.eye(3), **isam2_settings)    
     factor_graph.add_PoseEstimate(fr2.frame_id, fr2.T_pnp)
     
     plt.pause(0.001)
