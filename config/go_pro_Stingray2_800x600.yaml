@@ -20,16 +20,18 @@ D:
 #D: 
 #- [-0.2813603 , 0.13800046, 0.00004876, -0.00006016, -0.04346666]
 
-#osx_image_folder: '/Users/vik748/Google Drive/data/Stingray2_080718_800x600'
-#linux_image_folder: '/home/vik748/data/Stingray2_080718_800x600'
-osx_image_folder: '/Users/vik748/Google Drive/data/Lars2_081018_800x600'
-linux_image_folder: '/Users/vik748/Google Drive/data/Lars2_081018_800x600'
+osx_image_folder: '/Users/vik748/Google Drive/data/Stingray2_080718_800x600'
+linux_image_folder: '/home/vik748/data/Stingray2_080718_800x600'
+#osx_image_folder: '/Users/vik748/Google Drive/data/Lars2_081018_800x600'
+#linux_image_folder: '/Users/vik748/Google Drive/data/Lars2_081018_800x600'
 #osx_image_folder: '/Users/vik748/Google Drive/data/Lars1_080818_800x600'
 #linux_image_folder: '/home/vik748/data/Lars1_080818_800x600'
+osx_ground_truth_poses: '/Users/vik748/Google Drive/data/Multibeam_pointcloud_correction/Stingray2_080718/position_output2_full_TFs.txt'
+linux_ground_truth_poses: '/home/vik748/data/Multibeam_pointcloud_correction/Stingray2_080718/position_output2_full_TFs.txt'
 image_ext: 'png'
 chessboard: False
-init_image_indxs: [1240, 1250]  #[1215, 1225] 
-image_step: 4
+init_image_indxs: [420, 440]  #[1215, 1225] 
+image_step: 5
 use_masks: False
 plot_landmarks: True
 osx_masks_folder: '/Users/vik748/Google Drive/data/Stingray2_080718_800x600_masks_out'

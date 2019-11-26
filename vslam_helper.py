@@ -104,12 +104,12 @@ def draw_points(vis_orig, points, color = (0, 255, 0), thick = 3):
         cv2.circle(vis, (int(pt[0]), int(pt[1])), rad , color, thickness=thick)
     return vis
 
-def draw_arrows(vis_orig, points1, points2, color = (0, 255, 0), thick = 3):
+def draw_arrows(vis_orig, points1, points2, color = (0, 255, 0), thick = 2, tip_length = 0.25):
     if len(vis_orig.shape) == 2: vis = cv2.cvtColor(vis_orig,cv2.COLOR_GRAY2RGB)
     else: vis = vis_orig
-    thick = round(vis.shape[1]/1000)+1
     for p1,p2 in zip(points1,points2):
-        cv2.arrowedLine(vis, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1])), color=color, thickness=thick)
+        cv2.arrowedLine(vis, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1])), 
+                        color=color, thickness=thick, tipLength = tip_length)
     return vis
 
 def draw_feature_tracks(img_left,kp1,img_right,kp2, matches, mask, display_invalid=False, color=(0, 255, 0)):
@@ -141,7 +141,8 @@ def draw_point_tracks(kp1,img_right,kp2, bool_mask=None, display_invalid=False, 
         valid_left_matches = kp1[bool_mask,:]
         valid_right_matches = kp2[bool_mask,:]
     #img_right_out = draw_points(img_right, valid_right_matches)
-    img_right_out = draw_arrows(img_right, valid_left_matches, valid_right_matches, color=color)
+    img_right_out = draw_arrows(img_right, valid_left_matches, valid_right_matches, 
+                                color=color, thick = round(img_right.shape[1]/1000))
     
     return img_right_out
 
@@ -529,3 +530,18 @@ def rotation_distance(Ra, Rb):
     """ Returns the angle between two rotation matrices"""
     R = Ra @ Rb.T
     return np.rad2deg(np.arccos((np.trace(R) - 1) / 2))    
+
+def read_metashape_poses(file):
+    """ Read a text file where each line has image name followed by the 4x4 pose as
+        1 x 16 row and return it as a dictionary """
+    pose_dict = {}
+    with open(file) as f: 
+        first_line = f.readline()
+        if not first_line.startswith('Image_name,4x4 Tmatrix as 1x16 row'):
+            raise ValueError("File doesn't start with 'Image_name,4x4 Tmatrix as 1x16 row' might be wrong format")
+        data = f.readlines()
+        for i,line in enumerate(data):
+            name, T_string = (line.strip().split(',',maxsplit=1))
+            T = np.fromstring(T_string,sep=',').reshape((4,4))
+            pose_dict[name] = T
+    return pose_dict

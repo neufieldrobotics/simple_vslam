@@ -100,6 +100,13 @@ def writer(imgnames, masknames, config_dict, queue):
             print ("Asserting")
             assert False, "Specified feture descriptor not available"
             
+    if sys.platform == 'darwin':
+        gt_pose_file = config_dict.get('osx_ground_truth_poses')
+    else:
+        gt_pose_file = config_dict.get('linux_ground_truth_poses')
+    if gt_pose_file:
+            Frame.groundtruth_pose_dict = read_metashape_poses(gt_pose_file)
+            
     #settings_hash_string = str(hash(frozenset(a.items()))).replace('-','z')
     settings_string = ''.join(['_%s' % feature_detector_config[k] for k in sorted(feature_detector_config.keys())])
     local_temp_dir = os.path.dirname(os.path.abspath(__file__))+'/temp_data'
@@ -245,9 +252,9 @@ if __name__ == '__main__':
     fr2 = mpqueue.get()
     #gr2, mask2, kp2, des2 = fr2.gr,fr2.mask,fr2.kp,fr2.des
     
-    frame_queue = queue.Queue(maxsize=5)
-    frame_queue.put(fr1)
-    frame_queue.put(fr2)
+    #frame_queue = queue.Queue(maxsize=5)
+    #frame_queue.put(fr1)
+    #frame_queue.put(fr2)
     
     # Show image
     Frame.initialize_figures(window_xadj, window_yadj)
@@ -288,6 +295,7 @@ if __name__ == '__main__':
             ft = time.time()
             Frame.process_keyframe_PNP(fr_prev, fr_curr)
             Frame.frlog.debug("Time elapsed in process_keyframe: {:.4f}".format(time.time()-ft))
+            #input ("Press enter HERE ")
 
             ft = time.time()
             

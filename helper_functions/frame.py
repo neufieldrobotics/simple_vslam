@@ -14,6 +14,7 @@ from matplotlib import pyplot as plt
 from vslam_helper import *
 import pickle
 from colorama import Fore, Style
+import os
 
 class landmark():
     def __init__(self, fr_i_id,fr_j_id, kp_i_pt, kp_j_pt, coord_3d):
@@ -60,9 +61,11 @@ class Frame ():
     last_id = -1                          # ID of the last object created  
     clahe_obj = None                      # Contrast Limited Adaptive Histogram Equalization object if being used
     detector = None                       # Feature detector object being used
+    descriptor = None                     # Feature detector object being used
     matcher = None                        # Matcher object being used
     config_dict = {}                      # Dictionary containing all the required configuration settings
     is_config_set = False                 # Flag to make sure user is setting all the required config
+    groundtruth_pose_dict = None                   # ground truth pose dictionary
 
     # Visualization
     fig_frame_image = None                # Handle to Frame image which contains the image array being displayed
@@ -83,6 +86,7 @@ class Frame ():
         '''
         # Populated during initialization
         Frame.last_id += 1  
+        self.image_name = os.path.splitext(os.path.basename(image_name))[0]
         self.frame_id = Frame.last_id   # unique id for frame, required for gtsam
         self.mask    = None             # mask for the image
         self.kp_obj = None              # List of keypoint objects calc by Feature Extractor
@@ -95,8 +99,9 @@ class Frame ():
         self.kp_lm_ind = []             # Indices of keypoints that already have landmarks
         self.kp_cand_ind = []           # Indices of candidate keypoints that dont have landmarks associated
         self.lm_ind = []                # Index of landmarks which match kp_lm_ind
-        self.T_pnp = np.eye(4)    # Pose in world frame computed from PNP
-        self.T_gtsam = np.eye(4)  # Pose in world frame after iSAM2 optimization
+        self.T_pnp = np.eye(4)          # Pose in world frame computed from PNP
+        self.T_gtsam = np.eye(4)        # Pose in world frame after iSAM2 optimization
+        self.T_groundtruth = np.eye(4)  # Ground truth poses read from file
 
         # Variables used in processing frames and also passed to gtsam for optimisation
         self.kp_m_prev_lm_ind = None    # keypoint indices for pre-existing landmarks
@@ -166,6 +171,10 @@ class Frame ():
                                               Frame.K, 
                                               Frame.D)[:,0,:]
         pbf = "New feature candidates detected: " + str(len(self.kp))
+        
+        if Frame.groundtruth_pose_dict:
+            self.T_groundtruth = Frame.groundtruth_pose_dict[self.image_name]
+        
         Frame.frlog.debug("Image Pre-processing time is {:.4f}".format(time.time()-pt))
         Frame.frlog.debug(pbf)
     
@@ -262,7 +271,7 @@ class Frame ():
         #Frame.frlog.debug("Proj_1Tw:\t"+str(Proj_1Tw).replace('\n','\n\t\t\t'))
         #Frame.frlog.debug("Proj_2Tw:\t"+str(Proj_2Tw).replace('\n','\n\t\t\t'))
         
-        Pose_1T2 = Pose_1Tw @ Pose_wT2
+        #Pose_1T2 = Pose_1Tw @ Pose_wT2
         #trans_1T2 = Pose_1T2[:3,-1]
         
         trans_wT1 = Pose_wT1[:3,-1]
@@ -273,7 +282,7 @@ class Frame ():
             mask = np.ones((pts_1.shape[0],1),dtype='uint8')
         else:
             pts_3d_world_hom = cv2.triangulatePoints(Proj_1Tw, Proj_2Tw, pts_1[mask==1], 
-                                                  pts_2[mask==1]).T
+                                                     pts_2[mask==1]).T
         # pts_3d_world_hom is a Nx4 array of non-nomalized homogenous coorinates
         # So we normalize them by dividing with last element of each row
         # [:, None] returns the last elements of each row as a Nx1 2D instead of a 1
@@ -283,7 +292,7 @@ class Frame ():
         rows_to_del = []
         
         ANGLE_THRESHOLD = np.deg2rad(Frame.config_dict["Triangulation_settings"]["subtended_angle_threshold"])
-        Z_THRESHOLD = Frame.config_dict["Triangulation_settings"]["z_threshold"]
+        Z_THRESHOLD = Frame.config_dict["Triangulation_settings"]["z_threshold"] / Frame.scale
         
         for i,mask_val in enumerate(mask):
             if mask_val==1:                
@@ -309,7 +318,7 @@ class Frame ():
                 # This eliminates points that lie beyond the circle where trans_1T2 is the a cord 
                 # and the circle represents the locus of all points subtending angle_threshold to the cord
                 if pt_2X[2]<=0 or \
-                   pt_2X[2]>Z_THRESHOLD or \
+                   pt_2X[2]>Z_THRESHOLD: #or \
                    beta < ANGLE_THRESHOLD:
                    #parallax < .01: 
                    #dist > 50.0:                    
@@ -534,10 +543,19 @@ class Frame ():
         # b. Computing pose from Essential matrix between fr1 and fr2
         # c. Set the scale for algorithm as unit length between fr1 and fr2
         Frame.frlog.info("Recover pose used {} of total matches in Essential matrix {}".format(np.sum(mask_RP_12),essen_mat_pts))
-        pose_2T1 = compose_T(rot_2R1,trans_2t1)
+        
+        fr1.T_pnp = fr1.T_groundtruth
+        Frame.scale = np.linalg.norm(fr2.T_groundtruth[:3,-1] - fr1.T_groundtruth[:3,-1])
+        trans_2t1_scaled = trans_2t1 * Frame.scale
+        
+        pose_wT1 = fr1.T_pnp
+        pose_2T1 = compose_T(rot_2R1,trans_2t1_scaled)
         pose_1T2 = T_inv(pose_2T1)
-        fr2.T_pnp = pose_1T2
-        Frame.frlog.info("1T2 :\t"+str(pose_1T2[:3,:]).replace('\n','\n\t\t'))
+        pose_wT2 = pose_wT1 @ pose_1T2
+        fr2.T_pnp = pose_wT2
+        
+        Frame.frlog.info("wT1 :\t"+str(fr1.T_pnp[:3,:]).replace('\n','\n\t\t'))
+        Frame.frlog.info("wT2 :\t"+str(fr2.T_pnp[:3,:]).replace('\n','\n\t\t'))
                     
         img12 = draw_point_tracks(fr1.kp[fr1.kp_cand_ind], fr2.gr,
                                   fr2.kp[fr2.kp_m_prev_cand_ind],
@@ -545,19 +563,22 @@ class Frame ():
         
         Frame.fig_frame_image = Frame.ax1.imshow(img12)
         
-        plot_pose3_on_axes(Frame.ax2,np.eye(4), axis_length=0.5)
-        Frame.cam_pose = plot_pose3_on_axes(Frame.ax2, pose_1T2, axis_length=1.0)
+        plot_pose3_on_axes(Frame.ax2, pose_wT1, axis_length=0.5)
+        Frame.cam_pose = plot_pose3_on_axes(Frame.ax2, pose_wT2, axis_length=1.0)
         
-        Frame.cam_trail_pts = pose_1T2[:3,[-1]].T
+        Frame.cam_trail_pts = pose_wT2[:3,[-1]].T
         Frame.cam_pose_trail = plot_3d_points(Frame.ax2, Frame.cam_trail_pts, linestyle="", color='g', marker=".", markersize=2)
         
+        Frame.cam_trail_gt_pts = fr2.T_groundtruth[:3,[-1]].T
+        Frame.cam_pose_trail_gt = plot_3d_points(Frame.ax2, Frame.cam_trail_pts, linestyle="", color='orange', marker=".", markersize=2)
+
         #input("Press [enter] to continue.\n")
         
         fr1.kp_cand_ind         = fr1.kp_cand_ind[mask_RP_12[:,0].astype(bool)]
         fr2.kp_m_prev_cand_ind  = fr2.kp_m_prev_cand_ind[mask_RP_12[:,0].astype(bool)]
         
         # d. Triangulate landmarks using matched keypoints    
-        landmarks_12, mask_tri_12 = Frame.triangulate(np.eye(4), pose_1T2, 
+        landmarks_12, mask_tri_12 = Frame.triangulate(fr1.T_pnp, fr2.T_pnp, 
                                                       fr1.kp_ud_norm[fr1.kp_cand_ind], 
                                                       fr2.kp_ud_norm[fr2.kp_m_prev_cand_ind], 
                                                       None)
@@ -667,6 +688,13 @@ class Frame ():
         
         Frame.cam_trail_pts = np.append(Frame.cam_trail_pts,fr_j.T_pnp[:3,[-1]].T,axis=0)
         plot_3d_points(Frame.ax2,Frame.cam_trail_pts , line_obj=Frame.cam_pose_trail, linestyle="", color='g', marker=".", markersize=2)
+
+        Frame.cam_trail_gt_pts = np.append(Frame.cam_trail_gt_pts,fr_j.T_groundtruth[:3,[-1]].T,axis=0)
+        plot_3d_points(Frame.ax2,Frame.cam_trail_gt_pts , line_obj=Frame.cam_pose_trail_gt)
+
+        gt_trans_error = np.linalg.norm(fr_j.T_groundtruth[:3,-1]-fr_j.T_pnp[:3,-1])
+        gt_rot_error = rotation_distance(fr_j.T_groundtruth[:3,:3], fr_j.T_pnp[:3,:3])
+        Frame.frlog.info("Ground truth error: Trans: {:.5f} rot angle: {:.4f} deg".format(gt_trans_error,gt_rot_error))
                     
         fr_i.lm_ind = fr_i.lm_ind[mask_pnp[:,0].astype(bool)] 
         fr_i.kp_lm_ind = fr_i.kp_lm_ind[mask_pnp[:,0].astype(bool)] 
@@ -701,9 +729,9 @@ class Frame ():
         
         # Slice and Triangulate
         lm_j_new, mask_tri = Frame.triangulate(fr_i.T_pnp, fr_j.T_pnp,
-                                           fr_i.kp_ud_norm[fr_i.kp_cand_ind],
-                                           fr_j.kp_ud_norm[fr_j.kp_m_prev_cand_ind],
-                                           None)
+                                               fr_i.kp_ud_norm[fr_i.kp_cand_ind],
+                                               fr_j.kp_ud_norm[fr_j.kp_m_prev_cand_ind],
+                                               None)
         Frame.frlog.debug("Time elapsed in triangulate: {:.4f}".format(time.time()-time_start)) 
         time_start = time.time()
     
