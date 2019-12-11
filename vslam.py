@@ -278,15 +278,10 @@ if __name__ == '__main__':
     st = time.time()
     #for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
     spinner = cycle(['|', '/', '-', '\\'])
-    i = 4
+    #i = 4
     flag = False
     while True:
-        if not mpqueue.empty():
-            if cue_to_exit: 
-                vslog.info("EXITING!!!")
-                plt.close('all')
-                raise SystemExit(0)
-            
+        if not mpqueue.empty():            
             ft = time.time()
             
             fr_curr = mpqueue.get()
@@ -306,36 +301,33 @@ if __name__ == '__main__':
             if USE_GTSAM:
                 factor_graph.add_keyframe_factors(fr_curr)
                             
-                factor_graph.update(1)
-                
-                fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)  
-                fr_curr.T_pnp = fr_curr.T_gtsam 
-
-                #current_estimate = factor_graph.get_Estimate()
-                corr_landmarks, gtsam_lm_ids = factor_graph.get_landmark_estimates()
-                
-                mean_correction = np.mean(np.linalg.norm(corr_landmarks - Frame.landmarks[gtsam_lm_ids],axis=1))
-                max_correction = np.max(np.linalg.norm(corr_landmarks - Frame.landmarks[gtsam_lm_ids],axis=1))
-                Frame.frlog.info("GTAM Landmark correction: Mean: {:.3f} Max: {:.3f}".format(mean_correction,max_correction))
-                
-                Frame.landmarks[gtsam_lm_ids] = corr_landmarks
-                trans_correction = np.linalg.norm(fr_curr.T_gtsam[:3,-1]-fr_curr.T_pnp[:3,-1])
-                rot_correction = rotation_distance(fr_curr.T_gtsam[:3,:3], fr_curr.T_pnp[:3,:3])
-                Frame.frlog.info("GTSAM correction: Trans: {:.5f} rot angle: {:.4f} deg".format(trans_correction,rot_correction))
-                Frame.frlog.info("Time elapsed in iSAM optimization: {:.4f}".format(time.time()-ft))
+                if fr_curr.frame_id % 5 ==0:
+                    factor_graph.update(1)
+                    
+                    fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)  
+                    fr_curr.T_pnp = fr_curr.T_gtsam 
+    
+                    #current_estimate = factor_graph.get_Estimate()
+                    corr_landmarks, gtsam_lm_ids = factor_graph.get_landmark_estimates()
+                    
+                    mean_correction = np.mean(np.linalg.norm(corr_landmarks - Frame.landmarks[gtsam_lm_ids],axis=1))
+                    max_correction = np.max(np.linalg.norm(corr_landmarks - Frame.landmarks[gtsam_lm_ids],axis=1))
+                    Frame.frlog.info("GTAM Landmark correction: Mean: {:.3f} Max: {:.3f}".format(mean_correction,max_correction))
+                    
+                    Frame.landmarks[gtsam_lm_ids] = corr_landmarks
+                    trans_correction = np.linalg.norm(fr_curr.T_gtsam[:3,-1]-fr_curr.T_pnp[:3,-1])
+                    rot_correction = rotation_distance(fr_curr.T_gtsam[:3,:3], fr_curr.T_pnp[:3,:3])
+                    Frame.frlog.info("GTSAM correction: Trans: {:.5f} rot angle: {:.4f} deg".format(trans_correction,rot_correction))
+                    Frame.frlog.info("Time elapsed in iSAM optimization: {:.4f}".format(time.time()-ft))
             
             Frame.process_keyframe_triangulation(fr_prev, fr_curr)
             
             Frame.frlog.debug(Fore.RED+"Time to process last frame: {:.4f}".format(time.time()-st)+Style.RESET_ALL)
             Frame.frlog.debug(Fore.RED+"Time in the function: {:.4f}".format(time.time()-ft)+Style.RESET_ALL)
-            Frame.frlog.info(Fore.GREEN + Back.BLUE + "\tFRAME seq {} COMPLETE \n".format(fr_curr.frame_id)+Style.RESET_ALL)
-            
-            
-            
+            Frame.frlog.info(Fore.GREEN + Back.BLUE + "\tFRAME seq {} COMPLETE \n".format(fr_curr.frame_id)+Style.RESET_ALL)           
+                       
             st = time.time()
-            
-            fr_prev=fr_curr
-            
+                       
             if PAUSES: paused=True
 
             while(paused):   
@@ -348,8 +340,14 @@ if __name__ == '__main__':
                     flag = True
                     break
                 time.sleep(0.2)
-            
-            i+= 1
+
+            if cue_to_exit: 
+                vslog.info("EXITING!!!")
+                plt.close('all')
+                raise SystemExit(0)
+
+            fr_prev=fr_curr            
+            #i+= 1
         else: time.sleep(0.2)            
     
     writer_p.join()

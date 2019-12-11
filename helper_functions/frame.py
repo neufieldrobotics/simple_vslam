@@ -99,8 +99,10 @@ class Frame ():
 
         # Variables forwarded to the next frame
         self.kp_lm_ind = []             # Indices of keypoints that already have landmarks
+        self.kp_lm_ind_non_match = []   # Indices of keypoints with landmarks that could not be matched with next image using matcher
         self.kp_cand_ind = []           # Indices of candidate keypoints that dont have landmarks associated
         self.lm_ind = []                # Index of landmarks which match kp_lm_ind
+        self.lm_ind_non_match = []      # Index of landmarks which correspond to kp_lm_ind_non_match
         self.T_pnp = np.eye(4)          # Pose in world frame computed from PNP
         self.T_gtsam = np.eye(4)        # Pose in world frame after iSAM2 optimization
         self.T_groundtruth = None  # Ground truth poses read from file
@@ -179,6 +181,12 @@ class Frame ():
         
         Frame.frlog.debug("Image Pre-processing time is {:.4f}".format(time.time()-pt))
         Frame.frlog.debug(pbf)
+        
+    def __repr__(self):
+        st = ("FrameId: \t{}\nImage: \t\t{}".format(self.frame_id, self.image_name) +
+             "\nPNP_Pose:\t"+str(self.T_pnp[:3,:]).replace('\n','\n\t\t\t') +
+             "\nGTSAM_Pose:\t"+str(self.T_gtsam[:3,:]).replace('\n','\n\t\t\t'))
+        return st
     
     def show_features(self):
         '''
@@ -353,7 +361,7 @@ class Frame ():
         
         Modifies / Updates
         -------
-        fr_i: kp_lm_ind, lm_ind, kp_cand_ind
+        fr_i: kp_lm_ind, lm_ind, kp_cand_ind, kp_lm_ind_non_match
         fr_j: kp_m_prev_lm_ind, kp_m_prev_cand_ind
         ''' 
         # matches for features which are candidates from previous image and 
@@ -398,13 +406,20 @@ class Frame ():
             for m in matches_lm:
                 l_i += [m.queryIdx] 
                 l_j += [m.trainIdx]                 
-    
-            fr_i.kp_lm_ind = fr_i.kp_lm_ind[l_i]   # l_i_1 is index of matched lm keypoints into fr_i.kp
-                                                   # this has to be done this way since des_i_lm is a subset of fr1.des
-            fr_i.lm_ind = fr_i.lm_ind[l_i]
+            
+            l_i_mask = np.zeros(len(fr_i.kp_lm_ind), dtype=bool)
+            l_i_mask[l_i] = 1
+            fr_i.kp_lm_ind_non_match = fr_i.kp_lm_ind[~l_i_mask]
+
+            fr_i.kp_lm_ind = fr_i.kp_lm_ind[l_i_mask]  # l_i_1 is index of matched lm keypoints into fr_i.kp
+                                                       # this has to be done this way since des_i_lm is a subset of fr1.des
+            fr_i.lm_ind_non_match = fr_i.lm_ind[~l_i_mask]
+            fr_i.lm_ind = fr_i.lm_ind[l_i_mask]
             fr_j.kp_m_prev_lm_ind = np.array(l_j)      # fr_j.des is the full list, so m.train gives us index into fr_j.kp
         
         Frame.frlog.info(dbg_str)
+        Frame.frlog.info("{} landmarks couldn't be matched with matcher".format(len(fr_i.kp_lm_ind_non_match)))
+
             #Frame.frlog.debug("No of fr_i.kp_lm_ind: {}, fr_i.lm_ind: {}, fr_j.kp_m_prev_lm_ind: {}".format(
             #                  len(fr_i.kp_lm_ind),len(fr_i.lm_ind),len(fr_j.kp_m_prev_lm_ind)))     
         
@@ -797,6 +812,7 @@ class Frame ():
         fr_j.partition_kp_cand()
         img_cand_pts = draw_points(img_rej_pts,fr_j.kp[fr_j.kp_cand_ind], 
                                   color=[255,255,0])
+        Frame.img_cand_pts = img_cand_pts
         Frame.fig_frame_image.set_data(img_cand_pts)
         Frame.ax1.set_title('Frame {}'.format(fr_j.frame_id))
         Frame.fig1.canvas.draw_idle(); #plt.pause(0.01)
