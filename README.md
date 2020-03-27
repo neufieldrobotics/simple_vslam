@@ -24,6 +24,53 @@ git checkout zernike_gtsam
 # To checkout a particular 'tag' eg. v0.2.0 run:
 git checkout v0.2.0
 ```
+### GTSAM Installation
+Main repo https://bitbucket.org/gtborg/gtsam/overview
+
+Note: The GTSAM Overview lists Intel Math Kernel Library as optional, but **DO NOT INSTALL IT**. If Intel Math Kernel Library is installed, GTSAM compilation expects to use it. However, the standard Python doesn't use Math Kernel Library and will cause issues. So if you want to use the Intel Math Kernel Library, make sure it works with your python installation.
+
+```sh
+# On termial go into the conda environment by running
+conda activate simple_vslam_env
+
+# Check which Python the system is using by running:
+which python
+# The output should be the one from the conda environment on mac /Users/<username>/anaconda3/envs/simple_vslam_env/bin/python
+
+# Also check the current PYTHONPATH by running:
+echo $PYTHONPATH
+# On my mac it was empty
+
+# Install pre-reqs, you might have most of these already
+# for linux
+sudo apt install python-pip cmake libboost-all-dev
+
+# The original gtsam code can be cloned with git clone https://gtborg@bitbucket.org/gtborg/gtsam.git ~/apps/gtsam
+# However, this system was successfully tested with an older commit c8980b9b2bfbcb76ad6357061441ccdfb5d6a54b, an easy way to clone that is to use Vik’s fork with: 
+git clone https://bitbucket.org/vik748/gtsam.git
+cd gtsam
+# Install gtsam python requirements with
+pip install -r cython/requirements.txt 
+
+# Edit the CMakeLists.txt file to the flags GTSAM_BUILD_PYTHON, GTSAM_INSTALL_MATLAB_TOOLBOX and GTSAM_INSTALL_CYTHON_TOOLBOX turn off GTSAM_ALLOW_DEPRECATED_SINCE_V4, 
+# the respective lines should look as follows:
+  
+option(GTSAM_ALLOW_DEPRECATED_SINCE_V4   "Allow use of methods/functions deprecated in GTSAM 4" OFF)
+option(GTSAM_INSTALL_MATLAB_TOOLBOX      "Enable/Disable installation of matlab toolbox"  ON)
+option(GTSAM_INSTALL_CYTHON_TOOLBOX      "Enable/Disable installation of Cython toolbox"  ON)
+
+# These instructions are for installing within a conda environment, for system wide installation, this would have to be adjusted accordingly:  
+mkdir build
+cd build
+cmake -D GTSAM_PYTHON_VERSION=3.5 -DCMAKE_INSTALL_PREFIX=/Users/<username>/gtsam_bin ..
+make check -j4 # (check optional, runs unit tests)
+# Takes about 30 mins.
+make install # this should install the binaries to /Users/<username>/gtsam_bin
+
+# test installation with:
+python /Users/<username>/gtsam_bin/cython/gtsam/examples/ImuFactorExample2.py
+
+# If using conda environments, add the path '/Users/<username>/gtsam_bin/cython' to a .pth file in '/Users/<username>/anaconda/envs/simple_vslam_env/lib/python3.5/site-packages/gtsam.pth'
 
 ## Some important versions:
   - v0.1.0: Basic GTSAM incormporated
