@@ -1,6 +1,9 @@
-# simple_vslam
+# simple_vslam metashape_pts
 
-simple_vslam is a python based implementation of visual slam using opencv.
+This branch metashape_pts is intended as a test for stability and accuracy of the 
+gtsam / isam2 implementation. It uses feature pts exported from an aligned metashape 
+project.
+
 ## Prerequisites
 The following python packages are required to run this code:
   - opencv
@@ -19,21 +22,17 @@ conda activate simple_vslam_env
 ```sh
 git clone --recurse-submodules https://gitlab.com/neu-mit-lfi/simple_vslam.git
 cd simple_vslam
-git checkout zernike_gtsam
-
-# To checkout a particular 'tag' eg. v0.2.0 run:
-git checkout v0.2.0
+git checkout metashape_pts
 ```
-
-## Some important versions:
-  - v0.1.0: Basic GTSAM incormporated
-  - v0.2.0: Cleaned up and configured to use with Iceberg datasets, use -c config_file flag for appropriate config file. 
 
 ## Get test data
 Test datasets, Unzip and save it to a convenient location like `~/data`: 
-  - http://rpg.ifi.uzh.ch/docs/teaching/2016/kitti00.zip  
-  - Lars dataset: deepfreeze1 > /data/datasets_for_algorithms/2018_iceberg_datasets/Lars2_081018_800x600.zip
-  - Cervino dataset: deepfreeze1 > /data/datasets_for_algorithms/2018_iceberg_datasets/time_lapse_5_cervino_800x600.zip
+  - Lars1 dataset: 
+  - Stingrat2 dataset:
+  - Cervino dataset:
+
+## Create pkl files from metashape
+In order to create the required pkl file from Metashape use the function 'export_points_and_cams_to_pkl' from https://gitlab.com/neufieldrobotics/metashape_scripts
 
 ## Executing the package
 Edit a config file to point it to an image folder eg.
@@ -42,7 +41,7 @@ gedit config/kitti.conf
 ```
 Depending on the system, make sure either osx_image_folder or linux_image_folder points to the appropriate image folder. Then run the code with:
 ```sh
-./vslam.py -c config/kitti.conf
+./vslam_metashape.py -c config/kitti.conf
 ```
 
 ## Algorithm
