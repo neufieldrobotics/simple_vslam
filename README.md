@@ -37,11 +37,11 @@ In order to create the required pkl file from Metashape use the function 'export
 ## Executing the package
 Edit a config file to point it to an image folder eg.
 ```sh
-gedit config/kitti.conf
+gedit config/go_pro_Stingray2_metashape.conf
 ```
 Depending on the system, make sure either osx_image_folder or linux_image_folder points to the appropriate image folder. Then run the code with:
 ```sh
-./vslam_metashape.py -c config/kitti.conf
+./vslam_metashape.py -c config/go_pro_Stingray2_metashape.conf
 ```
 
 ## Algorithm
