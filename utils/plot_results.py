@@ -9,9 +9,11 @@ import numpy as np
 from matplotlib import pyplot as plt
 import glob
 import re
+import os
 
 def save_fig2png(fig, folder=None, fname=None):
-    plt._pylab_helpers.Gcf.figs.get(fig.number, None).window.showMaximized()
+    #plt._pylab_helpers.Gcf.figs.get(fig.number, None).window.showMaximized()
+    plt.gcf().set_size_inches(np.array([16, 7.5])*1.5/2)
     plt.pause(.1)
     if fname is None:
         if fig._suptitle is None:
@@ -28,7 +30,7 @@ def save_fig2png(fig, folder=None, fname=None):
     plt._pylab_helpers.Gcf.figs.get(fig.number, None).window.showNormal()
 
 
-files = sorted(glob.glob('/Users/vik748/Google Drive/data/feature_descriptor_comparision/results/raw_images_orbsf/*.csv'))
+files = sorted(glob.glob('/Users/vik748/Google Drive/data/feature_descriptor_comparision/results/raw_images_orbhc/*.csv'))
 bins = np.linspace(10, 250, 25)
 
 for file in files:
@@ -37,8 +39,8 @@ for file in files:
     
     fig3 = plt.figure(3); plt.cla()
     
-    plt.hist(results_array, bins=bins, alpha=0.5, label=['Zernike','SURF','ORB-SURF'])
-    plt.suptitle("Lars 1 800x600 Raw, ORB with SURF Corners - "+ lbl + " secs apart")
+    plt.hist(results_array, bins=bins, alpha=0.5, label=['Zernike','ORB','ORB-Harris Corners'])
+    plt.suptitle("Lars 1 800x600 Raw, ORB with Harris Corners - "+ lbl + " secs apart")
     plt.legend(loc='upper right')
     #plt.axes().set_ylim([0, 750])
     plt.xlabel('Bins (Number of matches)')
