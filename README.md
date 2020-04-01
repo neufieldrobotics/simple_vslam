@@ -45,10 +45,11 @@ echo $PYTHONPATH
 # for linux
 sudo apt install python-pip cmake libboost-all-dev
 
-# The original gtsam code can be cloned with git clone https://gtborg@bitbucket.org/gtborg/gtsam.git ~/apps/gtsam
-# However, this system was successfully tested with an older commit c8980b9b2bfbcb76ad6357061441ccdfb5d6a54b, an easy way to clone that is to use Vik’s fork with: 
-git clone https://bitbucket.org/vik748/gtsam.git
+# The original gtsam code can be cloned with git clone https://github.com/borglab/gtsam.git ~/apps/gtsam
+# However, the system was last tested with commit e7632608e59e6378b2103366a584f17472a1a71e
+git clone https://github.com/borglab/gtsam.git
 cd gtsam
+# optional, checkout a specific commit with git checkout <commit_hash>
 # Install gtsam python requirements with
 pip install -r cython/requirements.txt 
 
@@ -70,7 +71,9 @@ make install # this should install the binaries to /Users/<username>/gtsam_bin
 # test installation with:
 python /Users/<username>/gtsam_bin/cython/gtsam/examples/ImuFactorExample2.py
 
-# If using conda environments, add the path '/Users/<username>/gtsam_bin/cython' to a .pth file in '/Users/<username>/anaconda/envs/simple_vslam_env/lib/python3.5/site-packages/gtsam.pth'
+# If using conda environments, add the path '/Users/<username>/gtsam_bin/cython' to a .pth file in 
+# '/Users/<username>/anaconda/envs/simple_vslam_env/lib/python3.5/site-packages/gtsam.pth'
+```
 
 ## Some important versions:
   - v0.1.0: Basic GTSAM incormporated
