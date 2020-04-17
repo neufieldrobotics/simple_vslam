@@ -1,12 +1,12 @@
-osx_image_folder: '/Users/vik748/Google Drive/data/Lars2_081018/'
-osx_data_folder: '/Users/vik748/Google Drive/data/Lars2_081018_project_files/'
-linux_image_folder: '/home/vik748/data/Lars2_081018/'
-linux_data_folder: '/home/vik748/data/Lars2_081018_project_files/'
-data_pkl_file: metashape_export.pkl #'Lars2_08102018_metashape_pts_and_cams_gs_50_7_morethan_2_cams.pkl' #'metashape_export.pkl' #'Lars2_08102018_metashape_pts_and_cams_gs_50_7.pkl'
+osx_image_folder: '/Users/vik748/Google Drive/data/Stingray2_080718/'
+osx_data_folder: '/Users/vik748/Google Drive/data/Metashape_Bundler_export/'
+linux_image_folder: '/home/vik748/data/Stingray2_080718/'
+linux_data_folder: '/home/vik748/data/Metashape_Bundler_export/'
+data_pkl_file: 'Stingray2_08072018_metashape_pts_and_cams_local_coords_gs_150_15.pkl'
 image_ext: 'JPG'
 
-init_image_indxs: [1215, 1225]  #[1215, 1225] 
-image_step: 10
+init_image_indxs: [15, 25]  #[1215, 1225] 
+image_step: 5
 use_masks: False
 plot_landmarks: True
 masks_ext: 'png'
@@ -39,6 +39,6 @@ iSAM2_settings:
 # pose0_to_pose1_range: 1.0
  relinearizeThreshold: 0.1
  relinearizeSkip: 1
- proj_noise_val: 0.0003  # 1/3000
+ proj_noise_val: 0.00003  # 1/376
 
 

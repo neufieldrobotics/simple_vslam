@@ -1,11 +1,14 @@
-osx_image_folder: '/Users/vik748/Google Drive/data/Lars2_081018/'
-osx_data_folder: '/Users/vik748/Google Drive/data/Lars2_081018_project_files/'
+osx_image_folder: '/Users/vik748/Google Drive/data/Lars1_080818/'
+osx_data_folder: '/Users/vik748/Google Drive/data/Metashape_Bundler_export/'
 linux_image_folder: '/home/vik748/data/Lars2_081018/'
 linux_data_folder: '/home/vik748/data/Lars2_081018_project_files/'
-data_pkl_file: metashape_export.pkl #'Lars2_08102018_metashape_pts_and_cams_gs_50_7_morethan_2_cams.pkl' #'metashape_export.pkl' #'Lars2_08102018_metashape_pts_and_cams_gs_50_7.pkl'
+data_pkl_file: 'Lars1_08082018_metashape_pts_and_cams_gs_100_10_valid_only_plus_five_invalid.pkl'
+#'Lars1_08082018_metashape_pts_and_cams_gs_500_50_valid_only_plus_five_invalid_local_coords.pkl'
+#'Lars1_08082018_metashape_pts_and_cams.pkl'
+#'Lars1_08082018_metashape_pts_and_cams_gs_100_10_valid_only_plus_five_invalid.pkl' #'Lars2_08102018_metashape_pts_and_cams_gs_50_7_morethan_2_cams.pkl' #'metashape_export.pkl' #'Lars2_08102018_metashape_pts_and_cams_gs_50_7.pkl'
 image_ext: 'JPG'
 
-init_image_indxs: [1215, 1225]  #[1215, 1225] 
+init_image_indxs: [250, 260]  #[1215, 1225] 
 image_step: 10
 use_masks: False
 plot_landmarks: True
@@ -23,8 +26,8 @@ radial_non_max: False
 radial_non_max_radius: 5
 
 Triangulation_settings:
- z_threshold: 60 # In units set by frame 1 and 2
- subtended_angle_threshold: .5 # In degrees
+ z_threshold: 1000 # In units set by frame 1 and 2
+ subtended_angle_threshold: .005 # In degrees
 
 findEssential_settings:
  prob: 0.9999
@@ -39,6 +42,6 @@ iSAM2_settings:
 # pose0_to_pose1_range: 1.0
  relinearizeThreshold: 0.1
  relinearizeSkip: 1
- proj_noise_val: 0.0003  # 1/3000
+ proj_noise_val: 0.00003  # 1/3000
 
 

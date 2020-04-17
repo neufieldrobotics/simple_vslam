@@ -202,24 +202,38 @@ if __name__ == '__main__':
             
             if USE_GTSAM:
                 factor_graph.add_keyframe_factors_metashape(fr_curr)
-                            
-                factor_graph.update(1)
                 
-                fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)  
-                fr_curr.T_pnp = fr_curr.T_gtsam 
-
-                #current_estimate = factor_graph.get_Estimate()
-                corr_landmarks, gtsam_lm_ids = factor_graph.get_landmark_estimates()
-                
-                mean_correction = np.mean(np.linalg.norm(corr_landmarks - Frame_metashape.landmarks[gtsam_lm_ids],axis=1))
-                max_correction = np.max(np.linalg.norm(corr_landmarks - Frame_metashape.landmarks[gtsam_lm_ids],axis=1))
-                Frame_metashape.frlog.info("GTAM Landmark correction: Mean: {:.3f} Max: {:.3f}".format(mean_correction,max_correction))
-                
-                Frame_metashape.landmarks[gtsam_lm_ids] = corr_landmarks
-                trans_correction = np.linalg.norm(fr_curr.T_gtsam[:3,-1]-fr_curr.T_gtsam[:3,-1])
-                rot_correction = rotation_distance(fr_curr.T_gtsam[:3,:3], fr_curr.T_pnp[:3,:3])
-                Frame_metashape.frlog.info("GTSAM correction: Trans: {:.5f} rot angle: {:.4f} deg".format(trans_correction,rot_correction))
-                Frame_metashape.frlog.info("Time elapsed in iSAM optimization: {:.4f}".format(time.time()-ft))
+                if fr_curr.frame_id % 1 ==0:
+                    
+                    try:
+                        factor_graph.update(1)
+                    except:
+                        while(True):   
+                            Frame_metashape.fig1.canvas.start_event_loop(0.001)
+                            Frame_metashape.fig2.canvas.start_event_loop(0.001)
+                            if cue_to_exit: 
+                                flag = True
+                                break
+                            time.sleep(0.2)
+                    
+                    fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)  
+                    fr_prev.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_prev.frame_id)
+                    
+                    fr_curr.T_pnp = fr_curr.T_gtsam 
+                    fr_prev.T_pnp  = fr_prev.T_gtsam
+    
+                    #current_estimate = factor_graph.get_Estimate()
+                    corr_landmarks, gtsam_lm_ids = factor_graph.get_landmark_estimates()
+                    
+                    mean_correction = np.mean(np.linalg.norm(corr_landmarks - Frame_metashape.landmarks[gtsam_lm_ids],axis=1))
+                    max_correction = np.max(np.linalg.norm(corr_landmarks - Frame_metashape.landmarks[gtsam_lm_ids],axis=1))
+                    Frame_metashape.frlog.info("GTAM Landmark correction: Mean: {:.3f} Max: {:.3f}".format(mean_correction,max_correction))
+                    
+                    Frame_metashape.landmarks[gtsam_lm_ids] = corr_landmarks
+                    trans_correction = np.linalg.norm(fr_curr.T_gtsam[:3,-1]-fr_curr.T_gtsam[:3,-1])
+                    rot_correction = rotation_distance(fr_curr.T_gtsam[:3,:3], fr_curr.T_pnp[:3,:3])
+                    Frame_metashape.frlog.info("GTSAM correction: Trans: {:.5f} rot angle: {:.4f} deg".format(trans_correction,rot_correction))
+                    Frame_metashape.frlog.info("Time elapsed in iSAM optimization: {:.4f}".format(time.time()-ft))
             
             Frame_metashape.process_keyframe_triangulation(fr_prev, fr_curr)
             
