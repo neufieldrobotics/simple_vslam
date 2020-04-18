@@ -9,16 +9,8 @@ K:
 - [  0.0       ,   0.0       ,   1.0       ]
 
 D: 
-- [-0.28272795, 0.1439448 , -0.00082586, 0.00006393, -0.0542582 ] #
-#- [0.0, 0.0, 0.0, 0.0, 0.0]
+- [-0.28272795, 0.1439448 , -0.00082586, 0.00006393, -0.0542582 ]
 
-#K:
-#- [704.78050494,   0.0       , 403.64566634]
-#- [  0.0       , 713.98436137, 294.65049908]
-#- [  0.0       ,   0.0       ,   1.0       ]
-
-#D: 
-#- [-0.2813603 , 0.13800046, 0.00004876, -0.00006016, -0.04346666]
 
 osx_image_folder: '/Users/vik748/Google Drive/data/Stingray2_080718_800x600'
 linux_image_folder: '/home/vik748/data/Stingray2_080718_800x600'
@@ -30,17 +22,19 @@ osx_ground_truth_poses: '/Users/vik748/Google Drive/data/Multibeam_pointcloud_co
 linux_ground_truth_poses: '/home/vik748/data/Multibeam_pointcloud_correction/Stingray2_080718/position_output2_full_TFs.txt'
 image_ext: 'png'
 chessboard: False
-init_image_indxs: [420, 440]  #[1215, 1225] 
-image_step: 5
+init_image_indxs: [0, 20]  #[1215, 1225] 
+image_step: 10
 use_masks: False
 plot_landmarks: True
+display_candidates: False
 osx_masks_folder: '/Users/vik748/Google Drive/data/Stingray2_080718_800x600_masks_out'
 linux_masks_folder: '/home/vik748/data/Stingray2_080718_800x600_masks_out'
 masks_ext: 'png'
 lowe_ratio_test_threshold: 0.9
 use_RecoverPose_Filter: False
 pause_every_iteration: True
-use_gtsam: False
+use_gtsam: True
+gtsam_interval: 1
 
 use_tiling_non_max_supression: False
 tiling_non_max_tile_y: 17 
@@ -55,8 +49,8 @@ CLAHE_settings:
  tileGridSize: !!python/tuple [8,6]
 
 Triangulation_settings:
- z_threshold: 120 # In units set by frame 1 and 2
- subtended_angle_threshold: .01 # In degrees
+ z_threshold: 150 # In units set by frame 1 and 2
+ subtended_angle_threshold: .005 # In degrees
 
 findEssential_settings:
  prob: 0.9999
@@ -70,8 +64,8 @@ solvePnPRansac_settings:
 iSAM2_settings:
  pose0_to_pose1_range: 1.0
  relinearizeThreshold: 0.1
- relinearizeSkip: 10
- proj_noise_val: 0.00125  # 1/800
+ relinearizeSkip: 5
+ proj_noise_val: 0.000125  # 1/800
 
 feature_detector_type: zernike
 feature_descriptor_type: orb
@@ -81,7 +75,7 @@ ZERNIKE_settings:
  seci: 4 
  secj: 3
  levels: 6
- ratio:  0.8333333333333334
+ ratio:  0.8334
  sigi: 2.75
  sigd: 1.0
  nmax: 8

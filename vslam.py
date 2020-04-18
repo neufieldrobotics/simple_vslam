@@ -183,6 +183,7 @@ if __name__ == '__main__':
     findEssential_set = config_dict['findEssential_settings']
     PAUSES = config_dict['pause_every_iteration']
     USE_GTSAM = config_dict['use_gtsam']
+    GTSAM_INTERVAL = config_dict.get('gtsam_interval',1)
 
     
     if sys.platform == 'darwin':
@@ -301,9 +302,20 @@ if __name__ == '__main__':
             if USE_GTSAM:
                 factor_graph.add_keyframe_factors(fr_curr)
                             
-                if fr_curr.frame_id % 5 ==0:
-                    factor_graph.update(1)
-                    
+                if fr_curr.frame_id % GTSAM_INTERVAL ==0:
+                    try:
+                        factor_graph.update(2)
+                    except:
+                        e = sys.exc_info()[0]
+                        print("Exception occurered in factor_graph update: ")
+                        while(True):   
+                            Frame.fig1.canvas.start_event_loop(0.001)
+                            Frame.fig2.canvas.start_event_loop(0.001)
+                            if cue_to_exit: 
+                                flag = True
+                                break
+                            time.sleep(0.2)
+                            
                     fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)  
                     fr_prev.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_prev.frame_id)
                     

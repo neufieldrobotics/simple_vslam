@@ -564,10 +564,13 @@ class Frame ():
         if fr1.T_groundtruth is not None:
             fr1.T_pnp = fr1.T_groundtruth
             Frame.scale = np.linalg.norm(fr2.T_groundtruth[:3,-1] - fr1.T_groundtruth[:3,-1])
+            Frame.frlog.info("Since ground truth is available, setting scale to {:.2f} and first pose to: {}".format(Frame.scale, fr1.T_pnp))
+
         else:
             fr1.T_pnp = np.eye(4)
             Frame.scale = 1.0
             
+        print(np.linalg.norm(trans_2t1))
         trans_2t1_scaled = trans_2t1 * Frame.scale
         
         pose_wT1 = fr1.T_pnp
@@ -810,8 +813,12 @@ class Frame ():
         
         # partition kp_m into two sets        
         fr_j.partition_kp_cand()
-        img_cand_pts = draw_points(img_rej_pts,fr_j.kp[fr_j.kp_cand_ind], 
-                                  color=[255,255,0])
+        if Frame.config_dict.get('display_candidates'):
+            img_cand_pts = draw_points(img_rej_pts,fr_j.kp[fr_j.kp_cand_ind], 
+                                       color=[255,255,0])
+        else:
+            img_cand_pts = img_rej_pts  
+            
         Frame.img_cand_pts = img_cand_pts
         Frame.fig_frame_image.set_data(img_cand_pts)
         Frame.ax1.set_title('Frame {}'.format(fr_j.frame_id))
