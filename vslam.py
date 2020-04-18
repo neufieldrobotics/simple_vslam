@@ -305,7 +305,11 @@ if __name__ == '__main__':
                     factor_graph.update(1)
                     
                     fr_curr.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_curr.frame_id)  
+                    fr_prev.T_gtsam = factor_graph.get_curr_Pose_Estimate(fr_prev.frame_id)
+                    
                     fr_curr.T_pnp = fr_curr.T_gtsam 
+                    fr_prev.T_pnp  = fr_prev.T_gtsam
+
     
                     #current_estimate = factor_graph.get_Estimate()
                     corr_landmarks, gtsam_lm_ids = factor_graph.get_landmark_estimates()
