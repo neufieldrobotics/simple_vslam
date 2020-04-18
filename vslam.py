@@ -335,7 +335,14 @@ if __name__ == '__main__':
                     rot_correction = rotation_distance(fr_curr.T_gtsam[:3,:3], fr_curr.T_pnp[:3,:3])
                     Frame.frlog.info("GTSAM correction: Trans: {:.5f} rot angle: {:.4f} deg".format(trans_correction,rot_correction))
                     Frame.frlog.info("Time elapsed in iSAM optimization: {:.4f}".format(time.time()-ft))
-            
+                    
+                if Frame.config_dict['plot_landmarks']:
+                    plot_3d_points(Frame.ax2, Frame.landmarks[gtsam_lm_ids], line_obj=Frame.all_lm_plot_handle)
+                        
+            else:
+                if Frame.config_dict['plot_landmarks']:
+                    plot_3d_points(Frame.ax2, Frame.landmarks, line_obj=Frame.all_lm_plot_handle)
+
             Frame.process_keyframe_triangulation(fr_prev, fr_curr)
             
             Frame.frlog.debug(Fore.RED+"Time to process last frame: {:.4f}".format(time.time()-st)+Style.RESET_ALL)

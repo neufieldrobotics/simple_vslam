@@ -79,6 +79,7 @@ class Frame ():
     landmarks = None                      # Full array of all 3D landmarks
     lm_obs_count = None                   # Number of times a landmark has been observed
     landmark_array = np.array([])         # NP Array of landmark objects
+    ax2_plot_limits = np.zeros((3,2))     # Variable to track the current extent of the plot
     
     frlog = logging.getLogger('Frame')    # Logger object for console and file logging
     
@@ -208,6 +209,21 @@ class Frame ():
         kp_m_prev_cand_ind_set = set(self.kp_m_prev_cand_ind)
         self.kp_cand_ind = np.array(list(kp_ind_set - kp_m_prev_cand_ind_set))
                 
+    @staticmethod
+    def update_plot_limits(pts=None):
+        '''
+        Return the required 3d plot limits to show all data
+        '''
+        if pts is None:
+            pts = np.array([ Frame.ax2.get_xlim3d(),
+                             Frame.ax2.get_ylim3d(),
+                             Frame.ax2.get_zlim3d()  ])
+        else:
+            pts = pts.T
+        all_pts = np.hstack((Frame.ax2_plot_limits, pts))
+        Frame.ax2_plot_limits = np.hstack((np.min(all_pts,axis=1)[:,None], np.max(all_pts,axis=1)[:,None]))
+        
+
     @staticmethod
     def initialize_figures(window_xadj = 65, window_yadj = 430):
         '''
@@ -618,7 +634,8 @@ class Frame ():
 
         set_axes_equal(Frame.ax2)
         Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)
-        Frame.cam_pose = plot_pose3_on_axes(Frame.ax2, pose_wT2, axis_length=1.0, center_plot=True, zoom_to_fit=True)
+        Frame.cam_pose = plot_pose3_on_axes(Frame.ax2, pose_wT2, axis_length=1.0, center_plot=False, zoom_to_fit=False)
+        Frame.update_plot_limits()
         Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)
         
         #input("Press [enter] to continue.\n")
@@ -719,6 +736,7 @@ class Frame ():
         
         Frame.cam_trail_pts = np.append(Frame.cam_trail_pts,fr_j.T_pnp[:3,[-1]].T,axis=0)
         plot_3d_points(Frame.ax2,Frame.cam_trail_pts , line_obj=Frame.cam_pose_trail, linestyle="", color='g', marker=".", markersize=2)
+        Frame.update_plot_limits(fr_j.T_pnp[:3,[-1]].T)
 
         if fr_j.T_groundtruth is not None:
             Frame.cam_trail_gt_pts = np.append(Frame.cam_trail_gt_pts,fr_j.T_groundtruth[:3,[-1]].T,axis=0)
@@ -786,11 +804,11 @@ class Frame ():
         fr_j.kp_m_prev_cand_ind = fr_j.kp_m_prev_cand_ind[mask_tri[:,0].astype(bool)]
         
         
-        if Frame.config_dict['plot_landmarks']:
-            plot_3d_points(Frame.ax2, Frame.landmarks, line_obj=Frame.all_lm_plot_handle)
         plot_3d_points(Frame.ax2, lm_j_new, line_obj=Frame.new_lm_plot_handle)
-        
+
         Frame.fig2.suptitle('Frame {}'.format(fr_j.frame_id))
+        set_axes_equal(Frame.ax2, limits=Frame.ax2_plot_limits)
+
         Frame.fig2.canvas.draw_idle(); #plt.pause(0.01)
         
         num_curr_landmarks = len(Frame.landmarks)

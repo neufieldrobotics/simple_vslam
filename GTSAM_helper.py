@@ -47,7 +47,7 @@ class iSAM2Wrapper():
         self.initial_estimate = gtsam.Values()
         self.initial_estimate.insert(iSAM2Wrapper.get_key('x',0), 
                                      gtsam.gtsam.Pose3(pose0))
-        self.lm_factor_ids = []
+        self.lm_factor_ids = set()
         
 
     def add_GenericProjectionFactorCal3_S2_factor(self, pt_uv, X_id, L_id):
@@ -62,7 +62,7 @@ class iSAM2Wrapper():
                                                         self.get_key('l', l), 
                                                         self.K)
             self.graph.push_back(fact)
-        self.lm_factor_ids += L_id
+        self.lm_factor_ids.update(L_id)
         
     def add_PoseEstimate(self, X_id, T):    
         self.initial_estimate.insert(iSAM2Wrapper.get_key('x',X_id), 
@@ -94,7 +94,7 @@ class iSAM2Wrapper():
         lm = []
         for l_id in self.lm_factor_ids:
             lm += [self.current_estimate.atPoint3(iSAM2Wrapper.get_key('l',l_id)).vector()]            
-        return np.array(lm), self.lm_factor_ids
+        return np.array(lm), list(self.lm_factor_ids)
     
     def get_curr_Pose_Estimate(self,x_id):    
         return self.current_estimate.atPose3(iSAM2Wrapper.get_key('x',x_id)).matrix()
@@ -157,7 +157,7 @@ class iSAM2Wrapper():
         """Plot a 3D point on given figure with given 'linespec'."""
         fig = plt.figure(fignum)
         axes = fig.gca(projection='3d')
-        plot_line_on_axes(axes, point1, padd_keyframe_factorsoint2, linespec)
+        plot_line_on_axes(axes, point1, point2, linespec)
 
     @staticmethod
     def draw_graph(graph,values,fig_num=1):
@@ -259,6 +259,7 @@ class iSAM2Wrapper():
                                                                [l_id])                
                 # Add landmark estimates for the newly created landmarks
                 self.add_LandmarkEstimate([l_id], l.coord_3d)
+                #Frame.update_plot_limits(l.coord_3d)
                 new_lm_fact += 1
                 
             elif len(l.observed_kps) > 3:
