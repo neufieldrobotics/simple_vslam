@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Jan 26 08:40:22 2019
+
+@author: vik748
+"""
+
+import numpy as np
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import sys
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+from vslam_helper import *
+
+
+from vslam_helper import *
+
+
+pose_dict = read_metashape_poses('/Users/vik748/Google Drive/data/Multibeam_pointcloud_correction/Lars2_081018/Lars_2_081018_camera_poses_mts_20200428.txt')
+#pose_dict = read_metashape_poses('/Users/vik748/Google Drive/data/Multibeam_pointcloud_correction/Stingray2_080718/Stingray2_08072018_camera_poses_in_mts_20200422.txt')
+
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.set_aspect('equal')         # important!
+title = ax.set_title('3D Test')
+
+#plot_pose3RT_on_axes(ax,np.eye(3),np.zeros(3)[np.newaxis], axis_length=0.5)
+
+for img in sorted(pose_dict)[::20]:
+    #print(img, '->', pose_dict[img])
+    plot_pose3_on_axes(ax,pose_dict[img], axis_length=5)
+    #set_axes_equal(ax)
+    #plt.pause(.1)
+
+
+
+#R = np.array([[ 0.751, -0.075, -0.656],
+ #             [ 0.023,  0.996, -0.087],
+ #             [ 0.66 ,  0.05 ,  0.749]])
+
+#t = np.array([[0.86 ],[0.134],[0.492]])
+
+#R_inv, t_inv = pose_inv(R, t)
+
+#plot_pose3RT_on_axes(ax,R2, -t.T, axis_length=1.0)
+
+set_axes_equal(ax)
+
+plt.show()

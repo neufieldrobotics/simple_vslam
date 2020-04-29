@@ -3,33 +3,28 @@
 #- [0, fy, cy], 
 #- [0, 0, 1]])
 
+# Calibration from Lars2_08102018_camera_calib_opencv_20200428.xml
 K:
-- [ 704.262404172678908,   0.0              , 403.525703941033044]
-- [   0.0              , 700.985126030791616, 295.719954850563636]
-- [   0.0              ,   0.0              ,   1.0              ]
-#- [704.57264662,   0.0       , 403.39898405]
-#- [  0.0       , 682.12023168, 298.49026098]
-#- [  0.0       ,   0.0       ,   1.0       ]
+- [704.8071674690229, 0.0, 404.38567507076107]
+- [0.0, 696.856518161123, 295.9523023199551]
+- [0.0, 0.0, 1.0]
+
+D: [-0.2855072360349615, 0.15825534100041033, -3.279847441885595e-05, -0.00017378382457899745,
+  -0.07531545994327794]
 
 
-D: 
-- [-0.279159318136002921, 0.123589235024440372, -0.000189443288522673765, 0.0000476664883196381510, 
-   -0.0187031411930424600]
-#- [-0.28272795, 0.1439448 , -0.00082586, 0.00006393, -0.0542582 ]
-
-osx_image_folder: '/Users/vik748/Google Drive/data/Stingray2_080718_800x600'
-linux_image_folder: '/home/vik748/data/Stingray2_080718_800x600'
-osx_ground_truth_poses: '/Users/vik748/Google Drive/data/Multibeam_pointcloud_correction/Stingray2_080718/Stingray2_08072018_camera_poses_in_mts_20200422.txt'
-linux_ground_truth_poses: '/home/vik748/data/Multibeam_pointcloud_correction/Stingray2_080718/Stingray2_08072018_camera_poses_in_mts_20200422.txt'
+osx_image_folder: '/Users/vik748/Google Drive/data/Lars2_081018_800x600'
+linux_image_folder: '/home/vik748/data/Lars2_081018_800x600'
+osx_ground_truth_poses: '/Users/vik748/Google Drive/data/Multibeam_pointcloud_correction/Lars2_081018/Lars_2_081018_camera_poses_mts_20200428.txt'
+linux_ground_truth_poses: '/home/vik748/data/Multibeam_pointcloud_correction/Lars2_081018/Lars_2_081018_camera_poses_mts_20200428.txt'
 image_ext: 'png'
-chessboard: False
-init_image_indxs: [0, 20]  #[1215, 1225] 
+init_image_indxs: [1100, 1115]
 image_step: 10
 use_masks: False
 plot_landmarks: True
 display_candidates: False
-osx_masks_folder: '/Users/vik748/Google Drive/data/Stingray2_080718_800x600_masks_out'
-linux_masks_folder: '/home/vik748/data/Stingray2_080718_800x600_masks_out'
+#osx_masks_folder: '/Users/vik748/Google Drive/data/Lars2_080818_800x600_masks_out'
+#linux_masks_folder: '/home/vik748/data/Lars2_080818_800x600_masks_out'
 masks_ext: 'png'
 lowe_ratio_test_threshold: 0.90
 use_RecoverPose_Filter: False
@@ -44,7 +39,7 @@ tiling_non_max_tile_x: 8
 radial_non_max: False
 radial_non_max_radius: 5
 
-#pixel_matching_dist: 500
+#pixel_matching_dist: 200
 
 use_clahe: False
 CLAHE_settings:
@@ -52,8 +47,8 @@ CLAHE_settings:
  tileGridSize: !!python/tuple [8,6]
 
 Triangulation_settings:
- z_threshold: 400 # In units set by frame 1 and 2
- subtended_angle_threshold: .00005 # In degrees
+ z_threshold: 300 # In units set by frame 1 and 2
+ subtended_angle_threshold: .0005 # In degrees
 
 findEssential_settings:
  prob: 0.9999

@@ -33,6 +33,8 @@ tiling_non_max_tile_x: 8
 radial_non_max: False
 radial_non_max_radius: 5
 
+#pixel_matching_dist: 250
+
 Triangulation_settings:
  z_threshold: 60 # In units set by frame 1 and 2
  subtended_angle_threshold: 0.25 # In degrees
@@ -50,7 +52,7 @@ CLAHE_settings:
  clipLimit: 10.0
  tileGridSize: !!python/tuple [8,6]
 
-feature_detector_type: zernike
+feature_detector_type: orb
 feature_descriptor_type: orb
 
 ZERNIKE_settings:
@@ -73,7 +75,7 @@ iSAM2_settings:
  proj_noise_val: 0.00081 # 0.0027 = 1/376 0.00081 = 1/1241
 
 ORB_settings:
- WTA_K: 4
+ WTA_K: 2
  edgeThreshold: 31
  patchSize: 31
  fastThreshold: 5

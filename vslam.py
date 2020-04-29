@@ -83,11 +83,11 @@ def writer(imgnames, masknames, config_dict, queue):
         assert False, "Specified feture detector not available"
         
     if FEATURE_DESCRIPTOR_TYPE == 'orb':        
-        Frame.matcher = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
+        #Frame.matcher = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
         Frame.descriptor = cv2.ORB_create(**config_dict['ORB_settings'])
         feature_descriptor_config = config_dict['ORB_settings']
     else:
-        Frame.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
+        #Frame.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
         if FEATURE_DESCRIPTOR_TYPE == 'zernike':
             Frame.descriptor = MultiHarrisZernike(**config_dict['ZERNIKE_settings'])
             feature_descriptor_config = config_dict['ZERNIKE_settings']
@@ -233,13 +233,24 @@ if __name__ == '__main__':
     Frame.K = np.array(config_dict['K'])
     Frame.D = np.array(config_dict['D'])
     
-    Frame.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
     Frame.config_dict = config_dict    
-            
-    if config_dict['feature_descriptor_type'] == 'orb':
+                    
+    if config_dict['feature_descriptor_type'] == 'orb':        
+        Frame.descriptor = cv2.ORB_create(**config_dict['ORB_settings'])
+    elif config_dict['feature_descriptor_type'] == 'zernike':
+        Frame.descriptor = MultiHarrisZernike(**config_dict['ZERNIKE_settings'])
+    elif config_dict['feature_descriptor_type'] == 'sift':
+        Frame.descriptor = cv2.xfeatures2d.SIFT_create(**config_dict['SIFT_settings'])
+    elif config_dict['feature_descriptor_type'] == 'surf':
+        Frame.descriptor = cv2.xfeatures2d.SURF_create(**config_dict['SURF_settings'])
+    else:
+        print ("Asserting")
+        assert False, "Specified feture descriptor not available"
+    
+    if config_dict['feature_descriptor_type'] == 'orb' and config_dict['ORB_settings']['WTA_K'] != 2 :        
         Frame.matcher = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
     else:
-        Frame.matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
+        Frame.matcher = cv2.BFMatcher(Frame.descriptor.defaultNorm(), crossCheck=False)
 
     # Launch the pre-processing thread                
     mp.set_start_method('spawn',force=True)
