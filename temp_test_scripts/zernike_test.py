@@ -40,22 +40,23 @@ if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/'
 else:
     path = '/home/vik748/'
-img1 = cv2.imread(path+'data/time_lapse_5_cervino_800x600/G0057821.png',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
-img2 = cv2.imread(path+'data/time_lapse_5_cervino_800x600/G0057826.png',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
+img1 = cv2.imread(path+'/data/ir_dataset_day_1/ir_images1_020.jpg',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
+img2 = cv2.imread(path+'/data/ir_dataset_day_1/ir_images1_040.jpg',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
 #img2 = cv2.imread(path+'data/skerki_small/all/ESC.970622_025513.0622.tif',1) # iscolor = CV_LOAD_IMAGE_GRAYSCALE
 
 gr1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
 gr2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
-a = MultiHarrisZernike(Nfeats=600,like_matlab=False)
+a = MultiHarrisZernike(Nfeats= 600, seci = 5, secj = 4, levels = 6, ratio = 0.75, 
+                       sigi = 2.75, sigd = 1.0, nmax = 8, like_matlab=False, lmax_nd = 3, harris_threshold = None)
 a.plot_zernike(a.ZstrucZ)
 
 
-m1 = cv2.imread(path+'data/time_lapse_5_cervino_800x600_masks_out/G0057821_mask.png',cv2.IMREAD_GRAYSCALE)
-m2 = cv2.imread(path+'data/time_lapse_5_cervino_800x600_masks_out/G0057826_mask.png',cv2.IMREAD_GRAYSCALE)
+m1 = cv2.imread(path+'/data/ir_dataset_day_1/ir_images1_020.jpg',cv2.IMREAD_GRAYSCALE)
+m2 = cv2.imread(path+'/data/ir_dataset_day_1/ir_images1_040.jpg',cv2.IMREAD_GRAYSCALE)
 
-kp1, des1 = a.detectAndCompute(gr1, mask=m1, timing=True)
-kp2, des2 = a.detectAndCompute(gr2, mask=m2, timing=True)
+kp1, des1 = a.detectAndCompute(gr1, mask=None, timing=True)
+kp2, des2 = a.detectAndCompute(gr2, mask=None, timing=True)
 
 outImage	 = cv2.drawKeypoints(gr1, kp1, gr1,color=[255,255,0],
                              flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)#cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS

@@ -3,39 +3,27 @@
 #- [0, fy, cy], 
 #- [0, 0, 1]])
 
-# Calibration from Lars1_08082010_camera_calib_opencv_20200422.xml
 K:
-- [ 704.1386022291683,   0.0           , 405.8879561895266 ]
-- [   0.0            , 686.904621157287, 296.6670180431998 ]
-- [   0.0            ,   0.0           ,   1.0       ]
+- [704.7828555610147, 0.0, 401.4192884115758]
+- [0.0, 697.4874654750291, 296.63918937437165]
+- [0.0, 0.0, 1.0]
 
 D: 
-- [-0.279351255654882336, 0.127088911708472863, -0.000495524072154332213, 0.0000424940878375506994, 0.0278131704111216453]
+- [-0.28574540724519565, 0.15949992494106607, -0.000515563796390175, -9.00485425041488e-05, -0.0743708876047786]
 
-
-#K:
-#- [704.78050494,   0.0       , 403.64566634]
-#- [  0.0       , 713.98436137, 294.65049908]
-#- [  0.0       ,   0.0       ,   1.0       ]
-
-#D: 
-#- [-0.2813603 , 0.13800046, 0.00004876, -0.00006016, -0.04346666]
-
-
-
-osx_image_folder: '/Users/vik748/Google Drive/data/Lars1_080818_800x600'
-linux_image_folder: '/home/vik748/data/Lars1_080818_800x600'
-osx_ground_truth_poses: '/Users/vik748/Google Drive/data/Multibeam_pointcloud_correction/Lars1_080818/Lars1_08082018_camera_poses_mts_20200422.txt'
-linux_ground_truth_poses: '/home/vik748/data/Multibeam_pointcloud_correction/Lars1_080818/Lars1_08082018_camera_poses_mts_20200422.txt'
+osx_image_folder: '/Users/vik748/Google Drive/data/Cervino_1_080618_800x600'
+linux_image_folder: '/home/vik748/data/Cervino_1_080618_800x600'
+osx_ground_truth_poses: '/Users/vik748/Google Drive/data/Multibeam_pointcloud_correction/Cervino1_080618/Cervino_1_080618_camera_poses_mts_20200422.txt'
+linux_ground_truth_poses: '/home/vik748/data/Multibeam_pointcloud_correction/Cervino1_080618/Cervino_1_080618_camera_poses_mts_20200422.txt'
 image_ext: 'png'
-#chessboard: False
-init_image_indxs: [60, 80]  #[1215, 1225] 
-image_step: 10
+chessboard: False
+init_image_indxs: [0, 40]
+image_step: 15
 use_masks: False
 plot_landmarks: True
 display_candidates: False
-osx_masks_folder: '/Users/vik748/Google Drive/data/Lars1_080818_800x600_masks_out'
-linux_masks_folder: '/home/vik748/data/Lars1_080818_800x600_masks_out'
+#osx_masks_folder: '/Users/vik748/Google Drive/data/Stingray2_080718_800x600_masks_out'
+#linux_masks_folder: '/home/vik748/data/Stingray2_080718_800x600_masks_out'
 masks_ext: 'png'
 lowe_ratio_test_threshold: 0.9
 use_RecoverPose_Filter: False
@@ -50,7 +38,7 @@ tiling_non_max_tile_x: 8
 radial_non_max: False
 radial_non_max_radius: 5
 
-pixel_matching_dist: 200
+#pixel_matching_dist: 100
 
 use_clahe: False
 CLAHE_settings:
@@ -58,12 +46,12 @@ CLAHE_settings:
  tileGridSize: !!python/tuple [8,6]
 
 Triangulation_settings:
- z_threshold: 400 # In units set by frame 1 and 2
- subtended_angle_threshold: .0005 # In degrees
+ z_threshold: 600 # In units set by frame 1 and 2
+ subtended_angle_threshold: .00005 # In degrees
 
 findEssential_settings:
  prob: 0.9999
- threshold: 0.001
+ threshold: 0.0004
 
 solvePnPRansac_settings:
   iterationsCount: 500
@@ -71,7 +59,7 @@ solvePnPRansac_settings:
   confidence: 0.9999
 
 iSAM2_settings:
- #pose0_to_pose1_range: 1.0
+ pose0_to_pose1_range: 1.0
  relinearizeThreshold: 0.1
  relinearizeSkip: 5
  proj_noise_val: 0.000125  # 1/800
@@ -81,10 +69,10 @@ feature_descriptor_type: zernike
 
 ZERNIKE_settings:
  Nfeats: 1200
- seci: 8 
- secj: 6
+ seci: 4
+ secj: 3
  levels: 6
- ratio:  0.8334
+ ratio:  0.8333333333333334
  sigi: 2.75
  sigd: 1.0
  nmax: 8
@@ -96,9 +84,9 @@ ORB_settings:
  WTA_K: 2
  edgeThreshold: 31
  patchSize: 31
- fastThreshold: 3
+ fastThreshold: 15
  firstLevel: 0
- nfeatures: 1200
+ nfeatures: 2400
  nlevels: 6
  scaleFactor: 1.2
  scoreType: 0
