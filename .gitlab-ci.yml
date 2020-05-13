@@ -1,10 +1,25 @@
 image: continuumio/miniconda3:latest
 
 before_script:
+  - apt-get update -q -y
+  - apt-get install -y build-essential
   - conda env create -f conda_env.yml
   - source activate simple_vslam_env
 
-tests:
-  stage: test
+build:
+  stage: build
+  timeout: 4 hours
   script:
-    - python -m unittest discover -s tests -v
+  - cd install
+  - chmod +x build_and_install_gtsam.sh
+  - ./build_and_install_gtsam.sh
+  - cd ..
+  - conda develop install/gtsam_bin/cython
+  - more /opt/conda/envs/simple_vslam_env/lib/python3.5/site-packages/conda.pth || true
+  - python install/gtsam_bin/cython/gtsam/examples/VisualISAMExample.py
+  - python -m unittest discover -s tests -v
+
+  artifacts:
+    paths:
+      - install/gtsam_bin
+      - install/gtsam/build
