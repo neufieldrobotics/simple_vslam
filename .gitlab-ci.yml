@@ -11,5 +11,8 @@ test:
   stage: test
   timeout: 1 hours
   script:
+  - echo "CONDA_PREFIX" $CONDA_PREFIX
+  - source activate py35_env
+  - echo "CONDA_PREFIX" $CONDA_PREFIX
   - python /gtsam_bin/cython/gtsam/examples/VisualISAMExample.py
   - python -m unittest discover -s tests -v
