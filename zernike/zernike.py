@@ -74,10 +74,10 @@ class MultiHarrisZernike (cv2.Feature2D):
         self.sigd    = sigd          # derivation scale
         self.nmax    = nmax          # zernike order
         self.exact   = like_matlab   # Flag to replicate Oscar's Matlab version (slower)
-        #self.lmax_nd = lmax_nd       # Feature neighborhood size for local maximum filter
+        self.lmax_nd = lmax_nd       # Feature neighborhood size for local maximum filter
         self.zrad    = np.ceil(self.sigi*8).astype(int) # radius for zernike disk
         self.brad    = np.ceil(0.5*self.zrad).astype(int)    # radius for secondary zernike disk
-        self.non_max_kernel = np.ones((lmax_nd,lmax_nd), np.uint8)
+        self.non_max_kernel = np.ones((self.lmax_nd,self.lmax_nd), np.uint8)
         self.harris_threshold = harris_threshold # Minimum harris threshold for a keypoint
 
         if self.exact:
@@ -171,6 +171,39 @@ class MultiHarrisZernike (cv2.Feature2D):
                 if Z[n][m] is not 0:
                     axes[n,m].imshow(np.real(Z[n][m]),cmap='gray')
                 axes[n,m].axis('off')
+
+    def getNfeats(self):
+        return self.Nfeats
+
+    def getseci(self):
+        return self.seci
+
+    def getsecj(self):
+        return self.secj
+
+    def getlevels(self):
+        return self.levels
+
+    def getratio(self):
+        return self.ratio
+
+    def getsigi(self):
+        return self.sigi
+
+    def getsigd(self):
+        return self.sigd
+
+    def getnmax(self):
+        return self.nmax
+
+    def getlmax_nd(self):
+        return self.lmax_nd
+
+    def getharris_threshold(self):
+        if self.harris_threshold is None:
+            return 0
+        else:
+            return self.harris_threshold
 
     def generate_pyramid(self, img, mask=None):
         '''
