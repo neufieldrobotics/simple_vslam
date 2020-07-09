@@ -5,14 +5,18 @@ Created on Sun Nov  3 21:13:35 2019
 
 @author: vik748
 """
-import os
+import sys, os
 import cv2
 from matlab_imresize.imresize import imresize
 import numpy as np
-from vslam_helper import tiled_features, knn_match_and_lowe_ratio_filter
+from vslam_helper import tiled_features, knn_match_and_lowe_ratio_filter, draw_feature_tracks
 from matplotlib import pyplot as plt
 from datetime import datetime
 import re
+sys.path.insert(0, os.path.abspath('./external_packages/cmtpy/'))
+from cmtpy.histogram_warping_ace import HistogramWarpingACE
+from cmtpy import contrast_measurement as cm
+
 
 
 def save_fig2pdf(fig, folder=None, fname=None):
@@ -259,8 +263,8 @@ def analyze_image_pair_zer_orb_orbhc(image_0, image_1, settings, plotMatches=Tru
     orb_kp_0_ut = orb_detector.detect(image_0, None)
     orb_kp_1_ut = orb_detector.detect(image_1, None)
     # Use Harris corners from zernike for ORB
-    orbhc_kp_0 = zernike_kp_0.copy()   
-    orbhc_kp_1 = zernike_kp_1.copy()  
+    orbhc_kp_0 = zernike_kp_0.copy()
+    orbhc_kp_1 = zernike_kp_1.copy()
     orbhc_kp_0, orbhc_des_0 = orb_detector.compute(image_0, orbhc_kp_0)
     orbhc_kp_1, orbhc_des_1 = orb_detector.compute(image_1, orbhc_kp_1)
     
@@ -516,3 +520,173 @@ def analyze_image_pair_zer_surf_orbsf(image_0, image_1, settings, plotMatches=Tr
         input("Enter to continue")
 
     return {'zernike_matches':no_zernike_matches, 'surf_matches':no_surf_matches, 'orbsf_matches':no_orbsf_matches}
+
+def analyze_image_pair(image_0, image_1, settings, plotMatches=True): 
+    #K = settings['K']
+    #D = settings['D']
+    TILE_KP = settings['TILE_KP']
+    tiling = settings['tiling']
+    detector = settings['detector']
+    descriptor = settings['descriptor']
+    det_name = detector.getDefaultName().replace('Feature2D.','')
+    des_name = descriptor.getDefaultName().replace('Feature2D.','')
+        
+    if detector == descriptor and not TILE_KP:
+        kp_0, des_0 = detector.detectAndCompute(image_0, mask=None)
+        kp_1, des_1 = detector.detectAndCompute(image_1, mask=None)
+    else:
+        detector_kp_0 = detector.detect(image_0, mask=None)
+        detector_kp_1 = detector.detect(image_1, mask=None)
+
+        if TILE_KP:
+            kp_0 = tiled_features(detector_kp_0, image_0.shape, tiling[0], tiling[1], no_features= 1000)
+            kp_1 = tiled_features(detector_kp_1, image_1.shape, tiling[0], tiling[1], no_features= 1000)
+                    
+        else:
+            kp_0 = detector_kp_0
+            kp_1 = detector_kp_1
+
+        kp_0, des_0 = descriptor.compute(image_0, kp_0)
+        kp_1, des_1 = descriptor.compute(image_1, kp_1)
+       
+    if plotMatches:        
+        det_des_string = "Det: {} Des: {}".format(det_name, des_name)
+        kp_img_0 = image_0
+        kp_img_1 = image_1
+        
+        if TILE_KP:
+            feat_string_0 = "{}\nBefore tiling:{:d} after tiling {:d}".format(det_des_string, len(detector_kp_0), len(kp_0))
+            feat_string_1 = "Before tiling:{:d} after tiling {:d}".format(len(detector_kp_1), len(kp_1))
+
+            kp_img_0 = draw_markers(kp_img_0, detector_kp_0, color=[255,255,0])
+            kp_img_1 = draw_markers(kp_img_1, detector_kp_1, color=[255,255,0])
+            
+        else:            
+            feat_string_0 = "{}\n{:d} features".format(det_des_string, len(kp_0))
+            feat_string_1 = "{:d} features".format(len(kp_1))
+
+        kp_img_0 = draw_markers(kp_img_0, kp_0, color=[0,255,0])
+        kp_img_1 = draw_markers(kp_img_1, kp_1, color=[0,255,0])
+    
+        fig1 = plt.figure(1); plt.clf()
+        fig1, fig1_axes = plt.subplots(2,1, num=1)
+        fig1.suptitle(settings['set_title'] + ' features')
+        fig1_axes[0].axis("off"); fig1_axes[0].set_title(feat_string_0)
+        fig1_axes[0].imshow(kp_img_0)
+        fig1_axes[1].axis("off"); fig1_axes[1].set_title(feat_string_1)
+        fig1_axes[1].imshow(kp_img_1)
+        fig1.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.1)
+        plt.draw();
+    
+    '''
+    Match and find inliers
+    '''
+    
+    if isinstance(descriptor, cv2.ORB) and descriptor.getWTA_K() != 2 :
+        print ("ORB with WTA_K !=2")
+        matcher = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
+    else:
+        matcher = cv2.BFMatcher(descriptor.defaultNorm(), crossCheck=False)
+
+    matches_01 = knn_match_and_lowe_ratio_filter(matcher, des_0, des_1, threshold=0.9)
+    
+    kp0_match_01 = np.array([kp_0[mat.queryIdx].pt for mat in matches_01])
+    kp1_match_01 = np.array([kp_1[mat.trainIdx].pt for mat in matches_01])
+    
+    #kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(kp0_match_01,axis=1),K,D)
+    #kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(kp1_match_01,axis=1),K,D)
+    
+    #E_12, mask_e_12 = cv2.findEssentialMat(kp0_match_01_ud, kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
+    #                                       method=cv2.RANSAC, prob=0.9999, threshold=0.001)
+
+    E_12, mask_e_12 = cv2.findFundamentalMat(kp0_match_01, kp1_match_01, **settings['findFundamentalMat_params'])
+    
+    no_matches = np.sum(mask_e_12)
+    result = {'detector':det_name, 'descriptor':des_name, 'matches': no_matches,
+              'img0_no_features': len(kp_0), 'img1_no_features':len(kp_1)}
+    
+    if plotMatches:    
+        #valid_matches_img = draw_matches_vertical(image_0, kp_0, image_1, kp_1, matches_01, 
+        #                                                  mask_e_12, display_invalid=True, color=(0, 255, 0))
+        valid_matches_img = draw_feature_tracks(image_0, kp_0, image_1, kp_1, matches_01, 
+                                                mask_e_12, display_invalid=True, color=(0, 255, 0),
+                                                thick = 2)
+        fig2 = plt.figure(2); plt.clf()
+        fig2, fig2_axes = plt.subplots(1,1, num=2)
+        fig2.suptitle(settings['set_title'] + ' Feature Matching')
+        fig2_axes.axis("off"); fig2_axes.set_title("{}\n{:d} matches".format(det_des_string, no_matches))
+        fig2_axes.imshow(valid_matches_img)
+        fig2.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.0)
+        plt.draw(); plt.show(block=False); plt.pause(.2)
+        #input("Enter to continue")
+
+    return result
+
+def generate_contrast_images(img, contrast_adj_factors=np.arange(0,-1.1,-.1)):
+    '''
+    Given an image and list of contrsat_adj_factors returns list of images and contrat measurements
+    '''
+    ace_obj = HistogramWarpingACE(no_bits=8, tau=0.01, lam=5, adjustment_factor=-1.0, stretch_factor=-1.0,
+                                  min_stretch_bits=4, downsample_for_kde=True,debug=False, plot_histograms=False)
+    v_k, a_k = ace_obj.compute_vk_and_ak(img)
+
+    warped_images = np.empty(contrast_adj_factors.shape,dtype=object)
+    contrast_measurements = []
+    
+    contrast_estimators = {'global_contrast_factor': lambda gr: cm.compute_global_contrast_factor(gr),
+                           'rms_contrast': lambda gr: cm.compute_rms_contrast(gr,debug=False),
+                           'local_box_filt': lambda gr: cm.compute_box_filt_contrast(gr, kernel_size=17, debug=False),
+                           'local_gaussian_filt': lambda gr: cm.compute_gaussian_filt_contrast(gr, sigma=5.0, debug=False),
+                           'local_bilateral_filt': lambda gr: cm.compute_bilateral_filt_contrast(gr, sigmaSpace=5.0, sigmaColor=0.05, debug=False)}
+        
+    for i,adj in enumerate(contrast_adj_factors):
+        if adj==0:
+            warped_images[i] = img
+        else:
+            outputs = ace_obj.compute_bk_and_dk(v_k, a_k, adjustment_factor=adj, stretch_factor=adj)
+            warped_images[i], Tx = ace_obj.transform_image(*outputs, img)
+        cm_dict = {nm:ce(warped_images[i]) for nm, ce in contrast_estimators.items()}
+        #print("Contrast adj: {:.2f} contrast estimaes: {}".format(adj, cm_dict))
+        contrast_measurements.append(cm_dict)
+        
+    return warped_images, contrast_measurements
+
+def read_grimage(img_name, resize_scale = None, normalize=False, image_depth=8):
+    '''
+    Read image from file, convert to grayscale and resize if required
+    Parameters
+    ----------
+    img_name : String
+        Filename
+    resize_scale : float, optional
+        float scale factor for image < 1 downsamples and > 1 upsamples. The default is None.
+    normalize : bool, optional
+        Return normalized float image. The default is False.
+    image_depth : int, optional
+        Bit depth of image being read. The default is 8.
+
+    Raises
+    ------
+    FileNotFoundError
+        Raisees FileNotFound Error if unable to read image
+
+    Returns
+    -------
+    gr : MxN uint8 or flat32 numpy array
+        grayscale image
+    '''
+    img = cv2.imread(img_name, cv2.IMREAD_COLOR)
+    if img is None:
+        raise FileNotFoundError ("Could not read image from: {}".format(img_name))
+    gr_full = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+
+    if not resize_scale is None:
+        gr = cv2.resize(gr_full, (0,0), fx=resize_scale, fy=resize_scale, interpolation=cv2.INTER_AREA)
+    else:
+        gr = gr_full
+
+    if normalize:
+        levels = 2 ** image_depth - 1
+        gr = np.divide(gr, levels, dtype=np.float32)
+
+    return gr
