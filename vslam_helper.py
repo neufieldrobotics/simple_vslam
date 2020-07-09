@@ -144,7 +144,7 @@ def draw_arrows(vis_orig, points1, points2, color = (0, 255, 0), thick = 2, tip_
                         color=color, thickness=thick, tipLength = tip_length)
     return vis
 
-def draw_feature_tracks(img_left,kp1,img_right,kp2, matches, mask, display_invalid=False, color=(0, 255, 0)):
+def draw_feature_tracks(img_left,kp1,img_right,kp2, matches, mask, display_invalid=False, color=(0, 255, 0), thick = 2):
     '''
     This function extracts takes a 2 images, set of keypoints and a mask of valid
     (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
@@ -154,7 +154,7 @@ def draw_feature_tracks(img_left,kp1,img_right,kp2, matches, mask, display_inval
     valid_right_matches = np.array([kp2[mat.trainIdx].pt for is_match, mat in zip(bool_mask, matches) if is_match])
     valid_left_matches = np.array([kp1[mat.queryIdx].pt for is_match, mat in zip(bool_mask, matches) if is_match])
     #img_right_out = draw_points(img_right, valid_right_matches)
-    img_right_out = draw_arrows(img_right, valid_left_matches, valid_right_matches)
+    img_right_out = draw_arrows(img_right, valid_left_matches, valid_right_matches, thick = thick)
 
 
     return img_right_out
@@ -448,7 +448,7 @@ def knn_match_and_lowe_ratio_filter(matcher, des1, des2,threshold=0.9, dist_mask
     matches_knn = matcher.knnMatch(des2,des1, k=2, mask = dist_mask_21 )
     all_ds = [m[0].distance for m in matches_knn if len(m) >0]
 
-    print("Len of knn matches", len(matches_knn))
+    #print("Len of knn matches", len(matches_knn))
 
     matches = []
     # Run lowes filter and filter with difference higher than threshold this might
@@ -476,7 +476,7 @@ def knn_match_and_lowe_ratio_filter(matcher, des1, des2,threshold=0.9, dist_mask
     # run matches again using mask but from 1 to 2 which should remove duplicates
     # This is basically same as running cross match after lowe ratio test
     matches_cross = matcher.match(des1,des2,mask=mask)
-    print("Len of cross matches", len(matches_cross))
+    #print("Len of cross matches", len(matches_cross))
     return matches_cross
 
 def trim_using_mask(mask, *argv):

@@ -1,4 +1,4 @@
-# Install fbow
+# Install gtsam
 set -x
 CWD=`pwd`
 git clone --depth 1 https://github.com/borglab/gtsam gtsam
