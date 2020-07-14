@@ -7,7 +7,6 @@ Created on Sun Nov  3 21:13:35 2019
 """
 import sys, os
 import cv2
-from matlab_imresize.imresize import imresize
 import numpy as np
 from vslam_helper import tiled_features, knn_match_and_lowe_ratio_filter, draw_feature_tracks
 from matplotlib import pyplot as plt
@@ -35,6 +34,23 @@ def save_fig2pdf(fig, folder=None, fname=None):
         plt.savefig(fname +'_'+datetime.now().strftime("%Y%m%d%H%M%S") +'.pdf',format='pdf', dpi=1200,  orientation='landscape', papertype='letter')
 
     plt._pylab_helpers.Gcf.figs.get(fig.number, None).window.showNormal()
+    
+def save_fig2png(fig, folder=None, fname=None):    
+    fig.set_size_inches([8, 6.7])
+    plt.pause(.1)
+    if fname is None:
+        if fig._suptitle is None:
+            fname = 'figure_{:d}'.format(fig.number)
+        else:
+            ttl = fig._suptitle.get_text()
+            ttl = ttl.replace('$','').replace('\n','_').replace(' ','_')
+            fname = re.sub(r"\_\_+", "_", ttl) 
+    if folder:
+        plt.savefig(os.path.join(folder, fname +'_'+datetime.now().strftime("%Y%m%d%H%M%S") +'.pdf'),format='pdf', dpi=1200,  orientation='landscape', papertype='letter')
+    else:
+        plt.savefig(fname +'_'+datetime.now().strftime("%Y%m%d%H%M%S") +'.png',format='png', dpi=300)
+
+    
 
 def match_image_names(set1, set2):
     '''Return true if images in set2 start with the same name as images in set1'''
@@ -521,7 +537,7 @@ def analyze_image_pair_zer_surf_orbsf(image_0, image_1, settings, plotMatches=Tr
 
     return {'zernike_matches':no_zernike_matches, 'surf_matches':no_surf_matches, 'orbsf_matches':no_orbsf_matches}
 
-def analyze_image_pair(image_0, image_1, settings, plotMatches=True): 
+def analyze_image_pair(image_0, image_1, settings, plotMatches=True, saveFig=False): 
     #K = settings['K']
     #D = settings['D']
     TILE_KP = settings['TILE_KP']
@@ -568,8 +584,8 @@ def analyze_image_pair(image_0, image_1, settings, plotMatches=True):
         kp_img_0 = draw_markers(kp_img_0, kp_0, color=[0,255,0])
         kp_img_1 = draw_markers(kp_img_1, kp_1, color=[0,255,0])
     
-        fig1 = plt.figure(1); plt.clf()
-        fig1, fig1_axes = plt.subplots(2,1, num=1)
+        #fig1 = plt.figure(1); plt.clf()
+        fig1, fig1_axes = plt.subplots(2,1)
         fig1.suptitle(settings['set_title'] + ' features')
         fig1_axes[0].axis("off"); fig1_axes[0].set_title(feat_string_0)
         fig1_axes[0].imshow(kp_img_0)
@@ -611,13 +627,15 @@ def analyze_image_pair(image_0, image_1, settings, plotMatches=True):
         valid_matches_img = draw_feature_tracks(image_0, kp_0, image_1, kp_1, matches_01, 
                                                 mask_e_12, display_invalid=True, color=(0, 255, 0),
                                                 thick = 2)
-        fig2 = plt.figure(2); plt.clf()
-        fig2, fig2_axes = plt.subplots(1,1, num=2)
+        #fig2 = plt.figure(2); plt.clf()
+        fig2, fig2_axes = plt.subplots(1,1)
         fig2.suptitle(settings['set_title'] + ' Feature Matching')
         fig2_axes.axis("off"); fig2_axes.set_title("{}\n{:d} matches".format(det_des_string, no_matches))
         fig2_axes.imshow(valid_matches_img)
         fig2.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=.9, wspace=0.1, hspace=0.0)
         plt.draw(); plt.show(block=False); plt.pause(.2)
+        if saveFig:
+            save_fig2png(fig2)
         #input("Enter to continue")
 
     return result

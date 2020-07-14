@@ -11,7 +11,6 @@ import sys
 from matplotlib import pyplot as plt
 import os
 import glob
-from zernike.zernike import MultiHarrisZernike
 from vslam_helper import knn_match_and_lowe_ratio_filter, draw_feature_tracks, tiled_features
 from feat_detector_comparisions_helper import *
 import progressbar
@@ -20,7 +19,10 @@ import pandas as pd
 sys.path.insert(0, os.path.abspath('./external_packages/cmtpy/'))
 from cmtpy.histogram_warping_ace import HistogramWarpingACE
 from cmtpy import contrast_measurement as cm
+sys.path.insert(0, os.path.abspath('./external_packages/zernike_py/'))
+from zernike_py.MultiHarrisZernike import MultiHarrisZernike
 from collections import deque
+from itertools import tee
 
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/data'
@@ -42,18 +44,11 @@ if TILE_KP:
 else:
     NO_OF_UT_FEATURES = NO_OF_FEATURES
 
-
-#K = np.array([[3523.90252470728501/5, 0.0, 2018.22833167806152/5],
-#              [0.0, 3569.92180686745451/5, 1473.25249541175890/5],
-#              [0.0, 0.0, 1.0]])
-
-#D = np.array([-2.81360302828763176e-01, 1.38000456840603303e-01, 4.87629635176304053e-05, -6.01560125682630380e-05, -4.34666626743886730e-02])
-
 raw_img_folder = os.path.join(path,raw_sets_folder)
 clahe_img_folder = os.path.join(path,clahe_sets_folder)
 
-raw_image_names = sorted(glob.glob(raw_img_folder+'/*.png'))[:7]
-clahe_image_names = sorted(glob.glob(clahe_img_folder+'/*.tif'))[:7]
+raw_image_names = sorted(glob.glob(raw_img_folder+'/*.png'))
+clahe_image_names = sorted(glob.glob(clahe_img_folder+'/*.tif'))
 
 '''
 Detect Features
@@ -86,10 +81,20 @@ results_df = pd.DataFrame(columns = ['set_title','image_0', 'image_1', 'contrast
                                      'detector', 'descriptor', 'img0_no_features','img1_no_features', 'matches',
                                      'img0_global_contrast_factor', 'img0_rms_contrast', 'img0_local_box_filt','img0_local_gaussian_filt', 'img0_local_bilateral_filt',
                                      'img1_global_contrast_factor', 'img1_rms_contrast', 'img1_local_box_filt','img1_local_gaussian_filt', 'img1_local_bilateral_filt'])
-base_line_steps = [2,3]#[10,15] #[1, 2, 5, 10, 15, 20]
-contrast_adj_factors = np.arange(0,-1.1,-.1)
 
-image_names = raw_image_names
+# image_skip determines how pairs are compared 
+# image_skip = 5 with baseline 10,15 would mean :> (0,10), (0,15),(5,15), (5,20), (10,20), (10,25)  etc
+
+image_skip = 5
+#[10,15,20] #[1, 2, 5, 10, 15, 20]
+base_line_steps = np.divide([10,15,20], image_skip).astype(int).tolist()
+
+contrast_adj_factors = np.array([0.0, -0.5, -1.0]) #np.arange(0,-1.1,-.1)
+
+image_names = raw_image_names[0:25:image_skip]
+
+if not os.path.exists('results'):
+    os.makedirs('results')
 
 # Fill queue
 img_queue = deque(maxlen = max(base_line_steps) + 1 )
@@ -104,7 +109,14 @@ while len(img_queue) <= max(base_line_steps):
                 'contrast_measurements': contrast_meas}
     img_queue.append(img_dict)
     print("Added image {} to queue".format(img_name))
-  
+
+# These help to rerun the code without refilling the buffer
+img_queue_orig = img_queue.copy()
+img_iter, img_iter_copy = tee(img_iter)
+
+img_queue = img_queue_orig.copy()
+img_iter, img_iter_copy = tee(img_iter_copy)
+
 progress_bar = progressbar.ProgressBar(max_value=len(image_names) - max(base_line_steps) )
 img_count = 0
 progress_bar.update(img_count)
@@ -118,7 +130,7 @@ while True:
         
         pair_base_config = {'set_title': base_settings['set_title'],
                             'image_0': image_0_dict['name'], 'image_1': image_1_dict['name'],
-                            'baseline': base_line } 
+                            'baseline': base_line * image_skip} 
         print("Proccessing pair: {} and {}".format(image_0_dict['name'], image_1_dict['name']))
         
         for i in range(len(contrast_adj_factors)):
@@ -129,9 +141,12 @@ while True:
  
             pair_config = {**pair_base_config, **image_0_cms, **image_1_cms,
                            'contrast_adj_factor': contrast_adj_factors[i] }
-            
+                       
             for config_settings in config_settings_list:
-                pair_results = analyze_image_pair(image_0, image_1, config_settings, plotMatches = False)  
+                config_settings_2 = {**config_settings, 'set_title':config_settings['set_title']+" Ctrst fact: {:.1f}".format(contrast_adj_factors[i])}
+
+                pair_results = analyze_image_pair(image_0, image_1, config_settings_2, 
+                                                  plotMatches = False, saveFig = False)  
                 pair_results.update(pair_config)
                 results_df = results_df.append(pair_results, ignore_index=True)
     
@@ -151,57 +166,7 @@ while True:
                 'contrast_measurements': contrast_meas}
     img_queue.append(img_dict)
     
-output_file = "matching_results"+time.strftime("_%Y%m%d_%H%M%S")+".csv"
+
+output_file = "results/matching_results"+time.strftime("_%Y%m%d_%H%M%S")+".csv"
 results_df.to_csv(output_file)
 print("Results written to {}".format(output_file))
-
-
-'''
-  
-for img_name in image_names[:-min(base_line_steps)]: 
-
-    results_list = []
-
-    image_names = raw_image_names
-    
-    #for img in image_names[:-BASELINE_STEP_SIZE]
-    
-    for img0_name, img1_name in progressbar.progressbar(zip(image_names[:-BASELINE_STEP_SIZE], image_names[BASELINE_STEP_SIZE:]),
-                                                        max_value=len(image_names[:-BASELINE_STEP_SIZE])):
-        image_0 = cv2.imread(img0_name, cv2.IMREAD_GRAYSCALE)
-        image_1 = cv2.imread(img1_name, cv2.IMREAD_GRAYSCALE)
-        
-        
-       # ce(warped_images[i]) for nm, ce in contrast_estimators.items()]
-
-        pair_config = {'set_title': base_settings['set_title'],
-                       'image_0': os.path.splitext(os.path.basename(img0_name))[0], 
-                       'image_1': os.path.splitext(os.path.basename(img1_name))[0], 
-                       'contrast_adj_factor': 0,
-                       'baseline': BASELINE_STEP_SIZE}
-        
-        pair_config.update({'img0_'+nm:ce(image_0) for nm, ce in contrast_estimators.items()})
-        pair_config.update({'img1_'+nm:ce(image_1) for nm, ce in contrast_estimators.items()})
-        
-        pair_results = analyze_image_pair(image_0, image_1, config_settings, plotMatches = False)  
-        pair_results.update(pair_config)
-        results_df = results_df.append(pair_results, ignore_index=True)
-
-
-    results_array = np.array(results_list)
-    np.savetxt("results_array_baseline_"+str(BASELINE_STEP_SIZE)+'_'+datetime.now().strftime("%Y%m%d%H%M%S")+".csv", results_array, delimiter=",", header="zernike, surf, orb_sf")
-
-    fig3 = plt.figure(3)
-    plt.clf()
-    bins = np.linspace(10, 250, 25)
-
-    plt.hist(results_array, bins=bins, alpha=0.5, label=['Zernike','SURF','ORB_SF'])
-    plt.legend(loc='upper right')
-    plt.suptitle(config_settings['set_title'] + '\n Baseline: {:d}'.format(BASELINE_STEP_SIZE))
-    plt.xlabel('Bins (Number of matches)')
-    plt.ylabel('Occurances (Image pairs)')
-    plt.axes().set_ylim([0, 750])
-    plt.draw()
-    #save_fig2pdf(fig3)
-    
-'''

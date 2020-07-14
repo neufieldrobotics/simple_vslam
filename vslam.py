@@ -15,7 +15,8 @@ import glob
 import re
 import argparse
 import traceback
-from zernike.zernike import MultiHarrisZernike
+sys.path.insert(0, os.path.abspath('./external_packages/zernike_py/'))
+from zernike_py.MultiHarrisZernike import MultiHarrisZernike
 from helper_functions.frame import Frame
 np.set_printoptions(precision=5,suppress=True)
 import multiprocessing as mp
@@ -290,7 +291,8 @@ if __name__ == '__main__':
     #for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
     spinner = cycle(['|', '/', '-', '\\'])
     #i = 4
-    flag = False
+    #flag = False
+    empty_count = 0
     while True:
         if not mpqueue.empty():
             ft = time.time()
@@ -322,7 +324,7 @@ if __name__ == '__main__':
                             Frame.fig1.canvas.start_event_loop(0.001)
                             Frame.fig2.canvas.start_event_loop(0.001)
                             if cue_to_exit:
-                                flag = True
+                                #flag = True
                                 break
                             time.sleep(0.2)
 
@@ -370,7 +372,7 @@ if __name__ == '__main__':
                 Frame.fig2.canvas.start_event_loop(0.001)
 
                 if cue_to_exit:
-                    flag = True
+                    #flag = True
                     break
                 time.sleep(0.2)
 
@@ -380,8 +382,14 @@ if __name__ == '__main__':
                 raise SystemExit(0)
 
             fr_prev=fr_curr
-            #i+= 1
-        else: time.sleep(0.2)
+            empty_count = 0
+        else: 
+            #print("\n\n\n Waiting \n\n\n\n")
+            empty_count += 1
+            time.sleep(0.2)
+            if empty_count > 20:
+                Frame.frlog.info("Finished processin all frames !!!")
+                break
 
     writer_p.join()
     while(True):
@@ -389,3 +397,4 @@ if __name__ == '__main__':
         plt.pause(0.5)
         if cue_to_exit: break
     plt.close(fig='all')
+

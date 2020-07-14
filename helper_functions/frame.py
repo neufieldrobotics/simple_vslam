@@ -401,7 +401,7 @@ class Frame ():
             des_i_cand = fr_i.des[fr_i.kp_cand_ind]
             kp_i_cand_pts = fr_i.kp[fr_i.kp_cand_ind]
 
-        print ("\n\nFrame.matcher: ", Frame.matcher)
+        #print ("\n\nFrame.matcher: ", Frame.matcher)
 
         pixel_matching_dist = Frame.config_dict.get('pixel_matching_dist')
         if pixel_matching_dist:
