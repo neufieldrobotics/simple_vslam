@@ -27,11 +27,10 @@ from itertools import tee
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/data'
 else:
-    path = os.path.expanduser('~/data/')
+    path = os.path.expanduser('/data/Lars')
 import time
-timestr = time.strftime("%Y%m%d-%H%M%S")
 
-raw_sets_folder = 'Lars1_080818_800x600'
+raw_sets_folder = 'Lars2_081018_800x600'
 clahe_sets_folder = 'Lars1_080818_clahe_800x600'
 
 TILE_KP = True
@@ -86,10 +85,10 @@ results_df = pd.DataFrame(columns = ['set_title','image_0', 'image_1', 'contrast
 # image_skip = 5 with baseline 10,15 would mean :> (0,10), (0,15),(5,15), (5,20), (10,20), (10,25)  etc
 
 image_skip = 5
-#[10,15,20] #[1, 2, 5, 10, 15, 20]
-base_line_steps = np.divide([10,15,20], image_skip).astype(int).tolist()
+#[5,10,15,20] #[1, 2, 5, 10, 15, 20]
+base_line_steps = np.divide([5, 10,15,20], image_skip).astype(int).tolist()
 
-contrast_adj_factors = np.array([0.0, -0.5, -1.0]) #np.arange(0,-1.1,-.1)
+contrast_adj_factors = np.arange(0,-1.1,-.1)  #np.array([0.0, -0.5, -1.0])
 
 image_names = raw_image_names[0:25:image_skip]
 
@@ -130,7 +129,7 @@ while True:
         
         pair_base_config = {'set_title': base_settings['set_title'],
                             'image_0': image_0_dict['name'], 'image_1': image_1_dict['name'],
-                            'baseline': base_line * image_skip} 
+                            'baseline': base_line * image_skip } 
         print("Proccessing pair: {} and {}".format(image_0_dict['name'], image_1_dict['name']))
         
         for i in range(len(contrast_adj_factors)):
@@ -153,6 +152,10 @@ while True:
     img_queue.popleft()
     img_count += 1
     progress_bar.update(img_count); #sys.stdout.flush()
+    
+    if img_count % 10 == 0:
+        results_df.to_csv("temp_results.csv")
+        print ("Img count {}, intermediate results written to temp_results.csv")
 
     try:
         next_image_name = next(img_iter)
