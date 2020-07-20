@@ -35,8 +35,11 @@ def save_fig2pdf(fig, folder=None, fname=None):
 
     plt._pylab_helpers.Gcf.figs.get(fig.number, None).window.showNormal()
     
-def save_fig2png(fig, folder=None, fname=None):    
-    fig.set_size_inches([8, 6.7])
+def save_fig2png(fig, size=[8, 6.7], folder=None, fname=None):    
+    if size is None:
+        fig.set_size_inches([8, 6.7])
+    else:
+        fig.set_size_inches(size)
     plt.pause(.1)
     if fname is None:
         if fig._suptitle is None:
@@ -640,7 +643,7 @@ def analyze_image_pair(image_0, image_1, settings, plotMatches=True, saveFig=Fal
 
     return result
 
-def generate_contrast_images(img, contrast_adj_factors=np.arange(0,-1.1,-.1)):
+def generate_contrast_images(img, mask=None, contrast_adj_factors=np.arange(0,-1.1,-.1)):
     '''
     Given an image and list of contrsat_adj_factors returns list of images and contrat measurements
     '''
@@ -652,10 +655,10 @@ def generate_contrast_images(img, contrast_adj_factors=np.arange(0,-1.1,-.1)):
     contrast_measurements = []
     
     contrast_estimators = {'global_contrast_factor': lambda gr: cm.compute_global_contrast_factor(gr),
-                           'rms_contrast': lambda gr: cm.compute_rms_contrast(gr,debug=False),
-                           'local_box_filt': lambda gr: cm.compute_box_filt_contrast(gr, kernel_size=17, debug=False),
-                           'local_gaussian_filt': lambda gr: cm.compute_gaussian_filt_contrast(gr, sigma=5.0, debug=False),
-                           'local_bilateral_filt': lambda gr: cm.compute_bilateral_filt_contrast(gr, sigmaSpace=5.0, sigmaColor=0.05, debug=False)}
+                           'rms_contrast': lambda gr: cm.compute_rms_contrast(gr,mask=mask,debug=False),
+                           'local_box_filt': lambda gr: cm.compute_box_filt_contrast(gr,mask=mask, kernel_size=17, debug=False),
+                           'local_gaussian_filt': lambda gr: cm.compute_gaussian_filt_contrast(gr,mask=mask, sigma=5.0, debug=False),
+                           'local_bilateral_filt': lambda gr: cm.compute_bilateral_filt_contrast(gr,mask=mask, sigmaSpace=5.0, sigmaColor=0.05, debug=False)}
         
     for i,adj in enumerate(contrast_adj_factors):
         if adj==0:
@@ -663,7 +666,12 @@ def generate_contrast_images(img, contrast_adj_factors=np.arange(0,-1.1,-.1)):
         else:
             outputs = ace_obj.compute_bk_and_dk(v_k, a_k, adjustment_factor=adj, stretch_factor=adj)
             warped_images[i], Tx = ace_obj.transform_image(*outputs, img)
-        cm_dict = {nm:ce(warped_images[i]) for nm, ce in contrast_estimators.items()}
+        #cm_dict = {nm:ce(warped_images[i]) for nm, ce in contrast_estimators.items()}
+        
+        cm_dict = {}
+        for nm,ce in contrast_estimators.items():
+            contrast, contrast_masked = ce(warped_images[i])
+            cm_dict.update({nm:contrast, nm+"_masked":contrast_masked})
         #print("Contrast adj: {:.2f} contrast estimaes: {}".format(adj, cm_dict))
         contrast_measurements.append(cm_dict)
         
