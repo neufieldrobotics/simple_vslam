@@ -261,13 +261,7 @@ if __name__ == '__main__':
 
     # Process first 2 frames
     fr1 = mpqueue.get()
-    #gr1, mask1, kp1, des1 = fr1.gr,fr1.mask,fr1.kp,fr1.des
     fr2 = mpqueue.get()
-    #gr2, mask2, kp2, des2 = fr2.gr,fr2.mask,fr2.kp,fr2.des
-
-    #frame_queue = queue.Queue(maxsize=5)
-    #frame_queue.put(fr1)
-    #frame_queue.put(fr2)
 
     # Show image
     Frame.initialize_figures(window_xadj, window_yadj)
@@ -288,10 +282,8 @@ if __name__ == '__main__':
     fr_prev = fr2
 
     st = time.time()
-    #for i in range(init_imgs_indx[1]+img_step*2,len(images),img_step):
     spinner = cycle(['|', '/', '-', '\\'])
-    #i = 4
-    #flag = False
+
     empty_count = 0
     while True:
         if not mpqueue.empty():
@@ -299,15 +291,11 @@ if __name__ == '__main__':
 
             fr_curr = mpqueue.get()
 
-            #if frame_queue.full(): frame_queue.get()
-            #frame_queue.put(fr_curr)
-
             Frame.frlog.debug("Frame id:"+str(fr_curr.frame_id))
             Frame.frlog.debug(Fore.RED+"Time for current frame: "+str(time.time()-ft)+Style.RESET_ALL)
             ft = time.time()
             Frame.process_keyframe_PNP(fr_prev, fr_curr)
             Frame.frlog.debug("Time elapsed in process_keyframe: {:.4f}".format(time.time()-ft))
-            #input ("Press enter HERE ")
 
             ft = time.time()
 
@@ -324,7 +312,6 @@ if __name__ == '__main__':
                             Frame.fig1.canvas.start_event_loop(0.001)
                             Frame.fig2.canvas.start_event_loop(0.001)
                             if cue_to_exit:
-                                #flag = True
                                 break
                             time.sleep(0.2)
 
@@ -367,12 +354,10 @@ if __name__ == '__main__':
 
             while(paused):
                 print('\b'+next(spinner), end='', flush=True)
-                #plt.pause(0.1)
                 Frame.fig1.canvas.start_event_loop(0.001)
                 Frame.fig2.canvas.start_event_loop(0.001)
 
                 if cue_to_exit:
-                    #flag = True
                     break
                 time.sleep(0.2)
 
@@ -384,7 +369,6 @@ if __name__ == '__main__':
             fr_prev=fr_curr
             empty_count = 0
         else: 
-            #print("\n\n\n Waiting \n\n\n\n")
             empty_count += 1
             time.sleep(0.2)
             if empty_count > 20:

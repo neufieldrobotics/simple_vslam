@@ -27,11 +27,13 @@ from itertools import tee
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/data'
 else:
-    path = os.path.expanduser('/data/Lars')
+    path = os.path.expanduser('~/data')
 import time
 
-raw_sets_folder = 'Lars2_081018_800x600'
-clahe_sets_folder = 'Lars1_080818_clahe_800x600'
+#raw_sets_folder = 'Lars2_081018_800x600'
+raw_sets_folder = 'Stingray2_080718_800x600'
+
+#clahe_sets_folder = 'Lars1_080818_clahe_800x600'
 
 TILE_KP = True
 tiling = (4,3)
@@ -44,10 +46,12 @@ else:
     NO_OF_UT_FEATURES = NO_OF_FEATURES
 
 raw_img_folder = os.path.join(path,raw_sets_folder)
-clahe_img_folder = os.path.join(path,clahe_sets_folder)
+mask_folder = raw_img_folder.replace('_800x600', '_masks_from_model_800x600')
+
+#clahe_img_folder = os.path.join(path,clahe_sets_folder)
 
 raw_image_names = sorted(glob.glob(raw_img_folder+'/*.png'))
-clahe_image_names = sorted(glob.glob(clahe_img_folder+'/*.tif'))
+#clahe_image_names = sorted(glob.glob(clahe_img_folder+'/*.tif'))
 
 '''
 Detect Features
@@ -101,8 +105,13 @@ img_queue = deque(maxlen = max(base_line_steps) + 1 )
 img_iter = iter(image_names)
 while len(img_queue) <= max(base_line_steps):
     img_name = next(img_iter)
-    img = read_grimage(img_name)
-    contrast_imgs, contrast_meas = generate_contrast_images(img, contrast_adj_factors=contrast_adj_factors)
+    mask_name = os.path.join(mask_folder, 
+                             os.path.basename(img_name).replace('.png', '_mask.png'))
+
+    img = read_grimage(img_name)    
+    mask = cv2.imread(mask_name, cv2.IMREAD_GRAYSCALE).astype(bool)
+    
+    contrast_imgs, contrast_meas = generate_contrast_images(img, mask=mask, contrast_adj_factors=contrast_adj_factors)
     img_dict = {'name': os.path.splitext(os.path.basename(img_name))[0], 
                 'contrast_imgs': contrast_imgs,
                 'contrast_measurements': contrast_meas}
@@ -162,9 +171,14 @@ while True:
     except StopIteration:
         break
 
+    mask_name = os.path.join(mask_folder, 
+                             os.path.basename(next_image_name).replace('.png', '_mask.png'))
+    
     img = read_grimage(next_image_name)
-    contrast_imgs, contrast_meas = generate_contrast_images(img, contrast_adj_factors=contrast_adj_factors)
-    img_dict = {'name': os.path.splitext(os.path.basename(next_image_name))[0], 
+    mask = cv2.imread(mask_name, cv2.IMREAD_GRAYSCALE).astype(bool)
+    
+    contrast_imgs, contrast_meas = generate_contrast_images(img, mask=mask, contrast_adj_factors=contrast_adj_factors)
+    img_dict = {'name': os.path.splitext(os.path.basename(img_name))[0], 
                 'contrast_imgs': contrast_imgs,
                 'contrast_measurements': contrast_meas}
     img_queue.append(img_dict)

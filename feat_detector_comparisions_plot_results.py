@@ -11,13 +11,18 @@ from matplotlib import pyplot as plt
 import os
 import pandas as pd
 import scipy.stats as st
+from feat_detector_comparisions_helper import *
 
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/data'
 else:
     path = os.path.expanduser('~/data/')
 
-results_file = 'results/matching_results_20200709_225904_combined.csv'
+#results_file = 'results/matching_results_20200710_092947_Lars1_full.csv'
+#results_file = 'results/matching_results_20200717_180713_Stingray2.csv'
+#results_file = 'results/matching_results_20200711_053758_Lars2_full.csv'
+results_file = 'results/matching_results_20200711_053758_Lars2_full.csv'
+results_file = max(glob.glob('results/matching*.csv'), key=os.path.getctime)
 
 results_df = pd.read_csv(results_file)
 #results_df2 = pd.read_csv(results_file2)
@@ -38,7 +43,7 @@ for detdes_dict, ax in zip(detdes_dict_list, axes):
     
     for cont_fact in contrast_adj_factors:    
         plot_dict = { **detdes_dict,
-                     'set_title':'Lars1_080818_800x600',
+                     'set_title':'Stingray2_080718_800x600',
                      'contrast_adj_factor': cont_fact,
                      'baseline': 20}
          
@@ -61,3 +66,4 @@ for detdes_dict, ax in zip(detdes_dict_list, axes):
 axes[0].set_ylabel('Gaussian Kernel Denisty Estimates')
 fig.subplots_adjust(left=0.05, bottom=0.1, right=0.99, top=.9, wspace=0.05, hspace=0.05)
 fig.suptitle("Dataset: {}, baseline: {}".format(plot_dict['set_title'], plot_dict['baseline']))
+save_fig2png(fig, size=[16.0, 4.875])
