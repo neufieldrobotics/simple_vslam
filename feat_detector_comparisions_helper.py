@@ -12,9 +12,11 @@ from vslam_helper import tiled_features, knn_match_and_lowe_ratio_filter, draw_f
 from matplotlib import pyplot as plt
 from datetime import datetime
 import re
+print (os.path.abspath('./external_packages/cmtpy/'))
 sys.path.insert(0, os.path.abspath('./external_packages/cmtpy/'))
 from cmtpy.histogram_warping_ace import HistogramWarpingACE
 from cmtpy import contrast_measurement as cm
+import pandas as pd
 
 
 
@@ -716,3 +718,22 @@ def read_grimage(img_name, resize_scale = None, normalize=False, image_depth=8):
         gr = np.divide(gr, levels, dtype=np.float32)
 
     return gr
+
+def process_image_contrasts(img_name, contrast_adj_factors, mask_folder, ctrst_img_output_folder, base_settings):
+    img_name_base, img_name_ext = os.path.splitext(os.path.basename(img_name))
+    img = read_grimage(img_name)
+    mask_name = os.path.join(mask_folder, img_name_base+'_mask'+'.png')
+    mask = cv2.imread(mask_name, cv2.IMREAD_GRAYSCALE).astype(bool)
+    
+    img_df = pd.DataFrame(columns = ['set_title','image_name', 'contrast_adj_factor',
+                                     'global_contrast_factor', 'rms_contrast', 'local_box_filt','local_gaussian_filt', 'local_bilateral_filt',
+                                     'global_contrast_factor_masked', 'rms_contrast_masked', 'local_box_filt_masked','local_gaussian_filt_masked', 'local_bilateral_filt_masked'])
+        
+    contrast_imgs, contrast_meas = generate_contrast_images(img, mask=mask, contrast_adj_factors=contrast_adj_factors)
+    for c_img, c_meas, adj in zip(contrast_imgs, contrast_meas, contrast_adj_factors):
+        out_img_name = os.path.join(ctrst_img_output_folder, img_name_base+"_ctrst_adj_{:.2f}.png".format(adj) )
+        print(out_img_name)
+        cv2.imwrite(out_img_name, c_img)
+        img_df=img_df.append({'image_name':img_name_base, 'contrast_adj_factor':adj, **c_meas, **base_settings},
+                             ignore_index=True)
+    return img_df
