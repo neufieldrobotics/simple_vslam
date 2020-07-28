@@ -8,7 +8,7 @@ Created on Sun Nov  3 21:13:35 2019
 import sys, os
 import cv2
 import numpy as np
-from vslam_helper import tiled_features, knn_match_and_lowe_ratio_filter, draw_feature_tracks
+from vslam_helper import tiled_features, knn_match_and_lowe_ratio_filter, draw_feature_tracks, draw_arrows
 from matplotlib import pyplot as plt
 from datetime import datetime
 import re
@@ -545,12 +545,14 @@ def analyze_image_pair_zer_surf_orbsf(image_0, image_1, settings, plotMatches=Tr
 def analyze_image_pair(image_0, image_1, settings, plotMatches=True, saveFig=False): 
     #K = settings['K']
     #D = settings['D']
+    
     TILE_KP = settings['TILE_KP']
     tiling = settings['tiling']
     detector = settings['detector']
     descriptor = settings['descriptor']
     det_name = detector.getDefaultName().replace('Feature2D.','')
     des_name = descriptor.getDefaultName().replace('Feature2D.','')
+    if isinstance(descriptor, cv2.SparsePyrLKOpticalFlow): des_name='SparsePyrLKOpticalFlow'
         
     if detector == descriptor and not TILE_KP:
         kp_0, des_0 = detector.detectAndCompute(image_0, mask=None)
@@ -558,7 +560,7 @@ def analyze_image_pair(image_0, image_1, settings, plotMatches=True, saveFig=Fal
     else:
         detector_kp_0 = detector.detect(image_0, mask=None)
         detector_kp_1 = detector.detect(image_1, mask=None)
-
+    
         if TILE_KP:
             kp_0 = tiled_features(detector_kp_0, image_0.shape, tiling[0], tiling[1], no_features= 1000)
             kp_1 = tiled_features(detector_kp_1, image_1.shape, tiling[0], tiling[1], no_features= 1000)
@@ -566,9 +568,10 @@ def analyze_image_pair(image_0, image_1, settings, plotMatches=True, saveFig=Fal
         else:
             kp_0 = detector_kp_0
             kp_1 = detector_kp_1
-
-        kp_0, des_0 = descriptor.compute(image_0, kp_0)
-        kp_1, des_1 = descriptor.compute(image_1, kp_1)
+    
+        if not isinstance(descriptor, cv2.SparsePyrLKOpticalFlow):
+            kp_0, des_0 = descriptor.compute(image_0, kp_0)
+            kp_1, des_1 = descriptor.compute(image_1, kp_1)
        
     if plotMatches:        
         det_des_string = "Det: {} Des: {}".format(det_name, des_name)
@@ -578,19 +581,19 @@ def analyze_image_pair(image_0, image_1, settings, plotMatches=True, saveFig=Fal
         if TILE_KP:
             feat_string_0 = "{}\nBefore tiling:{:d} after tiling {:d}".format(det_des_string, len(detector_kp_0), len(kp_0))
             feat_string_1 = "Before tiling:{:d} after tiling {:d}".format(len(detector_kp_1), len(kp_1))
-
+    
             kp_img_0 = draw_markers(kp_img_0, detector_kp_0, color=[255,255,0])
             kp_img_1 = draw_markers(kp_img_1, detector_kp_1, color=[255,255,0])
             
         else:            
             feat_string_0 = "{}\n{:d} features".format(det_des_string, len(kp_0))
             feat_string_1 = "{:d} features".format(len(kp_1))
-
+    
         kp_img_0 = draw_markers(kp_img_0, kp_0, color=[0,255,0])
         kp_img_1 = draw_markers(kp_img_1, kp_1, color=[0,255,0])
     
         #fig1 = plt.figure(1); plt.clf()
-        fig1, fig1_axes = plt.subplots(2,1)
+        fig1, fig1_axes = plt.subplots(2,1,num=1)
         fig1.suptitle(settings['set_title'] + ' features')
         fig1_axes[0].axis("off"); fig1_axes[0].set_title(feat_string_0)
         fig1_axes[0].imshow(kp_img_0)
@@ -602,25 +605,34 @@ def analyze_image_pair(image_0, image_1, settings, plotMatches=True, saveFig=Fal
     '''
     Match and find inliers
     '''
+      
     
-    if isinstance(descriptor, cv2.ORB) and descriptor.getWTA_K() != 2 :
-        print ("ORB with WTA_K !=2")
-        matcher = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
+    if isinstance(descriptor, cv2.SparsePyrLKOpticalFlow):
+        kp0_match_01_full = cv2.KeyPoint_convert(kp_0)
+        kp1_match_01_full, mask_matching, err = descriptor.calc(image_0, image_1, kp0_match_01_full, None)
+        kp0_match_01 = kp0_match_01_full[mask_matching[:,0].astype(bool)]
+        kp1_match_01 = kp1_match_01_full[mask_matching[:,0].astype(bool)]
+    
     else:
-        matcher = cv2.BFMatcher(descriptor.defaultNorm(), crossCheck=False)
-
-    matches_01 = knn_match_and_lowe_ratio_filter(matcher, des_0, des_1, threshold=0.9)
-    
-    kp0_match_01 = np.array([kp_0[mat.queryIdx].pt for mat in matches_01])
-    kp1_match_01 = np.array([kp_1[mat.trainIdx].pt for mat in matches_01])
+        if isinstance(descriptor, cv2.ORB) and descriptor.getWTA_K() != 2 :
+            print ("ORB with WTA_K !=2")
+            matcher = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
+        else:
+            matcher = cv2.BFMatcher(descriptor.defaultNorm(), crossCheck=False)
+        
+        matches_01 = knn_match_and_lowe_ratio_filter(matcher, des_0, des_1, threshold=0.9)
+        mask_matching = None
+        
+        kp0_match_01 = np.array([kp_0[mat.queryIdx].pt for mat in matches_01])
+        kp1_match_01 = np.array([kp_1[mat.trainIdx].pt for mat in matches_01])
     
     #kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(kp0_match_01,axis=1),K,D)
     #kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(kp1_match_01,axis=1),K,D)
     
     #E_12, mask_e_12 = cv2.findEssentialMat(kp0_match_01_ud, kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
     #                                       method=cv2.RANSAC, prob=0.9999, threshold=0.001)
-
-    E_12, mask_e_12 = cv2.findFundamentalMat(kp0_match_01, kp1_match_01, **settings['findFundamentalMat_params'])
+    
+    E_12, mask_e_12 = cv2.findFundamentalMat(kp0_match_01, kp1_match_01, mask=mask_matching, **settings['findFundamentalMat_params'])
     
     no_matches = np.sum(mask_e_12)
     result = {'detector':det_name, 'descriptor':des_name, 'matches': no_matches,
@@ -629,9 +641,13 @@ def analyze_image_pair(image_0, image_1, settings, plotMatches=True, saveFig=Fal
     if plotMatches:    
         #valid_matches_img = draw_matches_vertical(image_0, kp_0, image_1, kp_1, matches_01, 
         #                                                  mask_e_12, display_invalid=True, color=(0, 255, 0))
-        valid_matches_img = draw_feature_tracks(image_0, kp_0, image_1, kp_1, matches_01, 
-                                                mask_e_12, display_invalid=True, color=(0, 255, 0),
-                                                thick = 2)
+        if isinstance(descriptor, cv2.SparsePyrLKOpticalFlow):
+            valid_matches_img = draw_arrows(image_1, kp0_match_01[mask_e_12[:,0]==1], kp1_match_01[mask_e_12[:,0]==1], color=(0, 255, 0), thick = 2)
+        else:
+            valid_matches_img = draw_feature_tracks(image_0, kp_0, image_1, kp_1, matches_01, 
+                                                    mask_e_12, display_invalid=True, color=(0, 255, 0),
+                                                    thick = 2)
+        
         #fig2 = plt.figure(2); plt.clf()
         fig2, fig2_axes = plt.subplots(1,1)
         fig2.suptitle(settings['set_title'] + ' Feature Matching')
@@ -642,7 +658,6 @@ def analyze_image_pair(image_0, image_1, settings, plotMatches=True, saveFig=Fal
         if saveFig:
             save_fig2png(fig2)
         #input("Enter to continue")
-
     return result
 
 def generate_contrast_images(img, mask=None, contrast_adj_factors=np.arange(0,-1.1,-.1)):
@@ -737,3 +752,17 @@ def process_image_contrasts(img_name, contrast_adj_factors, mask_folder, ctrst_i
         img_df=img_df.append({'image_name':img_name_base, 'contrast_adj_factor':adj, **c_meas, **base_settings},
                              ignore_index=True)
     return img_df
+
+def preprocessed_image_contrasts(img_name, contrast_adj_factors, contrast_img_folder, contrast_img_df):
+    img_base, img_ext = os.path.splitext(os.path.basename(img_name))
+    raw_sets_folder = os.path.basename(os.path.dirname(img_name))
+    
+    contrast_imgs = []
+    contrast_meas = []
+    for ctrst_adj_fact in contrast_adj_factors:
+        ctrst_adj_img_basename = "{}_ctrst_adj_{:.2f}{}".format(img_base, ctrst_adj_fact,img_ext)
+        ctrst_adj_img_name = os.path.join(contrast_img_folder, ctrst_adj_img_basename)
+        contrast_imgs.append( read_grimage(ctrst_adj_img_name) )
+        contrast_meas.append( contrast_img_df.loc[(raw_sets_folder,img_base, ctrst_adj_fact), :].to_dict() )
+        
+    return contrast_imgs, contrast_meas
