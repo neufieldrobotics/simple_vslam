@@ -9,4 +9,6 @@ results/
 *.m~
 *.csv
 *.pdf
+*.png
+*.bin
 
