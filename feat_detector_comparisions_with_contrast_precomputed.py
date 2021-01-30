@@ -87,7 +87,7 @@ config_settings_list = [{**base_settings, 'detector': zernike, 'descriptor': orb
                         {**base_settings, 'TILE_KP':False, 'detector': zernike, 'descriptor': zernike},
                         {**base_settings, 'detector': zernike, 'descriptor': KLT_optical_flow} ]
 
-config_settings_list = [{**base_settings, 'detector': zernike, 'descriptor': KLT_optical_flow} ]
+#config_settings_list = [{**base_settings, 'detector': zernike, 'descriptor': KLT_optical_flow} ]
 
 
 results_df = pd.DataFrame(columns = ['set_title','image_0', 'image_1', 'contrast_adj_factor', 'baseline',
@@ -102,9 +102,10 @@ image_skip = 5
 #[5,10,15,20] #[1, 2, 5, 10, 15, 20]
 base_line_steps = np.divide([20], image_skip).astype(int).tolist()
 
-contrast_adj_factors = np.arange(0,-1.1,-.1)  #np.array([0.0, -0.5, -1.0])
+#contrast_adj_factors = np.arange(0,-1.1,-.1)  #np.array([0.0, -0.5, -1.0])
+contrast_adj_factors = np.array([0.0, -0.5, -1.0])
 
-image_names = raw_image_names[0:   :image_skip]
+image_names = raw_image_names[900: 921  :image_skip]
 
 if not os.path.exists('results'):
     os.makedirs('results')
@@ -168,7 +169,7 @@ while True:
                 config_settings_2 = {**config_settings, 'set_title':config_settings['set_title']+" Ctrst fact: {:.1f}".format(contrast_adj_factors[i])}
 
                 pair_results = analyze_image_pair(image_0, image_1, config_settings_2, 
-                                                  plotMatches = False, saveFig = False)  
+                                                  plotMatches = True, saveFig = True)  
                 pair_results.update(pair_config)
                 results_df = results_df.append(pair_results, ignore_index=True)
     

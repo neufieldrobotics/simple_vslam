@@ -178,7 +178,7 @@ while True:
     mask = cv2.imread(mask_name, cv2.IMREAD_GRAYSCALE).astype(bool)
     
     contrast_imgs, contrast_meas = generate_contrast_images(img, mask=mask, contrast_adj_factors=contrast_adj_factors)
-    img_dict = {'name': os.path.splitext(os.path.basename(img_name))[0], 
+    img_dict = {'name': os.path.splitext(os.path.basename(next_image_name))[0], 
                 'contrast_imgs': contrast_imgs,
                 'contrast_measurements': contrast_meas}
     img_queue.append(img_dict)
