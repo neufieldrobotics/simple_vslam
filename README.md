@@ -19,7 +19,7 @@ conda activate simple_vslam_env
 ```sh
 git clone --recurse-submodules https://gitlab.com/neu-mit-lfi/simple_vslam.git
 cd simple_vslam
-git checkout simple_vslam_comparisons
+git checkout master
 
 # OPTIONALLY To checkout a particular 'tag' eg. v0.2.0 run:
 git checkout v0.2.0
