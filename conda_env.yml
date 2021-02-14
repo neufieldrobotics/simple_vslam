@@ -16,3 +16,26 @@ dependencies:
   - cmake
   - pip
   - conda-build
+  - pandas
+  - spyder-kernels=0.*
+  - conda-forge::exifread 
+  - conda-forge::utm
+  - cython
+  - pyqt
+  - pip
+  - pyproj
+  - cloudpickle
+  - joblib
+  - networkx
+  - Pillow
+  - pytest
+  - python-dateutil
+  - repoze.lru
+  - six
+  - xmltodict
+  - sphinx
+  - sphinx_rtd_theme
+  - conda-forge::ceres-solver
+  - conda-forge::gpxpy
+  - conda-forge::sphinx-autobuild
+  - conda-forge::exifread

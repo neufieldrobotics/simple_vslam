@@ -665,7 +665,7 @@ def generate_contrast_images(img, mask=None, contrast_adj_factors=np.arange(0,-1
     Given an image and list of contrsat_adj_factors returns list of images and contrat measurements
     '''
     ace_obj = HistogramWarpingACE(no_bits=8, tau=0.01, lam=5, adjustment_factor=-1.0, stretch_factor=-1.0,
-                                  min_stretch_bits=4, downsample_for_kde=True,debug=False, plot_histograms=False)
+                                  min_stretch_bits=3, downsample_for_kde=True,debug=False, plot_histograms=False)
     v_k, a_k = ace_obj.compute_vk_and_ak(img)
 
     warped_images = np.empty(contrast_adj_factors.shape,dtype=object)
@@ -735,10 +735,14 @@ def read_grimage(img_name, resize_scale = None, normalize=False, image_depth=8):
     return gr
 
 def process_image_contrasts(img_name, contrast_adj_factors, mask_folder, ctrst_img_output_folder, base_settings):
+    print("Processing image: {}".format(img_name))
     img_name_base, img_name_ext = os.path.splitext(os.path.basename(img_name))
     img = read_grimage(img_name)
-    mask_name = os.path.join(mask_folder, img_name_base+'_mask'+'.png')
-    mask = cv2.imread(mask_name, cv2.IMREAD_GRAYSCALE).astype(bool)
+    if mask_folder is not None:
+        mask_name = os.path.join(mask_folder, img_name_base+'_mask'+'.png')
+        mask = cv2.imread(mask_name, cv2.IMREAD_GRAYSCALE).astype(bool)
+    else:
+        mask = None
     
     img_df = pd.DataFrame(columns = ['set_title','image_name', 'contrast_adj_factor',
                                      'global_contrast_factor', 'rms_contrast', 'local_box_filt','local_gaussian_filt', 'local_bilateral_filt',
@@ -747,7 +751,7 @@ def process_image_contrasts(img_name, contrast_adj_factors, mask_folder, ctrst_i
     contrast_imgs, contrast_meas = generate_contrast_images(img, mask=mask, contrast_adj_factors=contrast_adj_factors)
     for c_img, c_meas, adj in zip(contrast_imgs, contrast_meas, contrast_adj_factors):
         out_img_name = os.path.join(ctrst_img_output_folder, img_name_base+"_ctrst_adj_{:.2f}.png".format(adj) )
-        print(out_img_name)
+        print("\t"+out_img_name)
         cv2.imwrite(out_img_name, c_img)
         img_df=img_df.append({'image_name':img_name_base, 'contrast_adj_factor':adj, **c_meas, **base_settings},
                              ignore_index=True)

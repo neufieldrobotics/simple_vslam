@@ -27,11 +27,11 @@ from itertools import tee
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/data'
 else:
-    path = os.path.expanduser('~/data')
+    path = os.path.expanduser('/data/2019_sermilik_processing/Morgan')
 import time
 
 #raw_sets_folder = 'Lars2_081018_800x600'
-raw_sets_folder = 'Stingray2_080718_800x600'
+raw_sets_folder = 'Morgan1_072719_800x600'
 
 #clahe_sets_folder = 'Lars1_080818_clahe_800x600'
 
@@ -94,7 +94,7 @@ base_line_steps = np.divide([5, 10,15,20], image_skip).astype(int).tolist()
 
 contrast_adj_factors = np.arange(0,-1.1,-.1)  #np.array([0.0, -0.5, -1.0])
 
-image_names = raw_image_names[0:25:image_skip]
+image_names = raw_image_names[0::image_skip]
 
 if not os.path.exists('results'):
     os.makedirs('results')

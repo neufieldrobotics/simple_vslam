@@ -27,12 +27,13 @@ from itertools import tee
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/data'
 else:
-    path = os.path.expanduser('~/data')
+    path = os.path.expanduser('/data/Stingray') # 2019_sermilik_processing/Morgan
 import time
 
 #raw_sets_folder = 'Lars2_081018_800x600'
-#raw_sets_folder = 'Stingray2_080718_800x600'
-raw_sets_folder = 'Morgan1_072719_800x600'
+raw_sets_folder = 'Stingray2_080718_800x600'
+#raw_sets_folder = 'Morgan1_072719_800x600'
+#raw_sets_folder = 'Morgan2_073019_800x600'
 
 #clahe_sets_folder = 'Lars1_080818_clahe_800x600'
 
@@ -48,9 +49,9 @@ else:
 raw_img_folder = os.path.join(path,raw_sets_folder)
 mask_folder = raw_img_folder.replace('_800x600', '_masks_from_model_800x600')
 
-contrast_img_fold = raw_img_folder + '_ctrst_imgs'
+contrast_img_fold = raw_img_folder + '_ctrst_imgs_3bit'
 
-contrast_img_df_file = os.path.join(path, "Contrast_images_df_"+raw_sets_folder+".csv")
+contrast_img_df_file = os.path.join(path, "Contrast_images_df_"+raw_sets_folder+"_3bit.csv")
 contrast_img_df = pd.read_csv(contrast_img_df_file, index_col=0).set_index(['set_title','image_name', 'contrast_adj_factor'])
 
 #clahe_img_folder = os.path.join(path,clahe_sets_folder)
@@ -73,7 +74,7 @@ sift = cv2.xfeatures2d.SIFT_create(nfeatures = NO_OF_UT_FEATURES, nOctaveLayers 
                                    edgeThreshold = 20, sigma = 1.6)
 
 KLT_optical_flow = cv2.SparsePyrLKOpticalFlow_create(crit= (cv2.TERM_CRITERIA_COUNT + cv2.TERM_CRITERIA_EPS, 50, 0.01),
-                                                     maxLevel= 4, winSize= (25,25), minEigThreshold= 1e-4)
+                                                     maxLevel= 4, winSize= (25,25), minEigThreshold= 1e-3)
 
 findFundamentalMat_params = {'method':cv2.FM_RANSAC,       # RAnsac
                              'param1':1.0,                # Inlier threshold in pixel since we don't use nomalized coordinates
@@ -82,13 +83,12 @@ findFundamentalMat_params = {'method':cv2.FM_RANSAC,       # RAnsac
 base_settings = {'set_title': os.path.basename(raw_img_folder), 'findFundamentalMat_params':findFundamentalMat_params, 
                    'TILE_KP':TILE_KP, 'tiling':tiling }
 
-config_settings_list = [{**base_settings, 'detector': zernike, 'descriptor': orb},
-                        {**base_settings, 'detector': orb, 'descriptor': orb},
-                        {**base_settings, 'TILE_KP':False, 'detector': zernike, 'descriptor': zernike},
-                        {**base_settings, 'detector': zernike, 'descriptor': KLT_optical_flow} ]
+#config_settings_list = [{**base_settings, 'TILE_KP':False, 'detector': zernike, 'descriptor': orb},
+#                        {**base_settings, 'TILE_KP':True, 'detector': orb, 'descriptor': orb},
+#                        {**base_settings, 'TILE_KP':False, 'detector': zernike, 'descriptor': zernike},
+#                        {**base_settings, 'TILE_KP':False, 'detector': zernike, 'descriptor': KLT_optical_flow} ]
 
 #config_settings_list = [{**base_settings, 'detector': zernike, 'descriptor': KLT_optical_flow} ]
-
 
 results_df = pd.DataFrame(columns = ['set_title','image_0', 'image_1', 'contrast_adj_factor', 'baseline',
                                      'detector', 'descriptor', 'img0_no_features','img1_no_features', 'matches',
@@ -168,6 +168,7 @@ while True:
             for config_settings in config_settings_list:
                 config_settings_2 = {**config_settings, 'set_title':config_settings['set_title']+" Ctrst fact: {:.1f}".format(contrast_adj_factors[i])}
 
+                #print (config_settings_2)
                 pair_results = analyze_image_pair(image_0, image_1, config_settings_2, 
                                                   plotMatches = True, saveFig = True)  
                 pair_results.update(pair_config)
