@@ -76,7 +76,7 @@ axes[2,3] = fig.add_subplot(gs[3,3], sharex = axes[1,3], sharey = axes[2,0])
 
 plot_img_histograms(gr1, axes[:,0], 'Full - Lars 1')
 
-omask_iceberg = np.zeros_like(gr1)
+mask_iceberg = np.zeros_like(gr1)
 mask_iceberg[205:310,:] = 1
 plot_img_histograms(np.copy(gr1), axes[:,1], 'Iceberg', mask = mask_iceberg )
 
