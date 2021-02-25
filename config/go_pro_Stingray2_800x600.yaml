@@ -57,7 +57,7 @@ Triangulation_settings:
 
 findEssential_settings:
  prob: 0.9999
- threshold: 0.001
+ threshold: 0.002
 
 solvePnPRansac_settings:
   iterationsCount: 500
