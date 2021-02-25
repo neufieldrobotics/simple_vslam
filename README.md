@@ -20,13 +20,14 @@ git clone --recurse-submodules https://gitlab.com/neufieldrobotics/simple_vslam.
 cd simple_vslam
 git checkout master
 
-# OPTIONALLY To checkout a particular 'tag' eg. v0.2.1 run:
-git checkout v0.2.1
+# OPTIONALLY To checkout a particular 'tag' eg. v0.2.2 run:
+git checkout v0.2.2
 ```
 #### Some important versions:
   - v0.1.0: Basic GTSAM incormporated
   - v0.2.0: Cleaned up and configured to use with Iceberg datasets, use -c config_file flag for appropriate config file. 
   - v0.2.1: Major bug fixed, use GTSAM corrected poses on current as well as previous pose to make new point triangulation accurate, this version works with the full Stingray dataset
+  - v0.2.2: Small config tweak in findEssential threshold to make Stingray work on 18.04
 
 ### Create Conda Environment
 These are instructions for installing gtsam in a conda environment so that the rest of the system is untouched.  This would let you use gtsam without interfering with the ROS installation.
