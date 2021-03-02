@@ -27,7 +27,7 @@ from itertools import tee
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/data'
 else:
-    path = os.path.expanduser('/data/2019_sermilik_processing/Morgan')
+    path = os.path.expanduser('~/data/')
 import time
 
 #raw_sets_folder = 'Lars2_081018_800x600'
@@ -154,7 +154,7 @@ while True:
                 config_settings_2 = {**config_settings, 'set_title':config_settings['set_title']+" Ctrst fact: {:.1f}".format(contrast_adj_factors[i])}
 
                 pair_results = analyze_image_pair(image_0, image_1, config_settings_2, 
-                                                  plotMatches = False, saveFig = False)  
+                                                  plotMatches = True, saveFig = False)  
                 pair_results.update(pair_config)
                 results_df = results_df.append(pair_results, ignore_index=True)
     

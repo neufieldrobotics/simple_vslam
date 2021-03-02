@@ -29,24 +29,29 @@ hostname = os.uname().nodename
 if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/data'
 elif hostname=='NEUFR-TP02':
-    path = os.path.expanduser('~/data/')
+    path = os.path.expanduser('~/data/low_contrast_datasets')
 else:
-    path = os.path.expanduser('/data/')
+    path = os.path.expanduser('/data/low_contrast_datasets')
 
-datasets = ['Lars1_080818_800x600', 'Lars2_081018_800x600']
+datasets = ['Lars1_080818_800x600', 'Lars2_081018_800x600', 'skerki_full', 'skerki_mud_CLAHE']
 
-image_names = { 'Lars1_080818_800x600': ['G0285493.png', 'G0285513.png'], # Lars1
-                'Lars2_081018_800x600': ['G0028388.JPG.png', 'G0028408.JPG.png'] }# Lars2
+contrast_types = ['RAW', '7_bit', '6_bit', '5_bit', '4_bit', '3_bit']
 
-dataset_name = datasets[1]
+image_names = { 'Lars1_080818_800x600': 'G0285493.png', #,'G0285513.png'], # Lars1
+                'Lars2_081018_800x600': 'G0028388.JPG.png', #, 'G0028408.JPG.png'], 
+                'skerki_full'         : 'ESC.970622_024806.0590.tif',
+                'skerki_mud_CLAHE'    : 'ESC.970622_024806.0590.tif'}
 
-img0_name = os.path.join(path, dataset_name, image_names[dataset_name][0] )
-img1_name = os.path.join(path, dataset_name, image_names[dataset_name][1] )
+
+dataset_name = datasets[3]
+contrast_type = contrast_types[0]
+img0_name = os.path.join(path, dataset_name, dataset_name+'_'+contrast_type, image_names[dataset_name] )
 
 TILE_KP = True
 tiling = (4,3)
 NO_OF_FEATURES = 600
 BASELINE_STEP_SIZE = 10
+
 
 if TILE_KP:
     NO_OF_UT_FEATURES = NO_OF_FEATURES * 2
@@ -65,12 +70,12 @@ Setup Feature Detectors
 orb = cv2.ORB_create(nfeatures = NO_OF_UT_FEATURES, edgeThreshold=31, patchSize=31, nlevels=6,
                       fastThreshold=1, scaleFactor=1.2, WTA_K=2, scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
 
-zernike = MultiHarrisZernike(Nfeats= NO_OF_FEATURES, seci= 2, secj= 3, levels= 6, ratio= 1/1.2,
+zernike = MultiHarrisZernike(Nfeats= NO_OF_FEATURES, seci= 3, secj= 4, levels= 6, ratio= 1/1.2,
                              sigi= 2.75, sigd= 1.0, nmax= 8, like_matlab= False, lmax_nd= 3)
 
-surf = cv2.xfeatures2d.SURF_create(hessianThreshold = 50, nOctaves = 6)
+surf = cv2.xfeatures2d.SURF_create(hessianThreshold = 15, nOctaves = 6)
 
-sift = cv2.xfeatures2d.SIFT_create(nfeatures = NO_OF_UT_FEATURES, nOctaveLayers = 3, contrastThreshold = 0.01,
+sift = cv2.xfeatures2d.SIFT_create(nfeatures = NO_OF_UT_FEATURES, nOctaveLayers = 6, contrastThreshold = 0.001,
                                    edgeThreshold = 20, sigma = 1.6)
 
 findFundamentalMat_params = {'method':cv2.FM_RANSAC,       # RAnsac
@@ -80,12 +85,22 @@ findFundamentalMat_params = {'method':cv2.FM_RANSAC,       # RAnsac
 KLT_optical_flow = cv2.SparsePyrLKOpticalFlow_create(crit= (cv2.TERM_CRITERIA_COUNT + cv2.TERM_CRITERIA_EPS, 50, 0.01),
                                                      maxLevel= 4, winSize= (25,25), minEigThreshold= 1e-3)
 
-config_settings = {'set_title': dataset_name, #'K':K, 'D':D, 
+# Plot settings database
+plot_display_settings_database= {('ESC.970622_024806.0590.tif', orb):{'max_second_dist': 100, 'max_prob':0.04}, 
+                                 ('ESC.970622_024806.0590.tif', zernike):{'max_second_dist': 9, 'max_prob':0.65},
+                                 ('ESC.970622_024806.0590.tif', sift):{'max_second_dist': 400, 'max_prob':0.015},
+                                 ('ESC.970622_024806.0590.tif', surf):{'max_second_dist': 0.7, 'max_prob':10}}
+
+
+config_settings = {'set_title': dataset_name+"_"+contrast_type, #'K':K, 'D':D, 
                    'TILE_KP':TILE_KP, 'tiling':tiling ,
-                   'detector': surf, 'descriptor': surf, 'findFundamentalMat_params':findFundamentalMat_params,
-                   'NO_OF_FEATURES': NO_OF_FEATURES}
+                   'detector': orb, 'descriptor': orb, 'findFundamentalMat_params':findFundamentalMat_params,
+                   'NO_OF_FEATURES': NO_OF_FEATURES }
+
+plot_display_settings = plot_display_settings_database.get((image_names[dataset_name],config_settings['descriptor']))
+if plot_display_settings is not None: 
+    config_settings.update(plot_display_settings)
 
 image_0 = read_grimage(img0_name)
 
-
-analyze_descriptor_distance_image_pair(image_0, config_settings, plotMatches=True, saveFig=False)
+analyze_descriptor_distance_image_pair(image_0, config_settings, plotMatches=True, saveFig=True)

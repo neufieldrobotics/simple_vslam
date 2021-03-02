@@ -11,7 +11,7 @@ import sys
 from matplotlib import pyplot as plt
 import os
 import glob
-from zernike.zernike import MultiHarrisZernike
+from external.zernike import MultiHarrisZernike
 from vslam_helper import knn_match_and_lowe_ratio_filter, draw_feature_tracks, tiled_features
 from feat_detector_comparisions_helper import *
 import progressbar

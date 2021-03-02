@@ -2,6 +2,7 @@
 __pycache__/
 temp_data/
 results/
+.spyproject/
 .ipynb_checkpoints/
 *.pyc
 \#*#

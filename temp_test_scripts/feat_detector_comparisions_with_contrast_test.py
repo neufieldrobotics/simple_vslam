@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.abspath('../external_packages/zernike_py/'))
 from zernike_py.MultiHarrisZernike import MultiHarrisZernike
 sys.path.insert(0, os.path.abspath('../external_packages/cmtpy/'))
 from cmtpy.histogram_warping_ace import HistogramWarpingACE
+sys.path.insert(0, os.path.abspath('../'))
 from vslam_helper import knn_match_and_lowe_ratio_filter, draw_feature_tracks, tiled_features, draw_arrows
 from feat_detector_comparisions_helper import *
 import progressbar

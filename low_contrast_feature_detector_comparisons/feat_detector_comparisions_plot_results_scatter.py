@@ -28,9 +28,9 @@ else:
 
 results_files = [#'results/matching_results_20200710_092947_Lars1_full.csv',
                  #'results/matching_results_20200711_053758_Lars2_full.csv',
-                 'results/matching_results_20200720_143024_Stingray2_with_mask_names_fixed.csv',
-                 'results/matching_results_20200722_003934-Morgan1_072719_800x600.csv',
-                 'results/matching_results_20200721_025524-Morgan2_073019_800x600.csv']
+                 '../results/matching_results_20200720_143024_Stingray2_with_mask_names_fixed.csv',
+                 '../results/matching_results_20200722_003934-Morgan1_072719_800x600.csv',
+                 '../results/matching_results_20200721_025524-Morgan2_073019_800x600.csv']
 
 #results_file = 'results/matching_results_20200721_025524 - Morgan2_073019_800x600.csv'
 #results_file = max(glob.glob('results/matching*.csv'), key=os.path.getctime)

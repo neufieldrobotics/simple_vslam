@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 from vslam_helper import tiled_features, knn_match_and_lowe_ratio_filter, draw_feature_tracks, draw_arrows
 from matplotlib import pyplot as plt
+import matplotlib as mpl
 from datetime import datetime
 import re
 print (os.path.abspath('./external_packages/cmtpy/'))
@@ -17,8 +18,8 @@ sys.path.insert(0, os.path.abspath('./external_packages/cmtpy/'))
 from cmtpy.histogram_warping_ace import HistogramWarpingACE
 from cmtpy import contrast_measurement as cm
 import pandas as pd
-
-
+import scipy.stats as st
+import warnings
 
 def save_fig2pdf(fig, folder=None, fname=None):
     plt._pylab_helpers.Gcf.figs.get(fig.number, None).window.showMaximized()
@@ -70,12 +71,21 @@ def draw_keypoints(vis, keypoints, color = (0, 255, 255)):
         cv2.circle(vis, (int(x), int(y)), 20, color, thickness=3)
     return vis
 
-def draw_markers(vis_orig, keypoints, color = (0, 0, 255),thickness = 2):
+def draw_markers(vis_orig, keypoints, color = (0, 0, 255),thickness = 2, 
+                 markerType=cv2.MARKER_CROSS, markerSize=20):
     if len(vis_orig.shape) == 2: vis = cv2.cvtColor(vis_orig,cv2.COLOR_GRAY2RGB)
     else: vis = vis_orig
-    for kp in keypoints:
-        x, y = kp.pt
-        cv2.drawMarker(vis, (int(x), int(y)), color,  markerSize=20, markerType = cv2.MARKER_CROSS, thickness=thickness)
+    if isinstance(color,list) and len(color) != 3:
+        assert len(keypoints) == len(color)
+        for kp,cl in zip(keypoints,color):
+            x, y = kp.pt
+            cv2.drawMarker(vis, (int(x), int(y)), cl,  
+                           markerSize=markerSize, markerType = markerType, thickness=thickness)
+    else:    
+        for kp in keypoints:
+            x, y = kp.pt
+            cv2.drawMarker(vis, (int(x), int(y)), color,  
+                           markerSize=markerSize, markerType = markerType, thickness=thickness)
     return vis
 
 def read_metashape_poses(file):
@@ -720,7 +730,9 @@ def read_grimage(img_name, resize_scale = None, normalize=False, image_depth=8):
     '''
     img = cv2.imread(img_name, cv2.IMREAD_COLOR)
     if img is None:
-        raise FileNotFoundError ("Could not read image from: {}".format(img_name))
+        #raise FileNotFoundError ("Could not read image from: {}".format(img_name))
+        warnings.warn("Could not read image from: {}".format(img_name))
+        return None
     gr_full = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
     if not resize_scale is None:
@@ -770,3 +782,370 @@ def preprocessed_image_contrasts(img_name, contrast_adj_factors, contrast_img_fo
         contrast_meas.append( contrast_img_df.loc[(raw_sets_folder,img_base, ctrst_adj_fact), :].to_dict() )
         
     return contrast_imgs, contrast_meas
+
+def normalize_and_applycolormap(values, values_max = None, colormap = cv2.COLORMAP_RAINBOW):
+    '''
+    Given an array of values, normalize to max value and apply colormap
+    '''
+    if values_max is not None:
+        intensities = np.round(values/values_max * 255).astype('uint8')
+    else:
+        intensities = np.round(values/values.max() * 255).astype('uint8')
+    colors = cv2.applyColorMap(intensities, colormap)
+    color_int_tuples = [tuple(map(int, cl)) for cl in colors[:,0,:]]
+    return color_int_tuples
+
+def analyze_descriptor_distance_image_pair(image_0, settings, mask=None,
+                                           plotMatches=True, saveFig=False):
+    '''
+    Compute distances to the 2nd clostest features and plot histogram + kde
+    '''
+    TILE_KP = settings['TILE_KP']
+    tiling = settings['tiling']
+    detector = settings['detector']
+    descriptor = settings['descriptor']
+    max_prob = settings.get('max_prob')
+    provided_kps = settings.get('provided_keypoints')
+
+    det_name = detector.getDefaultName().replace('Feature2D.','')
+    if det_name == 'Feature2D':
+        det_name = type(detector).__name__.replace('xfeatures2d_','')
+    des_name = descriptor.getDefaultName().replace('Feature2D.','')
+    if des_name == 'Feature2D':
+        des_name = type(descriptor).__name__.replace('xfeatures2d_','')
+    
+    # CASE WHEN FEATURES are PROVIDED
+    if provided_kps is not None:
+        det_name += '_provided'
+        kp_0, des_0 = descriptor.compute(image_0, provided_kps)
+
+    else:
+        NO_OF_FEATURES = settings['NO_OF_FEATURES']
+
+        if isinstance(descriptor, cv2.SparsePyrLKOpticalFlow): des_name='SparsePyrLKOpticalFlow'
+            
+        if detector == descriptor and not TILE_KP:
+            kp_0, des_0 = detector.detectAndCompute(image_0, mask=mask)
+            #kp_1, des_1 = detector.detectAndCompute(image_1, mask=None)
+        else:
+            detector_kp_0 = detector.detect(image_0, mask=mask)
+        
+            if TILE_KP:
+                try:
+                    kp_0 = tiled_features(detector_kp_0, image_0.shape, tiling[0], tiling[1], no_features= NO_OF_FEATURES)
+                except:
+                    print("Error with tiling, probably not enough features: {:d}".format(len(detector_kp_0)))
+                    print("Continuing without tiling")            
+                    kp_0 = detector_kp_0
+            else:
+                kp_0 = detector_kp_0
+        
+            if not isinstance(descriptor, cv2.SparsePyrLKOpticalFlow):
+                kp_0, des_0 = descriptor.compute(image_0, kp_0)
+       
+    if len(kp_0) == 0:
+        return {'detector':det_name, 'descriptor':des_name,
+                'second_dist_kde': None, 'kde_x':None, 'img0_no_features': len(kp_0)}
+
+    if isinstance(descriptor, cv2.ORB) and descriptor.getWTA_K() != 2 :
+        print ("ORB with WTA_K !=2")
+        matcher = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
+    else:
+        matcher = cv2.BFMatcher(descriptor.defaultNorm(), crossCheck=False)
+    
+    '''
+    Match and find second distances
+    '''
+    
+    matches_00 = matcher.knnMatch(des_0, des_0, k=2, mask=None)
+    matches_00_second = [m[1] for m in matches_00]
+    second_distances = np.array([m[1].distance for m in matches_00])
+    
+    second_dist_max = settings.get('max_second_dist',second_distances.max())
+    marker_colors = normalize_and_applycolormap(second_distances, values_max=second_dist_max, colormap = cv2.COLORMAP_RAINBOW)
+    
+    #no_matches = np.sum(mask_e_12)
+    
+
+    x = np.linspace(0,second_dist_max,51)
+    sec_dist_kde_full = st.gaussian_kde(second_distances,bw_method='silverman')
+    sec_dist_kde = sec_dist_kde_full(x)
+        
+    if plotMatches:        
+        full_map_BGR = cv2.applyColorMap(np.linspace(0,255,256).astype(np.uint8),cv2.COLORMAP_RAINBOW)
+        full_map_RGB = cv2.cvtColor(full_map_BGR, cv2.COLOR_BGR2RGB)
+        full_map = full_map_RGB[:,0,:] /255
+        cmap= mpl.colors.ListedColormap(full_map)
+        norm= mpl.colors.Normalize(vmin=0,vmax=second_dist_max)
+        print("Second dist max ", second_dist_max)
+        
+        det_des_string = "Det: {} Des: {}".format(det_name, des_name)
+        kp_img_0 = image_0
+        
+        if TILE_KP:
+            feat_string_0 = "{}\nBefore tiling:{:d} after tiling {:d}".format(det_des_string, len(detector_kp_0), len(kp_0))
+    #        kp_img_0 = draw_markers(kp_img_0, detector_kp_0, color=marker_colors, markerSize=1)
+            
+        else:            
+            feat_string_0 = "{}\n{:d} features".format(det_des_string, len(kp_0))
+    
+        kp_img_0 = draw_markers(kp_img_0, kp_0, color=marker_colors)
+    
+        #fig1 = plt.figure(1); plt.clf()
+        fig1, fig1_axes = plt.subplots(2,1, figsize= [9.28, 9.58])
+        fig1.subplots_adjust(top=0.91)
+        fig1.suptitle(settings['set_title'] + ' features')
+        fig1_axes[0].axis("off"); fig1_axes[0].set_title(feat_string_0)
+        fig1_axes[0].imshow(cv2.cvtColor(kp_img_0, cv2.COLOR_BGR2RGB))        
+        #cb = matplotlib.colorbar.ColorbarBase(fig1_axes[2], orientation='horizontal', 
+        #                           cmap=cmap, norm=norm, fraction=1)
+        
+        adjust_lower_axes_up = .06
+        bb_0 = fig1_axes[0].get_position()
+        left0, bottom0, width0, height0 = bb_0.x0, bb_0.y0, bb_0.width, bb_0.height
+        bb_1 = fig1_axes[1].get_position()
+        left1, bottom1, width1, height1 = bb_1.x0, bb_1.y0+adjust_lower_axes_up, bb_1.width, bb_1.height
+        fig1_axes[1].set_position([left0, bottom1, width0, height1])
+        
+        fig1_axes[1].hist(second_distances, bins=x, color='blue', density=True, alpha=0.4, label='Raw')
+        fig1_axes[1].fill_between(x, sec_dist_kde, color='red',alpha=0.4)        
+        fig1_axes[1].set_xlim((0,second_dist_max))
+        fig1_axes[1].set_xticklabels([])
+        fig1_axes[1].set_ylim([0,max_prob])
+        fig1_axes[1].set_ylabel('Prob. density')
+    
+        #im=mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+        #fig1.colorbar(im, ax=fig1_axes[1], cmap=cmap, orientation='horizontal', norm=norm)
+
+        cb_ax = fig1.add_axes([left0, 0.08+adjust_lower_axes_up, width0, 0.025])
+        cb = mpl.colorbar.ColorbarBase(cb_ax, cmap=cmap,
+                                       norm=norm, orientation='horizontal')
+        cb_ax.set_xlabel('Distance to second closest matches')
+        
+        fig_ttl = fig1._suptitle.get_text() + '_' + fig1_axes[0].get_title()
+        fig_ttl = fig_ttl.replace('$','').replace('\n','_').replace(' ','_')
+        fig_fname = re.sub(r"\_\_+", "_", fig_ttl)
+
+        if saveFig:
+            save_fig2png(fig1, fname= fig_fname, size = [9.28, 9.58])
+    
+    result = {'detector':det_name, 'descriptor':des_name,
+              'second_dist_kde': sec_dist_kde, 'kde_x':x, 'img0_no_features': len(kp_0), 
+              'keypoints':kp_0}
+    return result
+
+def adjust_lower_axes_to_image(axes, adj1_up = 0.04, adj2_up = 0.005):
+    '''
+    In a figure with 3 vertical axes, make axes 1 and 2 as wide as image in 0
+    Also adjust them vertically to make them tight
+    Also return an axes for colorbar touching lower x axis
+    '''
+    bb_0 = axes[0].get_position()
+    left0, bottom0, width0, height0 = bb_0.x0, bb_0.y0, bb_0.width, bb_0.height
+
+    bb_1 = axes[1].get_position()
+    left1, bottom1, width1, height1 = bb_1.x0, bb_1.y0, bb_1.width, bb_1.height    
+    axes[1].set_position([left0, bottom1+adj1_up, width0, height1])
+        
+    bb_2 = axes[2].get_position()
+    left2, bottom2, width2, height2 = bb_2.x0, bb_2.y0 + adj2_up, bb_2.width, bb_2.height
+    axes[2].set_position([left0, bottom2+ adj1_up + adj2_up, width0, height1])
+    
+    cb_ax = axes[0].figure.add_axes([left0, 0.08 + adj1_up + adj2_up, width0, 0.025])
+    return cb_ax
+
+
+def analyze_descriptor_distance_image_pair_with_eig(image_0, settings, mask=None,
+                                                    plotMatches=True, saveFig=False):
+    '''
+    Compute distances to the 2nd clostest features and plot histogram + kde
+    '''
+    TILE_KP = settings['TILE_KP']
+    tiling = settings['tiling']
+    detector = settings['detector']
+    descriptor = settings['descriptor']
+    max_prob = settings.get('max_prob')
+    provided_kps = settings.get('provided_keypoints')
+    kp_eig_vals_old = settings.get('kp_eigen_values')
+    provided_Ft = settings.get('provided_Ft')
+    plot_eig_movement = settings.get('plot_eig_movement',False)
+    eig_data_lims = settings.get('eig_plot_lims')
+
+    det_name = detector.getDefaultName().replace('Feature2D.','')
+    if det_name == 'Feature2D':
+        det_name = type(detector).__name__.replace('xfeatures2d_','')
+    des_name = descriptor.getDefaultName().replace('Feature2D.','')
+    if des_name == 'Feature2D':
+        des_name = type(descriptor).__name__.replace('xfeatures2d_','')
+    
+    # CASE WHEN FEATURES are PROVIDED
+    if provided_Ft is not None:
+        print("Using Ft")
+        det_name += '_provided'
+        kp_0, des_0, Ft, eig_vals = descriptor.computeFromFt(image_0, provided_Ft, computeEigVals=True)
+        kp_eig_vals = eig_vals
+
+    elif provided_kps is not None:
+        print("Using Provided keypoints")
+        det_name += '_provided'
+        kp_0, des_0 = descriptor.compute(image_0, provided_kps)
+            
+    else:
+        NO_OF_FEATURES = settings['NO_OF_FEATURES']
+
+        if isinstance(descriptor, cv2.SparsePyrLKOpticalFlow): des_name='SparsePyrLKOpticalFlow'
+            
+        if detector == descriptor and not TILE_KP:
+            kp_0, des_0 = detector.detectAndCompute(image_0, mask=mask)
+            #kp_1, des_1 = detector.detectAndCompute(image_1, mask=None)
+        else:
+            detector_kp_0 = detector.detect(image_0, mask=mask)
+        
+            if TILE_KP:
+                try:
+                    kp_0 = tiled_features(detector_kp_0, image_0.shape, tiling[0], tiling[1], no_features= NO_OF_FEATURES)
+                except:
+                    print("Error with tiling, probably not enough features: {:d}".format(len(detector_kp_0)))
+                    print("Continuing without tiling")            
+                    kp_0 = detector_kp_0
+            else:
+                kp_0 = detector_kp_0
+        
+            if not isinstance(descriptor, cv2.SparsePyrLKOpticalFlow):
+                kp_0, des_0 = descriptor.compute(image_0, kp_0)
+       
+    if len(kp_0) == 0:
+        return {'detector':det_name, 'descriptor':des_name,
+                'second_dist_kde': None, 'kde_x':None, 'img0_no_features': len(kp_0)}
+
+    if isinstance(descriptor, cv2.ORB) and descriptor.getWTA_K() != 2 :
+        print ("ORB with WTA_K !=2")
+        matcher = cv2.BFMatcher(cv2.NORM_HAMMING2, crossCheck=False)
+    else:
+        matcher = cv2.BFMatcher(descriptor.defaultNorm(), crossCheck=False)
+    
+    '''
+    Match and find second distances
+    '''
+    
+    matches_00 = matcher.knnMatch(des_0, des_0, k=2, mask=None)
+    matches_00_second = [m[1] for m in matches_00]
+    second_distances = np.array([m[1].distance for m in matches_00])
+    
+    second_dist_max = settings.get('max_second_dist',second_distances.max())
+    marker_colors = normalize_and_applycolormap(second_distances, values_max=second_dist_max, colormap = cv2.COLORMAP_RAINBOW)
+    
+    #no_matches = np.sum(mask_e_12)
+    
+    x = np.linspace(0,second_dist_max,51)
+    sec_dist_kde_full = st.gaussian_kde(second_distances,bw_method='silverman')
+    sec_dist_kde = sec_dist_kde_full(x)
+        
+    if plotMatches:
+        full_map_BGR = cv2.applyColorMap(np.linspace(0,255,256).astype(np.uint8),cv2.COLORMAP_RAINBOW)
+        full_map_RGB = cv2.cvtColor(full_map_BGR, cv2.COLOR_BGR2RGB)
+        full_map = full_map_RGB[:,0,:] /255
+        cmap= mpl.colors.ListedColormap(full_map)
+        norm= mpl.colors.Normalize(vmin=0,vmax=second_dist_max)
+        print("Second dist max ", second_dist_max)
+        
+        det_des_string = "Det: {} Des: {}".format(det_name, des_name)
+        kp_img_0 = image_0
+        
+        if TILE_KP:
+            feat_string_0 = "{}\nBefore tiling:{:d} after tiling {:d}".format(det_des_string, len(detector_kp_0), len(kp_0))
+    #        kp_img_0 = draw_markers(kp_img_0, detector_kp_0, color=marker_colors, markerSize=1)
+            
+        else:            
+            feat_string_0 = "{}\n{:d} features".format(det_des_string, len(kp_0))
+    
+        kp_img_0 = draw_markers(kp_img_0, kp_0, color=marker_colors)
+    
+        #fig1 = plt.figure(1); plt.clf()
+        fig1, fig1_axes = plt.subplots(3,1, figsize= [9.28, 12])
+        fig1.suptitle(settings['set_title'] + ' features')
+        fig1_axes[0].axis("off"); fig1_axes[0].set_title(feat_string_0)
+        fig1.canvas.draw()
+        plt.pause(.1)
+        fig1.set_size_inches([9.28, 12])
+        fig1.subplots_adjust(top=0.91)
+        #fig1.canvas.draw()
+        #plt.pause(.1)
+        fig1_axes[0].imshow(cv2.cvtColor(kp_img_0, cv2.COLOR_BGR2RGB)) 
+
+        #cb = matplotlib.colorbar.ColorbarBase(fig1_axes[2], orientation='horizontal', 
+        #                           cmap=cmap, norm=norm, fraction=1)
+        #plt.pause(.1)
+        cb_ax = adjust_lower_axes_to_image(fig1_axes)
+                
+        marker_colors_RGB = cv2.cvtColor(np.array(np.array(marker_colors)[:,np.newaxis,:],dtype=np.uint8), cv2.COLOR_BGR2RGB)[:,0,:]        
+
+        if len(kp_eig_vals) != len(kp_0):
+            color_eig_lookup = {}
+            for k, c, e in zip(provided_kps, marker_colors_RGB, kp_eig_vals):
+                color_eig_lookup[k.pt] = (c,e)
+            kp_0_colors = []
+            kp_0_eig_vals = []
+            for k in kp_0:
+                c, e = color_eig_lookup.get(k.pt, (np.array([255,255,255]), np.array([0,0])))
+                kp_0_colors.append(c)
+                kp_0_eig_vals.append(e)
+            marker_colors_RGB = np.array(kp_0_colors)
+            kp_eig_vals = np.array(kp_0_eig_vals)
+        
+        
+        
+        if plot_eig_movement:
+            arrow_size = np.max(kp_eig_vals) * .01
+            for (x1, y1), (x2,y2), c in zip(kp_eig_vals_old, kp_eig_vals, marker_colors_RGB):
+                fig1_axes[1].scatter(kp_eig_vals[:,0], kp_eig_vals[:,1], color=(1, 1, 1, 0.0))
+                arrow_col =  tuple(c/255) + tuple([.25])
+                fig1_axes[1].arrow(x1, y1, x2-x1, y2-y1, fc=arrow_col, ec=arrow_col,
+                                   head_width= arrow_size, head_length=2*arrow_size, overhang=arrow_size/4,
+                                   length_includes_head=True, head_starts_at_zero=False)
+            
+        else:                
+            fig1_axes[1].scatter(kp_eig_vals[:,0], kp_eig_vals[:,1], color=marker_colors_RGB/255, marker='+')
+
+        if eig_data_lims is None:
+            eig_data_lims = np.mean(kp_eig_vals,axis=0) + 1 * np.std(kp_eig_vals,axis=0)
+        print("Eig value plot data lims: ",eig_data_lims)
+        fig1_axes[1].set_xlim([0, eig_data_lims[1]])
+        fig1_axes[1].set_ylim([0, eig_data_lims[1]])
+        fig1_axes[1].set_aspect('equal', adjustable='datalim',anchor='SW')
+        #fig1.canvas.draw()
+        #fig1.canvas.flush_events()
+        plt.pause(.1)
+        
+        fig1_axes[1].set_xlim([0, fig1_axes[1].get_xlim()[1]-fig1_axes[1].get_xlim()[0]])
+        fig1_axes[1].set_ylim([0, fig1_axes[1].get_ylim()[1]-fig1_axes[1].get_ylim()[0]])
+
+        fig1_axes[1].set_xlabel(r'$\lambda_1$'); fig1_axes[1].set_ylabel(r'$\lambda_2$')
+
+        
+        fig1_axes[2].hist(second_distances, bins=x, color='blue', density=True, alpha=0.4, label='Raw')
+        fig1_axes[2].fill_between(x, sec_dist_kde, color='red',alpha=0.4)        
+        fig1_axes[2].set_xlim((0,second_dist_max))
+        fig1_axes[2].set_xticklabels([])
+        fig1_axes[2].set_ylim([0,max_prob])
+        fig1_axes[2].set_ylabel('Prob. density')
+    
+        #im=mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+        #fig1.colorbar(im, ax=fig1_axes[1], cmap=cmap, orientation='horizontal', norm=norm)
+
+        #cb_ax = fig1.add_axes([left0, 0.08+adjust_middle_axes_up + adjust_lower_axes_up, width0, 0.025])
+        cb = mpl.colorbar.ColorbarBase(cb_ax, cmap=cmap,
+                                       norm=norm, orientation='horizontal')
+        cb_ax.set_xlabel('Distance to second closest matches')
+        
+        fig_ttl = fig1._suptitle.get_text() + '_' + fig1_axes[0].get_title()
+        fig_ttl = fig_ttl.replace('$','').replace('\n','_').replace(' ','_')
+        fig_fname = re.sub(r"\_\_+", "_", fig_ttl)
+
+        if saveFig:
+            save_fig2png(fig1, fname= fig_fname, size = [9.28, 12])
+    
+    result = {'detector':det_name, 'descriptor':des_name,
+              'second_dist_kde': sec_dist_kde, 'kde_x':x, 'img0_no_features': len(kp_0), 
+              'keypoints':kp_0}
+    return result
