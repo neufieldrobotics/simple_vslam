@@ -1,9 +1,12 @@
 [submodule "matlab_imresize"]
 	path = matlab_imresize
 	url = https://github.com/vik748/matlab_imresize.git
+	branch = master
 [submodule "external_packages/cmtpy"]
 	path = external_packages/cmtpy
 	url = https://github.com/vik748/cmtpy.git
+	branch = master
 [submodule "external_packages/zernike_py"]
 	path = external_packages/zernike_py
 	url = https://github.com/neufieldrobotics/zernike_py.git
+	branch = master
