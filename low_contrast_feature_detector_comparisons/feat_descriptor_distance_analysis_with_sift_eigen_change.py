@@ -36,12 +36,21 @@ img0_mask_filename = os.path.join(path, dataset_name, 'masks', img0_name_base+'_
 image_0 = read_grimage(img0_filename)
 image_0_mask = read_grimage(img0_mask_filename)
 
-_, _, kp_eig_vals, Ft = zernike.detectAndCompute(image_0, computeEigVals=True, mask=image_0_mask, timing=False)
+#_, _, kp_eig_vals, Ft = zernike.detectAndCompute(image_0, computeEigVals=True, mask=image_0_mask, timing=False)
+#kp_sift, des = zernike.detectAndCompute(image_0, computeEigVals=False, mask=image_0_mask, timing=False)
+kp_sift, des = sift.detectAndCompute(image_0, mask=image_0_mask)
+kp_sift_o2s =[]
+for k in kp_sift:
+    octave = unpackOctave(k)[2]
+    k.octave = octave
+    kp_sift_o2s.append(k)
 
 config_settings = {'set_title': dataset_name, #'K':K, 'D':D, 
                    'TILE_KP':TILE_KP, 'tiling':tiling ,
-                   'detector': zernike, 'descriptor': zernike, 'findFundamentalMat_params':findFundamentalMat_params,
-                   'NO_OF_FEATURES': NO_OF_FEATURES, 'kp_eigen_values':kp_eig_vals, 'provided_Ft': Ft,
+                   'detector': sift, 'descriptor': sift, 'findFundamentalMat_params':findFundamentalMat_params,
+                   'NO_OF_FEATURES': NO_OF_FEATURES,
+                   #'provided_keypoints': kp_sift,
+                   #'kp_eigen_values':kp_eig_vals, 'provided_Ft': Ft,
                    'plot_eig_movement': False}
 
 plot_display_settings = plot_display_settings_database.get((image_names[dataset_name],config_settings['descriptor']))
@@ -53,7 +62,7 @@ results = analyze_descriptor_distance_image_pair_with_eig(image_0, config_settin
 
 
 
-dataset_name = datasets[8]
+dataset_name = datasets[3]
 contrast_type = contrast_types[0]
 
 img0_name = image_names[dataset_name]
@@ -80,7 +89,7 @@ analyze_descriptor_distance_image_pair_with_eig(image_0, config_settings,
                                                 plotMatches=True, saveFig=True)
 
 
-dataset_name = datasets[8]
+dataset_name = datasets[3]
 contrast_type = contrast_types[0]
 
 img0_name = image_names[dataset_name]

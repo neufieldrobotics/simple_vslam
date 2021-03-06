@@ -22,7 +22,7 @@ else:
 #results_file = 'results/matching_results_20200717_180713_Stingray2.csv'
 #results_file = 'results/matching_results_20200711_053758_Lars2_full.csv'
 results_file = 'results/matching_results_20200711_053758_Lars2_full.csv'
-results_file = 'results/matching_results_20200720_054213_Stingray2_with_mask.csv'
+results_file = '../results/matching_results_20200720_054213_Stingray2_with_mask.csv'
 #results_file = max(glob.glob('results/matching*.csv'), key=os.path.getctime)
 
 results_df = pd.read_csv(results_file)

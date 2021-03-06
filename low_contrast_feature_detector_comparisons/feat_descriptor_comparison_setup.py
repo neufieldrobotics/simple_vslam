@@ -65,10 +65,10 @@ Setup Feature Detectors
 orb = cv2.ORB_create(nfeatures = NO_OF_UT_FEATURES, edgeThreshold=31, patchSize=31, nlevels=6,
                       fastThreshold=1, scaleFactor=1.2, WTA_K=2, scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
 
-zernike = MultiHarrisZernike(Nfeats= NO_OF_FEATURES, seci= 3, secj= 4, levels= 6, ratio= 1/1.2,
+zernike = MultiHarrisZernike(Nfeats= NO_OF_FEATURES, seci= 3, secj= 4, levels= 6, ratio= 1/1.2, #0.5, 
                              sigi= 2.75, sigd= 1.0, nmax= 8, like_matlab= False, lmax_nd= 3, harris_threshold = None   )
 
-surf = cv2.xfeatures2d.SURF_create(hessianThreshold = 15, nOctaves = 6)
+surf = cv2.xfeatures2d.SURF_create(hessianThreshold = 15, nOctaves = 1)
 
 sift = cv2.xfeatures2d.SIFT_create(nfeatures = NO_OF_UT_FEATURES, nOctaveLayers = 6, contrastThreshold = 0.001,
                                    edgeThreshold = 20, sigma = 1.6)
@@ -82,7 +82,7 @@ KLT_optical_flow = cv2.SparsePyrLKOpticalFlow_create(crit= (cv2.TERM_CRITERIA_CO
 
 # Plot settings database
 plot_display_settings_database= {('ESC.970622_024806.0590.tif', orb):{'max_second_dist': 100, 'max_prob':0.04}, 
-                                 ('ESC.970622_024806.0590.tif', zernike):{'max_second_dist': 9, 'max_prob':0.65, 'eig_plot_lims': [67, 89 ]},
+                                 ('ESC.970622_024806.0590.tif', zernike):{'max_second_dist': 9, 'max_prob':0.8, 'eig_plot_lims': [67, 89 ]},
                                  ('ESC.970622_024806.0590.tif', sift):{'max_second_dist': 400, 'max_prob':0.015},
                                  ('ESC.970622_024806.0590.tif', surf):{'max_second_dist': 0.7, 'max_prob':10},
                                  ('G0285493.png', sift):{'max_second_dist': 450, 'max_prob':0.03},
