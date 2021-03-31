@@ -12,6 +12,8 @@ from matplotlib import pyplot as plt
 import os
 import glob
 sys.path.insert(0, os.path.abspath('../external_packages/zernike_py/'))
+sys.path.insert(0, os.path.abspath('../external_packages/cmtpy/'))
+sys.path.insert(0, os.path.abspath('..'))
 from zernike_py import MultiHarrisZernike
 from vslam_helper import knn_match_and_lowe_ratio_filter, draw_feature_tracks, tiled_features
 from feat_detector_comparisions_helper import *
@@ -40,12 +42,12 @@ else:
 
 '''
 LOAD DATA
+'''
 K = np.array([[3523.90252470728501/5, 0.0, 2018.22833167806152/5],
               [0.0, 3569.92180686745451/5, 1473.25249541175890/5],
               [0.0, 0.0, 1.0]])
 
 D = np.array([-2.81360302828763176e-01, 1.38000456840603303e-01, 4.87629635176304053e-05, -6.01560125682630380e-05, -4.34666626743886730e-02])
-'''
 
 raw_img_folder = os.path.join(path,raw_sets_folder)
 clahe_img_folder = os.path.join(path,clahe_sets_folder)
@@ -79,11 +81,31 @@ surf_detector = cv2.xfeatures2d.SURF_create(hessianThreshold = 50, nOctaves = 6)
 config_settings = {'set_title': 'Lars1 800x600 Raw Images',
                    'K':K, 'D':D, 'TILE_KP':TILE_KP, 'tiling':tiling ,
                    'zernike_detector': zernike_detector, 'orb_detector': orb_detector, 'surf_detector': surf_detector}#, 'sift_detector': sift_detector}
+for BASELINE_STEP_SIZE in [1, 2, 5, 10, 15, 20]:#[1, 2, 5, 10, 15, 20]
 
-img0_name = raw_image_names[0]
-img1_name = raw_image_names[9]
+    results_list = []
 
-image_0 = cv2.imread(img0_name, cv2.IMREAD_GRAYSCALE)
-image_1 = cv2.imread(img1_name, cv2.IMREAD_GRAYSCALE)
+    image_names = raw_image_names
+    for img0_name, img1_name in progressbar.progressbar(zip(image_names[:-BASELINE_STEP_SIZE], image_names[BASELINE_STEP_SIZE:]),
+                                                        max_value=len(image_names[:-BASELINE_STEP_SIZE])):
+        image_0 = cv2.imread(img0_name, cv2.IMREAD_GRAYSCALE)
+        image_1 = cv2.imread(img1_name, cv2.IMREAD_GRAYSCALE)
 
-results = analyze_image_pair_zer_orb_orbhc(image_0, image_1, config_settings, plotMatches = True)
+        results = analyze_image_pair_zer_surf_orbsf(image_0, image_1, config_settings, plotMatches = False)
+        results_list.append([results['zernike_matches'], results['surf_matches'], results['orbsf_matches']])
+
+    results_array = np.array(results_list)
+    np.savetxt("results_array_baseline_"+str(BASELINE_STEP_SIZE)+'_'+datetime.now().strftime("%Y%m%d%H%M%S")+".csv", results_array, delimiter=",", header="zernike, surf, orb_sf")
+
+    fig3 = plt.figure(3)
+    plt.clf()
+    bins = np.linspace(10, 250, 25)
+
+    plt.hist(results_array, bins=bins, alpha=0.5, label=['Zernike','SURF','ORB_SF'])
+    plt.legend(loc='upper right')
+    plt.suptitle(config_settings['set_title'] + '\n Baseline: {:d}'.format(BASELINE_STEP_SIZE))
+    plt.xlabel('Bins (Number of matches)')
+    plt.ylabel('Occurances (Image pairs)')
+    plt.axes().set_ylim([0, 750])
+    plt.draw()
+    save_fig2pdf(fig3)

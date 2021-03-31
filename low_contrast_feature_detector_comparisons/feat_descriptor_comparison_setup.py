@@ -35,20 +35,31 @@ else:
 
 contrast_types = ['RAW', '7_bit', '6_bit', '5_bit', '4_bit', '3_bit']
 
-image_names = { 'Lars1_080818_800x600'      : 'G0285493.png', #,'G0285513.png'], # Lars1
-                'Lars2_081018_800x600'      : 'G0028388.png', #, 'G0028408.JPG.png'], 
-                'skerki_full'               : 'ESC.970622_030232.0655.tif',
-                'skerki_mud'                : 'ESC.970622_024806.0590.tif',
-                'skerki_mud_CLAHE'          : 'ESC.970622_024806.0590.tif',
-                'lab_with_target'           : 'GOPR1511.png',
-                'Stingray2_080718_800x600'  : 'G0035780.png',
-                'Morgan2_UAV_800x600'       : 'DJI_0875.png',
-                'Morgan2_UAV_800x600_CLAHE' : 'DJI_0875.png'}
+image_names = { 'Lars1_080818_800x600'         : 'G0285493.png', #,'G0285513.png'], # Lars1
+                'Lars2_081018_800x600'         : 'G0028388.png', #, 'G0028408.JPG.png'],
+                'skerki_full'                  : 'ESC.970622_030232.0655.tif',
+                'skerki_mud'                   : 'ESC.970622_024806.0590.tif',
+                'skerki_mud_CLAHE'             : 'ESC.970622_024806.0590.tif',
+                'lab_with_target'              : 'GOPR1511.png',
+                'Stingray2_080718_800x600'     : 'G0035780.png',
+                'Morgan2_UAV_800x600'          : 'DJI_0875.png',
+                'Morgan2_UAV_800x600_CLAHE'    : 'DJI_0875.png',
+                'Morgan2_UAV_800x600_stretch'  : 'DJI_0875.png',
+                'Morgan2_UAV_800x600_histeq'   : 'DJI_0875.png',
+                'Morgan2_UAV_800x600_adhisteq' : 'DJI_0875.png',
+                'skerki_mud_trim'              : 'ESC.970622_024806.0590.tif',
+                'skerki_mud_trim_CLAHE'        : 'ESC.970622_024806.0590.tif',
+                'skerki_mud_trim_stretch'      : 'ESC.970622_024806.0590.tif',
+                'skerki_mud_trim_histeq'       : 'ESC.970622_024806.0590.tif',
+                'skerki_mud_trim_adhisteq'     : 'ESC.970622_024806.0590.tif',
+                }
+
+
 
 datasets = sorted(image_names.keys())
 
 tiling = (4,3)
-NO_OF_FEATURES = 100
+NO_OF_FEATURES = 600
 BASELINE_STEP_SIZE = 10
 
 TILE_KP = False
@@ -65,7 +76,7 @@ Setup Feature Detectors
 orb = cv2.ORB_create(nfeatures = NO_OF_UT_FEATURES, edgeThreshold=31, patchSize=31, nlevels=6,
                       fastThreshold=1, scaleFactor=1.2, WTA_K=2, scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
 
-zernike = MultiHarrisZernike(Nfeats= NO_OF_FEATURES, seci= 3, secj= 4, levels= 6, ratio= 1/1.2, #0.5, 
+zernike = MultiHarrisZernike(Nfeats= NO_OF_FEATURES, seci= 3, secj= 4, levels= 6, ratio= 1/1.2, #0.5,
                              sigi= 2.75, sigd= 1.0, nmax= 8, like_matlab= False, lmax_nd= 3, harris_threshold = None   )
 
 surf = cv2.xfeatures2d.SURF_create(hessianThreshold = 15, nOctaves = 1)
@@ -81,12 +92,15 @@ KLT_optical_flow = cv2.SparsePyrLKOpticalFlow_create(crit= (cv2.TERM_CRITERIA_CO
                                                      maxLevel= 4, winSize= (25,25), minEigThreshold= 1e-3)
 
 # Plot settings database
-plot_display_settings_database= {('ESC.970622_024806.0590.tif', orb):{'max_second_dist': 100, 'max_prob':0.04}, 
-                                 ('ESC.970622_024806.0590.tif', zernike):{'max_second_dist': 9, 'max_prob':0.8, 'eig_plot_lims': [67, 89 ]},
+plot_display_settings_database= {('ESC.970622_024806.0590.tif', orb):{'max_second_dist': 100, 'max_prob':0.04},
+                                 ('ESC.970622_024806.0590.tif', zernike):{'max_second_dist': 9, 'max_prob':0.8, 'eig_plot_lims': [175, 250], 'hist_lim': 5500},#[67, 89 ]},
                                  ('ESC.970622_024806.0590.tif', sift):{'max_second_dist': 400, 'max_prob':0.015},
                                  ('ESC.970622_024806.0590.tif', surf):{'max_second_dist': 0.7, 'max_prob':10},
                                  ('G0285493.png', sift):{'max_second_dist': 450, 'max_prob':0.03},
-                                 ('DJI_0875.png', zernike):{'max_second_dist': 9.22, 'max_prob':0.72, 'eig_plot_lims': [66, 62]},
+                                 ('DJI_0875.png', zernike):{'max_second_dist': 9.22, 'max_prob':0.72, 'eig_plot_lims': [1005, 885], 'hist_lim': 70000}, #[66, 62
+                                 sift:{'max_second_dist': 450, 'max_prob':0.015},
+                                 orb:{'max_second_dist': 100, 'max_prob':0.035},
+                                 zernike:{'max_second_dist': 9, 'max_prob':0.5}
                                  }
 
 np.random.seed(7)

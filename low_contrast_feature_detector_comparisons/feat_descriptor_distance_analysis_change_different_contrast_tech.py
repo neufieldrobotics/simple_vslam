@@ -25,7 +25,7 @@ from datetime import datetime
 import scipy.stats as st
 from feat_descriptor_comparison_setup import *
 
-dataset_name = datasets[2]
+dataset_name = datasets[12]
 contrast_type = contrast_types[0]
 
 img0_name = image_names[dataset_name]
@@ -36,24 +36,23 @@ img0_mask_filename = os.path.join(path, dataset_name, 'masks', img0_name_base+'_
 image_0 = read_grimage(img0_filename)
 image_0_mask = read_grimage(img0_mask_filename)
 
-_, _, kp_eig_vals, Ft = zernike.detectAndCompute(image_0, computeEigVals=True, mask=image_0_mask, timing=False)
 
 config_settings = {'set_title': dataset_name, #'K':K, 'D':D,
                    'TILE_KP':TILE_KP, 'tiling':tiling ,
                    'detector': zernike, 'descriptor': zernike, 'findFundamentalMat_params':findFundamentalMat_params,
-                   'NO_OF_FEATURES': NO_OF_FEATURES, 'kp_eigen_values':kp_eig_vals, 'provided_Ft': Ft,
-                   'plot_eig_movement': False}
+                   'NO_OF_FEATURES': NO_OF_FEATURES}
 
 plot_display_settings = plot_display_settings_database.get((image_names[dataset_name],config_settings['descriptor']))
 if plot_display_settings is not None:
     config_settings.update(plot_display_settings)
 
-results = analyze_descriptor_distance_image_pair_with_eig(image_0, config_settings,
-                                                          mask = image_0_mask, plotMatches=True, saveFig=True)
+plt.close('all')
+results = analyze_descriptor_distance_image_pair_with_histogram(image_0, config_settings,
+                                                 mask = image_0_mask, plotMatches=True, saveFig=True)
 
 
 
-dataset_name = datasets[4]
+dataset_name = datasets[13]
 contrast_type = contrast_types[0]
 
 img0_name = image_names[dataset_name]
@@ -67,21 +66,64 @@ image_0_mask = read_grimage(img0_mask_filename)
 config_settings = {'set_title': dataset_name, #'K':K, 'D':D,
                    'TILE_KP':TILE_KP, 'tiling':tiling ,
                    'detector': zernike, 'descriptor': zernike, 'findFundamentalMat_params':findFundamentalMat_params,
-                   #'NO_OF_FEATURES': NO_OF_FEATURES}
-                   'provided_keypoints': results['keypoints'], 'kp_eigen_values':kp_eig_vals,  'provided_Ft': Ft,
-                   'plot_eig_movement': True}
+                   'NO_OF_FEATURES': NO_OF_FEATURES}
 
 plot_display_settings = plot_display_settings_database.get((image_names[dataset_name],config_settings['descriptor']))
-plot_display_settings = None
 if plot_display_settings is not None:
     config_settings.update(plot_display_settings)
 
 
-analyze_descriptor_distance_image_pair_with_eig(image_0, config_settings,
+analyze_descriptor_distance_image_pair_with_histogram(image_0, config_settings,
+                                                plotMatches=True, saveFig=True)
+
+dataset_name = datasets[14]
+contrast_type = contrast_types[0]
+
+img0_name = image_names[dataset_name]
+img0_name_base, image0_name_ext = os.path.splitext(img0_name)
+img0_filename = os.path.join(path, dataset_name, dataset_name+'_'+contrast_type, img0_name )
+img0_mask_filename = os.path.join(path, dataset_name, 'masks', img0_name_base+'_mask'+image0_name_ext )
+
+image_0 = read_grimage(img0_filename)
+image_0_mask = read_grimage(img0_mask_filename)
+
+config_settings = {'set_title': dataset_name, #'K':K, 'D':D,
+                   'TILE_KP':TILE_KP, 'tiling':tiling ,
+                   'detector': zernike, 'descriptor': zernike, 'findFundamentalMat_params':findFundamentalMat_params,
+                   'NO_OF_FEATURES': NO_OF_FEATURES}
+
+plot_display_settings = plot_display_settings_database.get((image_names[dataset_name],config_settings['descriptor']))
+if plot_display_settings is not None:
+    config_settings.update(plot_display_settings)
+
+analyze_descriptor_distance_image_pair_with_histogram(image_0, config_settings,
+                                                plotMatches=True, saveFig=True)
+
+dataset_name = datasets[15]
+contrast_type = contrast_types[0]
+
+img0_name = image_names[dataset_name]
+img0_name_base, image0_name_ext = os.path.splitext(img0_name)
+img0_filename = os.path.join(path, dataset_name, dataset_name+'_'+contrast_type, img0_name )
+img0_mask_filename = os.path.join(path, dataset_name, 'masks', img0_name_base+'_mask'+image0_name_ext )
+
+image_0 = read_grimage(img0_filename)
+image_0_mask = read_grimage(img0_mask_filename)
+
+config_settings = {'set_title': dataset_name, #'K':K, 'D':D,
+                   'TILE_KP':TILE_KP, 'tiling':tiling ,
+                   'detector': zernike, 'descriptor': zernike, 'findFundamentalMat_params':findFundamentalMat_params,
+                   'NO_OF_FEATURES': NO_OF_FEATURES}
+
+plot_display_settings = plot_display_settings_database.get((image_names[dataset_name],config_settings['descriptor']))
+if plot_display_settings is not None:
+    config_settings.update(plot_display_settings)
+
+analyze_descriptor_distance_image_pair_with_histogram(image_0, config_settings,
                                                 plotMatches=True, saveFig=True)
 
 
-dataset_name = datasets[4]
+dataset_name = datasets[16]
 contrast_type = contrast_types[0]
 
 img0_name = image_names[dataset_name]
@@ -95,14 +137,11 @@ image_0_mask = read_grimage(img0_mask_filename)
 config_settings = {'set_title': dataset_name, #'K':K, 'D':D,
                    'TILE_KP':TILE_KP, 'tiling':tiling ,
                    'detector': zernike, 'descriptor': zernike, 'findFundamentalMat_params':findFundamentalMat_params,
-                   #'NO_OF_FEATURES': NO_OF_FEATURES}
-                   'provided_keypoints': results['keypoints'], 'kp_eigen_values':kp_eig_vals,  'provided_Ft': Ft,
-                   'plot_eig_movement': False}
+                   'NO_OF_FEATURES': NO_OF_FEATURES}
 
 plot_display_settings = plot_display_settings_database.get((image_names[dataset_name],config_settings['descriptor']))
-plot_display_settings = None
 if plot_display_settings is not None:
     config_settings.update(plot_display_settings)
 
-analyze_descriptor_distance_image_pair_with_eig(image_0, config_settings,
+analyze_descriptor_distance_image_pair_with_histogram(image_0, config_settings,
                                                 plotMatches=True, saveFig=True)

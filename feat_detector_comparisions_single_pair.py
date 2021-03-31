@@ -11,7 +11,8 @@ import sys
 from matplotlib import pyplot as plt
 import os
 import glob
-from zernike.zernike import MultiHarrisZernike
+sys.path.insert(0, os.path.abspath('./external_packages/zernike_py/'))
+from zernike_py import MultiHarrisZernike
 from matlab_imresize.imresize import imresize
 from vslam_helper import knn_match_and_lowe_ratio_filter, draw_feature_tracks, tiled_features
 
@@ -37,7 +38,7 @@ def draw_markers(vis, keypoints, color = (0, 0, 255)):
 def read_metashape_poses(file):
     img_names = []
     #pose_array = np.zeros([0,4,4])
-    with open(file) as f: 
+    with open(file) as f:
         first_line = f.readline()
         if not first_line.startswith('Image_name,4x4 Tmatrix as 1x16 row'):
             raise ValueError("File doesn't start with 'Image_name,4x4 Tmatrix as 1x16 row' might be wrong format")
@@ -57,7 +58,7 @@ def read_image_list(img_names, resize_ratio=1):
         if resize_ratio != 1:
             img = imresize(img, resize_ratio, method='bicubic')
         images.append(img)
-        
+
     return images
 
 def draw_matches_vertical(img_top, kp1,img_bottom,kp2, matches, mask, display_invalid=False, color=(0, 255, 0)):
@@ -84,7 +85,7 @@ if sys.platform == 'darwin':
     path = '/Users/vik748/Google Drive/data'
 else:
     path = '/home/vik748/data'
-    
+
 sets_folder = 'feature_descriptor_comparision'
 test_set = 'set_1'
 
@@ -113,14 +114,14 @@ assert len(raw_image_names) == 2, "Number of images in set is not 2 per type"
 '''
 Detect Features
 '''
-orb_detector = cv2.ORB_create(nfeatures=2 * NO_OF_FEATURES, edgeThreshold=31, patchSize=31, nlevels=6, 
+orb_detector = cv2.ORB_create(nfeatures=2 * NO_OF_FEATURES, edgeThreshold=31, patchSize=31, nlevels=6,
                               fastThreshold=1, scaleFactor=1.2, WTA_K=2,
                               scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0)
 
-zernike_detector = MultiHarrisZernike(Nfeats= NO_OF_FEATURES, seci= 2, secj= 3, levels= 6, ratio= 1/1.2, 
+zernike_detector = MultiHarrisZernike(Nfeats= NO_OF_FEATURES, seci= 2, secj= 3, levels= 6, ratio= 1/1.2,
                                       sigi= 2.75, sigd= 1.0, nmax= 8, like_matlab= False, lmax_nd= 3)
 
-sift_detector = cv2.xfeatures2d.SIFT_create(nfeatures = 2 * NO_OF_FEATURES, nOctaveLayers = 3, contrastThreshold = 0.01, 
+sift_detector = cv2.xfeatures2d.SIFT_create(nfeatures = 2 * NO_OF_FEATURES, nOctaveLayers = 3, contrastThreshold = 0.01,
                                             edgeThreshold = 20, sigma = 1.6)
 
 surf_detector = cv2.xfeatures2d.SURF_create(hessianThreshold = 50, nOctaves = 6)
@@ -166,7 +167,7 @@ orb_kp_img_1 = draw_markers(cv2.cvtColor(raw_images[1], cv2.COLOR_GRAY2RGB), orb
 surf_kp_img_0 = draw_markers(cv2.cvtColor(raw_images[0], cv2.COLOR_GRAY2RGB), surf_kp_0,color=[255,255,0])
 surf_kp_img_1 = draw_markers(cv2.cvtColor(raw_images[1], cv2.COLOR_GRAY2RGB), surf_kp_1,color=[255,255,0])
 
-    
+
 fig1, fig1_axes = plt.subplots(2,3)
 fig1.suptitle('800x600 Raw Images Top 25 features')
 fig1_axes[0,0].axis("off"); fig1_axes[0,0].set_title("Zernike Features")
@@ -199,12 +200,12 @@ zernike_kp1_match_01 = np.array([zernike_kp_1[mat.trainIdx].pt for mat in zernik
 zernike_kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(zernike_kp0_match_01,axis=1),K,D)
 zernike_kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(zernike_kp1_match_01,axis=1),K,D)
 
-zernike_E_12, zernike_mask_e_12 = cv2.findEssentialMat(zernike_kp0_match_01_ud, zernike_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
+zernike_E_12, zernike_mask_e_12 = cv2.findEssentialMat(zernike_kp0_match_01_ud, zernike_kp1_match_01_ud, focal=1.0, pp=(0., 0.),
                                                        method=cv2.RANSAC, prob=0.9999, threshold=0.001)
 
 print("Zernike After essential: ", np.sum(zernike_mask_e_12))
 
-zernike_valid_matches_img = draw_matches_vertical(raw_images[0],zernike_kp_0, raw_images[1],zernike_kp_1, zernike_matches_01, 
+zernike_valid_matches_img = draw_matches_vertical(raw_images[0],zernike_kp_0, raw_images[1],zernike_kp_1, zernike_matches_01,
                                               zernike_mask_e_12, display_invalid=True, color=(0, 255, 0))
 
 
@@ -216,12 +217,12 @@ orb_kp1_match_01 = np.array([orb_kp_1[mat.trainIdx].pt for mat in orb_matches_01
 orb_kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(orb_kp0_match_01,axis=1),K,D)
 orb_kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(orb_kp1_match_01,axis=1),K,D)
 
-orb_E_12, orb_mask_e_12 = cv2.findEssentialMat(orb_kp0_match_01_ud, orb_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
+orb_E_12, orb_mask_e_12 = cv2.findEssentialMat(orb_kp0_match_01_ud, orb_kp1_match_01_ud, focal=1.0, pp=(0., 0.),
                                                method=cv2.RANSAC, prob=0.9999, threshold=0.001)
 
 print("Orb After essential: ", np.sum(orb_mask_e_12))
 
-orb_valid_matches_img = draw_matches_vertical(raw_images[0],orb_kp_0, raw_images[1],orb_kp_1, orb_matches_01, 
+orb_valid_matches_img = draw_matches_vertical(raw_images[0],orb_kp_0, raw_images[1],orb_kp_1, orb_matches_01,
                                               orb_mask_e_12, display_invalid=True, color=(0, 255, 0))
 
 
@@ -233,12 +234,12 @@ surf_kp1_match_01 = np.array([surf_kp_1[mat.trainIdx].pt for mat in surf_matches
 surf_kp0_match_01_ud = cv2.undistortPoints(np.expand_dims(surf_kp0_match_01,axis=1),K,D)
 surf_kp1_match_01_ud = cv2.undistortPoints(np.expand_dims(surf_kp1_match_01,axis=1),K,D)
 
-surf_E_12, surf_mask_e_12 = cv2.findEssentialMat(surf_kp0_match_01_ud, surf_kp1_match_01_ud, focal=1.0, pp=(0., 0.), 
+surf_E_12, surf_mask_e_12 = cv2.findEssentialMat(surf_kp0_match_01_ud, surf_kp1_match_01_ud, focal=1.0, pp=(0., 0.),
                                                method=cv2.RANSAC, prob=0.9999, threshold=0.001)
 
 print("surf After essential: ", np.sum(surf_mask_e_12))
 
-surf_valid_matches_img = draw_matches_vertical(raw_images[0],surf_kp_0, raw_images[1],surf_kp_1, surf_matches_01, 
+surf_valid_matches_img = draw_matches_vertical(raw_images[0],surf_kp_0, raw_images[1],surf_kp_1, surf_matches_01,
                                               surf_mask_e_12, display_invalid=True, color=(0, 255, 0))
 
 
