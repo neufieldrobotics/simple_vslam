@@ -267,7 +267,7 @@ class Frame ():
 
 
     @staticmethod
-    def triangulate(Pose_wT1, Pose_wT2,  pts_1_2d, pts_2_2d, mask):
+    def triangulate(Pose_wT1, Pose_wT2,  pts_1_2d, pts_2_2d, mask=None):
         '''
         This function accepts two homogeneous transforms (poses) of 2 cameras in world coordinates,
         along with corresponding matching points and returns the 3D coordinates in world coordinates.

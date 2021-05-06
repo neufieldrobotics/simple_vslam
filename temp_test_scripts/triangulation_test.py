@@ -1,6 +1,5 @@
 """
-Example based on Visual iSAM2 example supplied with GTSAM, instead using a custom
-wrapper
+Use GTSAM's provided camera simulation example to test and understand OpenCVs triangulate function
 """
 # pylint: disable=invalid-name, E1101
 

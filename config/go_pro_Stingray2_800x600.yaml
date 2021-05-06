@@ -7,44 +7,46 @@ K:
 - [ 704.262404172678908,   0.0              , 403.525703941033044]
 - [   0.0              , 700.985126030791616, 295.719954850563636]
 - [   0.0              ,   0.0              ,   1.0              ]
-#- [704.57264662,   0.0       , 403.39898405]
-#- [  0.0       , 682.12023168, 298.49026098]
-#- [  0.0       ,   0.0       ,   1.0       ]
-
 
 D: 
 - [-0.279159318136002921, 0.123589235024440372, -0.000189443288522673765, 0.0000476664883196381510, 
    -0.0187031411930424600]
-#- [-0.28272795, 0.1439448 , -0.00082586, 0.00006393, -0.0542582 ]
 
+# Use these paths if using on an OSX system
 osx_image_folder: '/Users/vik748/Google Drive/data/Stingray2_080718_800x600'
-linux_image_folder: '/home/vik748/data/Stingray2_080718_800x600'
-osx_ground_truth_poses: '/Users/vik748/Google Drive/data/Multibeam_pointcloud_correction/Stingray2_080718/Stingray2_08072018_camera_poses_in_mts_20200422.txt'
-linux_ground_truth_poses: '/home/vik748/data/Multibeam_pointcloud_correction/Stingray2_080718/Stingray2_08072018_camera_poses_in_mts_20200422.txt'
-image_ext: 'png'
-chessboard: False
-init_image_indxs: [0, 20]  #[1215, 1225] 
-image_step: 10
-use_masks: False
-plot_landmarks: True
-display_candidates: False
 osx_masks_folder: '/Users/vik748/Google Drive/data/Stingray2_080718_800x600_masks_out'
+osx_ground_truth_poses: '/Users/vik748/Google Drive/data/Multibeam_pointcloud_correction/Stingray2_080718/Stingray2_08072018_camera_poses_in_mts_20200422.txt'
+
+# Use these paths if using on linux
+linux_image_folder: '/home/vik748/data/Stingray2_080718_800x600'
 linux_masks_folder: '/home/vik748/data/Stingray2_080718_800x600_masks_out'
-masks_ext: 'png'
+linux_ground_truth_poses: '/home/vik748/data/Multibeam_pointcloud_correction/Stingray2_080718/Stingray2_08072018_camera_poses_in_mts_20200422.txt'
+
+image_ext: 'png' # Extension of image files
+use_masks: False # True if providing masks to mask out sections of images
+masks_ext: 'png' # Extension of image masks
+chessboard: False # 
+# Indexes of initial images. These should have good baseline separation to enable the algorithm to initialize well
+init_image_indxs: [0, 20]  #[1215, 1225] 
+# Step size between images. Since this algorithm does not have keyframe selection, we manually provide image separation for numerical stability
+image_step: 10 
+
+plot_landmarks: True  # Plot the landmarks in 3D plot (grey color)
+display_candidates: True 
+
 lowe_ratio_test_threshold: 0.90
 use_RecoverPose_Filter: False
 pause_every_iteration: True
+
 use_gtsam: True
 gtsam_interval: 1
 
 use_tiling_non_max_supression: False
-tiling_non_max_tile_y: 17 
-tiling_non_max_tile_x: 8 
+tiling_non_max_tile_y: 4 
+tiling_non_max_tile_x: 3 
 
 radial_non_max: False
 radial_non_max_radius: 5
-
-#pixel_matching_dist: 500
 
 use_clahe: False
 CLAHE_settings:

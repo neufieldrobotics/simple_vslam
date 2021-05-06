@@ -7,7 +7,9 @@ wrapper
 from __future__ import print_function
 
 import sys, os
-sys.path.insert(1, os.path.join(sys.path[0], '..'))
+#sys.path.insert(1, os.path.join(sys.path[0], '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir,'helper_functions'))
+
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,15 +30,15 @@ if __name__ == '__main__':
     # K = gtsam.Cal3_S2(50.0, 50.0, 0.0, 50.0, 50.0)
 
     K = np.array([[50.0,  0,    50.0],
-                      [ 0.0 , 50.0, 50.0],
-                      [ 0.0 ,  0.0,  1.0]])
+                  [ 0.0 , 50.0, 50.0],
+                  [ 0.0 ,  0.0,  1.0]])
     D = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
     
     Ksim = gtsam.Cal3_S2(iSAM2Wrapper.CameraMatrix_to_Cal3_S2(K))
 
     # Define the camera observation noise model
-#    measurement_noise = gtsam.noiseModel_Isotropic.Sigma(
-#        2, 1.0)  # one pixel in u and v
+    # measurement_noise = gtsam.noiseModel_Isotropic.Sigma(
+    #  2, 1.0)  # one pixel in u and v
 
     # Create the set of ground-truth landmarks
     points = SFMdata.createPoints()
@@ -44,7 +46,7 @@ if __name__ == '__main__':
     # Create the set of ground-truth poses
     poses = SFMdata.createPoses(Ksim)
     
-    factor_graph = iSAM2Wrapper(poses[0].matrix(), pose0_to_pose1_range=17,
+    factor_graph = iSAM2Wrapper(poses[0].matrix(), pose0_to_pose1_range=25,
                                 relinearizeThreshold=0.1, relinearizeSkip=1, K=np.eye(3), 
                                 proj_noise_val=1.0/100)
     #factor_graph.set_Camera_matrix(np.eye(3))

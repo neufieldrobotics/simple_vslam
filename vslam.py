@@ -8,8 +8,6 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import time
 import os, sys
-from vslam_helper import *
-from utils.ssc import *
 import yaml
 import glob
 import re
@@ -17,7 +15,6 @@ import argparse
 import traceback
 sys.path.insert(0, os.path.abspath('./external_packages/zernike_py/'))
 from zernike_py.MultiHarrisZernike import MultiHarrisZernike
-from helper_functions.frame import Frame
 np.set_printoptions(precision=5,suppress=True)
 import multiprocessing as mp
 from colorama import Fore, Back, Style
@@ -26,8 +23,9 @@ import logging
 import copyreg
 import queue
 
+from helper_functions.vslam_helper import *
 from helper_functions.frame import Frame
-from GTSAM_helper import iSAM2Wrapper
+from helper_functions.GTSAM_helper import iSAM2Wrapper
 
 '''
 PROCESS FRAME
