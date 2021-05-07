@@ -16,7 +16,7 @@ The code has been tested with the following conda environment specified in [cond
 ### Clone the repo and submodules
 It is important to follow these commands to make sure all the external submodules are cloned.
 ```sh
-git clone --recurse-submodules https://gitlab.com/neufieldrobotics/simple_vslam.git
+git clone --recurse-submodules https://github.com/neufieldrobotics/simple_vslam.git
 cd simple_vslam
 git checkout master
 
@@ -116,25 +116,25 @@ Depending on the system, make sure either osx_image_folder or linux_image_folder
 
 ## Algorithm
 ### Frame Dataflow
-<img src="docs/frame_data_flow.png" alt="Simaple Vslam Frame Data Flow" width="800" align="middle">
+![Simple Vslam Frame Data Flow](./docs/frame_data_flow.svg)
 
 ### iSAM2 algorithm
 1. Process X<sub>0</sub>  
-   <img src="https://gitlab.com/neu-mit-lfi/simple_vslam/raw/zernike_gtsam/docs/gtsam_workflow_diagrams/gtsam_diagram_x0.svg" alt="GTSAM diagram x0" width="800" align="middle">
+   ![GTSAM diagram x0](./docs/gtsam_workflow_diagrams/gtsam_diagram_x0.svg)
     1. Add prior factor for X<sub>0</sub>
     2. Add estimate for X<sub>0</sub>
+
 1. Process X<sub>1</sub>  
-   <img src="https://gitlab.com/neu-mit-lfi/simple_vslam/raw/zernike_gtsam/docs/gtsam_workflow_diagrams/gtsam_diagram_x1.svg" alt="GTSAM diagram x1" width="800" align="middle">
+   ![GTSAM diagram x1](./docs/gtsam_workflow_diagrams/gtsam_diagram_x1.svg)
     1. Add range factor between X<sub>0</sub> - X<sub>1</sub>  
     3. Add estimate for X<sub>1</sub>
+
 1. Process X<sub>2</sub>  
-   <img src="https://gitlab.com/neu-mit-lfi/simple_vslam/raw/zernike_gtsam/docs/gtsam_workflow_diagrams/gtsam_diagram_x2.svg" alt="GTSAM diagram x2" width="800" align="middle">
+   ![GTSAM diagram x2](./docs/gtsam_workflow_diagrams/gtsam_diagram_x2.svg)
     1. Add projection factor between X<sub>2</sub> - l<sub>2</sub>, X<sub>1</sub> - l<sub>2</sub> & X<sub>0</sub> - l<sub>2</sub>
     2. Add estimate for X<sub>2</sub> & l<sub>2</sub>
 
 1. Process X<sub>3</sub>  
-   <img src="https://gitlab.com/neu-mit-lfi/simple_vslam/raw/zernike_gtsam/docs/gtsam_workflow_diagrams/gtsam_diagram_x3.svg" alt="GTSAM diagram x3" width="800" align="middle">
+    ![GTSAM diagram x3](./docs/gtsam_workflow_diagrams/gtsam_diagram_x3.svg)
     1. Add projection factor between X<sub>3</sub> - l<sub>4</sub>, X<sub>2</sub> - l<sub>4</sub> & X<sub>1</sub> - l<sub>4</sub>
     2. Add estimate for X<sub>3</sub> & l<sub>4</sub>
-
-simple_vslam_comparisons

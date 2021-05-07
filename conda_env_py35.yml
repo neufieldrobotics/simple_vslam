@@ -1,0 +1,19 @@
+name: simple_vslam_env
+channels:
+  - defaults
+dependencies:
+  - python=3.5.6
+  - opencv=3.3.1
+  - matplotlib
+  - numpy
+  - scipy
+  - pyyaml
+  - colorama
+  - progressbar2
+  - pyqt
+  - spyder-kernels
+  - boost
+  - cmake
+  - pip
+  - conda-build
+  - packaging

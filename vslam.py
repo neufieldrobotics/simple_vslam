@@ -22,10 +22,15 @@ from itertools import cycle
 import logging
 import copyreg
 import queue
-
-from helper_functions.vslam_helper import *
-from helper_functions.frame import Frame
-from helper_functions.GTSAM_helper import iSAM2Wrapper
+try:
+    this_file_dir = os.path.dirname(os.path.abspath(__file__))
+except NameError as e:
+    print(e)
+    this_file_dir = globals()['_dh'][0]
+sys.path.insert(0, os.path.join(this_file_dir, 'helper_functions'))
+from vslam_helper import *
+from frame import Frame
+from GTSAM_helper import iSAM2Wrapper
 
 '''
 PROCESS FRAME

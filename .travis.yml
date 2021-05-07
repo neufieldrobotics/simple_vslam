@@ -1,0 +1,34 @@
+language: minimal
+
+services:
+  - docker
+
+matrix:
+  include:
+   - arch: amd64
+     env : DOCKER_IMAGE=neufieldrobotics/conda_py3.5_gtsam:gtsam_4.0.2
+
+before_install:
+- docker pull $DOCKER_IMAGE
+
+script:
+- echo TRAVIS_BUILD_DIR is $TRAVIS_BUILD_DIR
+- >
+  docker run
+  -v $TRAVIS_BUILD_DIR:/simple_vslam/
+  $DOCKER_IMAGE
+  /bin/bash -c 
+  "
+  pwd;
+  echo "CONDA_PREFIX" $CONDA_PREFIX;
+  conda env update -n py35_env --file conda_env.yml;
+  source activate py35_env;
+  echo "CONDA_PREFIX" $CONDA_PREFIX;
+  python /gtsam_bin/cython/gtsam/examples/VisualISAMExample.py;
+  cd simple_vslam;
+  tree -L 2;
+  python temp_test_scripts/VisualISAM2withWrapper_Example.py;
+  yes | python temp_test_scripts/pnp_example_using_chessboard_points.py;
+  yes | python temp_test_scripts/recover_pose_test.py; 
+  python -m unittest discover -s tests -v;
+  "
