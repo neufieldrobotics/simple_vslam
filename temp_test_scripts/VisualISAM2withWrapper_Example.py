@@ -82,7 +82,7 @@ if __name__ == '__main__':
             # Add initial guesses to all observed landmarks
             # Intentionally initialize the variables off from the ground truth
             for j, point in enumerate(points):
-                factor_graph.add_LandmarkEstimate(np.array([j]), np.array([[point.x()-0.25, point.y()+0.20, point.z()+0.15]]))
+                factor_graph.add_LandmarkEstimate(np.array([j]), np.array([[point[0]-0.25, point[1]+0.20, point[2]+0.15]]))
         else:
             # Update iSAM with the new factors
             # Each call to iSAM2 update(*) performs one iteration of the iterative nonlinear solver.
