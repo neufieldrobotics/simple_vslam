@@ -8,7 +8,7 @@ import numpy as np
 #import SFMdata
 from gtsam.gtsam import (Cal3_S2, Cal3DS2, DoglegOptimizer,
                          GenericProjectionFactorCal3_S2, NonlinearFactorGraph,
-                         Point3, Pose3, PriorFactorPoint3, PriorFactorPose3,
+                         Pose3, PriorFactorPoint3, PriorFactorPose3,
                          Rot3, SimpleCamera, Values, symbolChr, symbolIndex, RangeFactorPose3)
 import gtsam.utils.plot as gtsam_plot
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W0611
