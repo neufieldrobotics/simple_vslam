@@ -57,7 +57,7 @@ class iSAM2Wrapper():
         if pt_uv.shape[1] != 2:
             raise ValueError("2nd dimension on supplied point is not 2, required Nx2 array")
         for pt,l in zip(pt_uv, L_id):
-            fact = gtsam.GenericProjectionFactorCal3_S2(gtsam.gtsam.Point2(*pt), 
+            fact = gtsam.GenericProjectionFactorCal3_S2(pt,
                                                         self.projection_noise, 
                                                         self.get_key('x', X_id), 
                                                         self.get_key('l', l), 
