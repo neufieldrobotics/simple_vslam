@@ -25,12 +25,12 @@ class iSAM2Wrapper():
         # Add a prior on pose x0. This indirectly specifies where the origin is.
         # 0.3 rad std on roll,pitch,yaw and 0.1m on x,y,z
 
-        pose_noise = gtsam.noiseModel_Diagonal.Sigmas(np.array([0.3, 0.3, 0.3, 0.1, 0.1, 0.1]))
+        pose_noise = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.3, 0.3, 0.3, 0.1, 0.1, 0.1]))
         x0factor = PriorFactorPose3(iSAM2Wrapper.get_key('x', 0), gtsam.gtsam.Pose3(pose0), pose_noise)
         self.graph.push_back(x0factor)
         
         # Set scale between pose 0 and pose 1 to Unity 
-        x0x1_noise = gtsam.noiseModel_Isotropic.Sigma(1, 0.1)
+        x0x1_noise = gtsam.noiseModel.Isotropic.Sigma(1, 0.1)
         x1factor = RangeFactorPose3(iSAM2Wrapper.get_key('x', 0),iSAM2Wrapper.get_key('x', 1), pose0_to_pose1_range,x0x1_noise)
         self.graph.push_back(x1factor)
 
@@ -39,7 +39,7 @@ class iSAM2Wrapper():
         iS2params.setRelinearizeSkip(relinearizeSkip)
         self.isam2 = gtsam.ISAM2(iS2params)
         
-        self.projection_noise = gtsam.noiseModel_Isotropic.Sigma(2, proj_noise_val)
+        self.projection_noise = gtsam.noiseModel.Isotropic.Sigma(2, proj_noise_val)
         self.K = gtsam.Cal3_S2(iSAM2Wrapper.CameraMatrix_to_Cal3_S2(K))
         #self.opt_params = gtsam.DoglegParams()
         #self.opt_params.setVerbosity('Error')
