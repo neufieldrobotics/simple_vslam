@@ -196,7 +196,7 @@ class iSAM2Wrapper():
     @staticmethod
     def get_key(letter,number):
         """Create key for pose id number."""
-        return int(gtsam.symbol(ord(letter), number))
+        return int(gtsam.symbol(letter, number))
 
     @staticmethod
     def CameraMatrix_to_Cal3_S2(K):
