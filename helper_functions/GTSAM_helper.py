@@ -175,23 +175,6 @@ class iSAM2Wrapper():
         poses = gtsam.allPose3s(values)
         for i in range(poses.size()):
             plot.plot_pose3(fig_num, poses.atPose3(poses.keys().at(i)),axis_length=2.0)
-
-    @staticmethod
-    def Point2arr(pt):
-        if type(pt) is gtsam.gtsam.Point2 :
-            return np.array([pt.x(), pt.y()])
-        elif type(pt) is gtsam.gtsam.Point3 :
-            return np.array([pt.x(), pt.y(), pt.z()])
-        else:
-            raise ValueError("Point supplied is neither gtsam.Point2 or gtsam.Point3")
-    @staticmethod
-    def arr2Point(pt):
-        if len(pt) == 2 :
-            return gtsam.gtsam.Point2(pt)
-        elif len(pt) ==3 :
-            return gtsam.gtsam.Point3(pt)
-        else:
-            raise ValueError("Length of Array supplied is neither 2 or 3")
             
     @staticmethod
     def get_key(letter,number):
