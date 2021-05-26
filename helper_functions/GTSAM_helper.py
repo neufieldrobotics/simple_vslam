@@ -255,4 +255,3 @@ class iSAM2Wrapper():
         ## Add estiamates
         self.add_PoseEstimate(fr_j.frame_id, fr_j.T_pnp)  
         Frame.frlog.info("GTSAM add factors: existing(>3 obs): {}   new (3 obs): {}".format(exist_lm_fact, new_lm_fact))
-                

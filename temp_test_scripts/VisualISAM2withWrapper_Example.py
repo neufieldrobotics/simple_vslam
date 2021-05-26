@@ -61,7 +61,7 @@ if __name__ == '__main__':
         for j, point in enumerate(points):
             camera = gtsam.PinholeCameraCal3_S2(pose, Ksim)
             measurement = camera.project(point)
-            undist_m = cv2.undistortPoints(np.expand_dims(np.expand_dims(iSAM2Wrapper.Point2arr(measurement),0),1),K,D)[:,0,:]
+            undist_m = cv2.undistortPoints(np.expand_dims(np.expand_dims(measurement,0),1),K,D)[:,0,:]
             #undist_pt = iSAM2Wrapper.arr2Point(undist_m)
 
             #m_pt = np.array([measurement.x(), measurement.y()])
