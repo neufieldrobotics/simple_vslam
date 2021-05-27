@@ -77,7 +77,7 @@ class iSAM2Wrapper():
             raise ValueError("2nd dimension on supplied point is not 3, required Nx3 array")
         for l, p_est in zip(L_id, Pt_estimate):
             self.initial_estimate.insert(iSAM2Wrapper.get_key('l', l),
-                                         gtsam.Point3(*p_est))
+                                         p_est)
 
     def update(self, iterations=1):
         self.isam2.update(self.graph, self.initial_estimate)
@@ -95,7 +95,7 @@ class iSAM2Wrapper():
     def get_landmark_estimates(self):
         lm = []
         for l_id in self.lm_factor_ids:
-            lm += [self.current_estimate.atPoint3(iSAM2Wrapper.get_key('l', l_id)).vector()]
+            lm += [self.current_estimate.atPoint3(iSAM2Wrapper.get_key('l', l_id))]
         return np.array(lm), list(self.lm_factor_ids)
 
     def get_curr_Pose_Estimate(self, x_id):
