@@ -173,6 +173,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='This is the simple VSLAM pipeline')
     parser.add_argument('-c', '--config', help='location of config file in yaml format',
                         default='config/go_pro_Stingray2_800x600.yaml') #go_pro_icebergs_config.yaml
+    parser.add_argument('-q', '--quit', help='exit the code after completing, use for test scripts',
+                        default=False, action='store_true') #go_pro_icebergs_config.yaml
+
     args = parser.parse_args()
 
     # Inputs, images and camera info
@@ -379,7 +382,7 @@ if __name__ == '__main__':
                 break
 
     writer_p.join()
-    while(True):
+    while(not args.quit):
         print('\b'+next(spinner), end='', flush=True)
         plt.pause(0.5)
         if cue_to_exit: break
