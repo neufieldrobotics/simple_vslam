@@ -32,5 +32,5 @@ script:
   yes | python temp_test_scripts/recover_pose_test.py &&
   python temp_test_scripts/VisualISAM2withWrapper_Example.py &&
   yes | python ./vslam.py -c config/go_pro_Lab_800x600.yaml &&
-  python -m unittest discover -s tests -v &&
+  python -m unittest discover -s tests -v
   "
