@@ -16,7 +16,7 @@ from vslam_helper import *
 import pickle
 from colorama import Fore, Style
 import os, sys
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 
 class landmark():
     def __init__(self, fr_i_id,fr_j_id, kp_i_pt, kp_j_pt, coord_3d):
