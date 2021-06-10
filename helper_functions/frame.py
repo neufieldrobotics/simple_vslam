@@ -11,10 +11,12 @@ import cv2
 import time
 import logging
 from matplotlib import pyplot as plt
+import matplotlib
 from vslam_helper import *
 import pickle
 from colorama import Fore, Style
 import os, sys
+matplotlib.use('Agg')
 
 class landmark():
     def __init__(self, fr_i_id,fr_j_id, kp_i_pt, kp_j_pt, coord_3d):
@@ -252,12 +254,14 @@ class Frame ():
         Frame.ax1.set_title('Frame 1')
         Frame.ax1.axis("off")
         Frame.fig1.subplots_adjust(0,0,1,1)
-        plt.get_current_fig_manager().window.setGeometry(window_xadj,window_yadj,1036,842)
+        if matplotlib.get_backend()!='agg':
+            plt.get_current_fig_manager().window.setGeometry(window_xadj,window_yadj,1036,842)
 
         Frame.fig2 = plt.figure(2)
         Frame.ax2 = Frame.fig2.add_subplot(111, projection='3d')
         Frame.fig2.subplots_adjust(0,0,1,1)
-        plt.get_current_fig_manager().window.setGeometry(1036+window_xadj,window_yadj,640,676) #(864, 430, 800, 900)
+        if  matplotlib.get_backend()!='agg':
+            plt.get_current_fig_manager().window.setGeometry(1036+window_xadj,window_yadj,640,676) #(864, 430, 800, 900)
         if sys.version_info[:2] == (3, 5):
             Frame.ax2.set_aspect('equal')         # important!
 
