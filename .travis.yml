@@ -19,18 +19,18 @@ script:
   $DOCKER_IMAGE
   /bin/bash -c 
   "
-  pwd;
-  echo "CONDA_PREFIX" $CONDA_PREFIX;
-  conda env update -n py35_env --file conda_env.yml;
-  source activate py35_env;
-  echo "CONDA_PREFIX" $CONDA_PREFIX;
-  python /gtsam_bin/cython/gtsam/examples/VisualISAMExample.py;
-  cd simple_vslam;
-  tree -L 2;
-  python temp_test_scripts/VisualISAM2withWrapper_Example.py;
-  yes | python temp_test_scripts/pnp_example_using_chessboard_points.py;
-  yes | python temp_test_scripts/recover_pose_test.py;
-  python temp_test_scripts/VisualISAM2withWrapper_Example.py;
-  yes | ./vslam.py -c config/go_pro_Lab_800x600.yaml; 
-  python -m unittest discover -s tests -v;
+  echo $(pwd) &&
+  echo "CONDA_PREFIX:" $CONDA_PREFIX &&
+  conda env update -n py36_env --file conda_env.yml &&
+  source activate py36_env &&
+  echo "CONDA_PREFIX:" $CONDA_PREFIX &&
+  python -m gtsam.examples.VisualISAM2Example &&
+  cd simple_vslam &&
+  tree -L 2 &&
+  python temp_test_scripts/VisualISAM2withWrapper_Example.py &&
+  yes | python temp_test_scripts/pnp_example_using_chessboard_points.py &&
+  yes | python temp_test_scripts/recover_pose_test.py &&
+  python temp_test_scripts/VisualISAM2withWrapper_Example.py &&
+  yes | python ./vslam.py -c config/go_pro_Lab_800x600.yaml &&
+  python -m unittest discover -s tests -v &&
   "

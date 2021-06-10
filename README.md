@@ -1,4 +1,4 @@
-# simple_vslam
+# simple_vslam [![Build Status](https://travis-ci.com/neufieldrobotics/simple_vslam.svg?branch=master)](https://travis-ci.com/neufieldrobotics/simple_vslam)
 
 simple_vslam is a python based implementation of visual slam using opencv.
 ## Prerequisites
