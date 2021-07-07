@@ -99,10 +99,10 @@ python ./python/gtsam/examples/ImuFactorISAM2Example.py
 
 ## Get test data
 Test datasets, Unzip and save it to a convenient location like `~/data`. The most extensively tested dataset is Stingray which uses the config file, [config/go_pro_Stingray2_800x600.yaml](./config/go_pro_Stingray2_800x600.yaml)
-  - Stingray dataset: `deepfreeze1 > /data/datasets_for_algorithms/2018_iceberg_datasets/Stingray/Stingray2_080718_800x600.tar`
-  - Lars dataset: `deepfreeze1 > /data/datasets_for_algorithms/2018_iceberg_datasets/Lars/Lars2_081018_800x600.zip`
-  - Cervino dataset: `deepfreeze1 > /data/datasets_for_algorithms/2018_iceberg_datasets/Cervino/time_lapse_5_cervino_800x600.zip`
-  - http://rpg.ifi.uzh.ch/docs/teaching/2016/kitti00.zip
+  - Stingray dataset: [https://coe.northeastern.edu/fieldrobotics/2018_iceberg_gopro_datasets/Stingray2/](https://coe.northeastern.edu/fieldrobotics/2018_iceberg_gopro_datasets/Stingray2/) 
+  - Lars dataset: [https://coe.northeastern.edu/fieldrobotics/2018_iceberg_gopro_datasets/Lars2/](https://coe.northeastern.edu/fieldrobotics/2018_iceberg_gopro_datasets/Lars2/) 
+  - Cervino dataset: [https://coe.northeastern.edu/fieldrobotics/2018_iceberg_gopro_datasets/Cervino1/](https://coe.northeastern.edu/fieldrobotics/2018_iceberg_gopro_datasets/Cervino1/) 
+  - KITTI: [http://rpg.ifi.uzh.ch/docs/teaching/2016/kitti00.zip](http://rpg.ifi.uzh.ch/docs/teaching/2016/kitti00.zip) 
   
 ## Executing the package
 Edit a config file to point it to an image folder eg.

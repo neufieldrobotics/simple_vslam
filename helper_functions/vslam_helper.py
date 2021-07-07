@@ -14,20 +14,98 @@ import math
 import itertools
 
 def R2d_from_theta(theta):
+    """
+    Given an angle theta in radians return a 2D rotation matrix
+
+    Parameters
+    ----------
+    theta : scalar
+        Angle in radians
+
+    Returns
+    -------
+    2x2 Numpy array
+        2D rotation matrix
+
+    """
     return np.array([[np.cos(theta), np.sin(theta)],[-np.sin(theta), np.cos(theta)]])
 
 def compose_T(R,t):
+    """
+    Compose homogenous transform representing pose from rotation and translation
+
+    Parameters
+    ----------
+    R : 3x3 Numpy array
+        3D Rotation Matrix
+    t : 3x1 Numpy array
+        Translation vector
+
+    Returns
+    -------
+    4x4 Numpy array
+        Homogenous matrix representing the pose.
+
+    """
     return np.vstack((np.hstack((R,t)),np.array([0, 0, 0, 1])))
 
 def decompose_T(T_in):
+    """
+    Decompose homogenous transform representing pose into rotation matrix and translation vector
+
+    Parameters
+    ----------
+    T_in : 4x4 Numpy array
+        Homogenous trasnform representing the pose.
+
+    Returns
+    -------
+    3x3 Numpy array
+        3D Rotation Matrix.
+    1x3 Numpy array
+        Translation vector.
+
+    """
     return T_in[:3,:3], T_in[:3,[-1]].T
 
 def pose_inv(R_in, t_in):
+    """
+    Efficiently invert pose represented as rotation matrix and translation vector
+
+    Parameters
+    ----------
+    R_in : 3x3 Numpy array
+        3D Rotation Matrix.
+    t_in : 3x1 Numpy array
+        Translation vector.
+
+    Returns
+    -------
+    R_out : 3x3 Numpy array
+        3D Rotation Matrix.
+    t_out : 3x1 Numpy array
+        Translation vector.
+
+    """
     t_out = -np.matmul((R_in).T,t_in)
     R_out = R_in.T
     return R_out,t_out
 
 def T_inv(T_in):
+    """
+    Efficiently invert pose represented as homogenous transform
+
+    Parameters
+    ----------
+    T_in : 4x4 Numpy array
+        Homogenous trasnform representing the pose.
+
+    Returns
+    -------
+    4x4 Numpy array
+        Homogenous trasnform representing the pose.
+
+    """
     R_in = T_in[:3,:3]
     t_in = T_in[:3,[-1]]
     R_out = R_in.T
@@ -35,6 +113,33 @@ def T_inv(T_in):
     return np.vstack((np.hstack((R_out,t_out)),np.array([0, 0, 0, 1])))
 
 def T_from_PNP(coord_3d, img_pts, K, D, **solvePnPRansac_settings):
+    """
+    Solve OpenCV's PNP algorithm and return calculated pose as homogenos transform
+    and mask of inliers
+
+    Parameters
+    ----------
+    coord_3d : Nx3 Numpy array
+        Real world coordinates of image features.
+    img_pts : Nx2 Numpy array
+        Image coordinates (non-normalized) of image features.
+    K : 2x2 Numpy array
+        OpenCV camera matrix.
+    D : TYPE
+        OpenCV camera distortion coefficients.
+    **solvePnPRansac_settings : dict
+        OpenCV solvePnPRansac setitngs.
+
+    Returns
+    -------
+    bool
+        Success.
+    4x4 Numpy array
+        Homogenous trasnform representing the pose.
+    Nx1 Numpy array
+        mask of inlier features.
+
+    """
     success, rvec_to_obj, tvecs_to_obj, inliers = cv2.solvePnPRansac(coord_3d, img_pts,
                                                    K, D, **solvePnPRansac_settings)
     if success:
@@ -48,6 +153,29 @@ def T_from_PNP(coord_3d, img_pts, K, D, **solvePnPRansac_settings):
         return success, None, None
 
 def T_from_PNP_norm(coord_3d, img_pts, **solvePnPRansac_settings):
+    """
+    Solve OpenCV's PNP algorithm and return calculated pose as homogenos transform
+    and mask of inliers
+
+    Parameters
+    ----------
+    coord_3d : Nx3 Numpy array
+        Real world coordinates of image features.
+    img_pts : Nx2 Numpy array
+        Normalized Image coordinates of image features.
+    **solvePnPRansac_settings : dict
+        OpenCV solvePnPRansac setitngs.
+
+    Returns
+    -------
+    bool
+        Success.
+    4x4 Numpy array
+        Homogenous trasnform representing the pose.
+    Nx1 Numpy array
+        mask of inlier features.
+
+    """
     success, rvec_to_obj, tvecs_to_obj, inliers = cv2.solvePnPRansac(coord_3d, img_pts,
                                                    np.eye(3), None, **solvePnPRansac_settings)
     if success:
@@ -60,14 +188,48 @@ def T_from_PNP_norm(coord_3d, img_pts, **solvePnPRansac_settings):
         return success, None, None
 
 def ceil2MSD(x):
+    """
+    Round up the input to the next Most Significant Digit
+    eg. 0.0431 -> 0.05
+        0.3431 -> 0.4
+        10.3   -> 20.0
+        1210.3431 ->  2000.0
+        61210.34  -> 70000.0
+
+    Parameters
+    ----------
+    x : float
+        input value
+
+    Returns
+    -------
+    float
+        MSD round up.
+
+    """
     mlp = 10**math.floor(math.log10(x))
     return float("%.0e" % (math.ceil(x / mlp ) * mlp))
 
 def undistortKeyPoints(kps, K, D):
-    '''
-    This function extracts coordinates from keypoint object,
-    undistorts them using K and D and returns undistorted coordinates"
-    '''
+    """
+    Wrapper to OpenCV undistortPoints which returns normalized undistorted
+    image coordinates
+
+    Parameters
+    ----------
+    kps : Nx2 Numpy array
+        Array of x,y coordinates in image space
+    K : 2x2 Numpy array
+        OpenCV camera matrix.
+    D : TYPE
+        OpenCV camera distortion coefficients.
+
+    Returns
+    -------
+    Nx2 Numpy array
+        Undistorted normalized image coordinates.
+
+    """
     #kp_pts = np.array([o.pt for o in kps])
     #kp_pts_cont = np.ascontiguousarray(kp_pts[:,:2]).reshape((kp_pts.shape[0],1,2))
     # this version returns normalized points with F=1 and centered at 0,0
@@ -77,7 +239,7 @@ def undistortKeyPoints(kps, K, D):
 
 def displayMatches(img_left,kp1,img_right,kp2, matches, mask, display_invalid, in_image=None, color=(0, 255, 0)):
     '''
-    This function extracts takes a 2 images, set of keypoints and a mask of valid
+    This function takes a 2 images, set of keypoints and a mask of valid
     (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
     The mask should be the same length as matches
     '''
@@ -99,7 +261,7 @@ def displayMatches(img_left,kp1,img_right,kp2, matches, mask, display_invalid, i
 def draw_matches_vertical(img_top, kp1,img_bottom,kp2, matches, mask, display_invalid=False, color=(0, 255, 0)):
     '''
     This function takes a 2 images, set of keypoints and a mask of valid
-    (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
+    (mask as a ndarray) keypoints and vertically plots the valid ones in green and invalid in red.
     The mask should be the same length as matches
     '''
     assert img_top.shape == img_bottom.shape
@@ -117,6 +279,26 @@ def draw_matches_vertical(img_top, kp1,img_bottom,kp2, matches, mask, display_in
 
 
 def draw_points(vis_orig, points, color = (0, 255, 0), thick = 3):
+    """
+    Given an image draw features as circle with the provided color
+
+    Parameters
+    ----------
+    vis_orig : NxM or NxMx3 Numpy array
+        Original image.
+    points : Nx2 Numpy array
+        Image coordinates of features.
+    color : Tuple of ints len 3, optional
+        Color as BGR values between 0-255. The default is green (0,255,0).
+    thick : float, optional
+        Thickness of circle. The default is 3.
+
+    Returns
+    -------
+    vis : NxMx3 Numpy array
+        Image with circles drawn around the features.
+
+    """
     if vis_orig.shape[2] == 3: vis = vis_orig
     else: vis = cv2.cvtColor(vis_orig,cv2.COLOR_GRAY2RGB)
     rad = int(vis.shape[1]/200)
@@ -127,6 +309,24 @@ def draw_points(vis_orig, points, color = (0, 255, 0), thick = 3):
     return vis
 
 def draw_markers(vis_orig, keypoints, color = (0, 0, 255)):
+    """
+    Given an image draw features as crosses with the provided color
+
+    Parameters
+    ----------
+    vis_orig : NxM or NxMx3 Numpy array
+        Original image.
+    points : Nx2 Numpy array
+        Image coordinates of features.
+    color : Tuple of ints len 3, optional
+        Color as BGR values between 0-255. The default is red (0,0,255).
+
+    Returns
+    -------
+    vis : NxMx3 Numpy array
+        Image with crosses drawn around the features.
+
+    """
     if vis_orig.shape[2] == 3: vis = vis_orig
     else: vis = cv2.cvtColor(vis_orig,cv2.COLOR_GRAY2RGB)
 
@@ -135,8 +335,55 @@ def draw_markers(vis_orig, keypoints, color = (0, 0, 255)):
         cv2.drawMarker(vis, (int(x), int(y)), color,  markerSize=30, markerType = cv2.MARKER_CROSS, thickness=2)
     return vis
 
+def draw_keypoints(vis, keypoints, color = (0, 255, 255)):
+    """
+    Given an image draw features as circle with the provided color
+
+    Parameters
+    ----------
+    vis : NxM or NxMx3 Numpy array
+        Original image.
+    keypoints : list of OpenCV keypoint objects
+        Keypoints to be drawn.
+    color : Tuple of ints len 3, optional
+        Color as BGR values between 0-255. The default is yellow (0,255,255).
+
+    Returns
+    -------
+    vis : NxMx3 Numpy array
+        Image with crosses drawn around the features.
+
+    """
+    for kp in keypoints:
+        x, y = kp.pt
+        cv2.circle(vis, (int(x), int(y)), 15, color)
+    return vis
 
 def draw_arrows(vis_orig, points1, points2, color = (0, 255, 0), thick = 2, tip_length = 0.25):
+    """
+    Draw arrows from coordinates in point1 to point 2.
+
+    Parameters
+    ----------
+    vis_orig : NxM or NxMx3 Numpy array
+        Original image.
+    points1 : Nx2 Numpy array
+        Image coordinates of tracked features in prev image.
+    points2 : Nx2 Numpy array
+        Image coordinates of tracled features in current image.
+    color : Tuple of ints len 3, optional
+        Color as BGR values between 0-255. The default is green (0,255,0).
+    thick : float, optional
+        Thickness of arrows. The default is 2.
+    tip_length : float, optional
+        Tip length of arrow. The default is 0.25.
+
+    Returns
+    -------
+    vis : NxMx3 Numpy array
+        Image with arrows drawn between pairs from point1 to point2 for the features.
+
+    """
     if len(vis_orig.shape) == 2: vis = cv2.cvtColor(vis_orig,cv2.COLOR_GRAY2RGB)
     else: vis = vis_orig
     for p1,p2 in zip(points1,points2):
@@ -145,11 +392,37 @@ def draw_arrows(vis_orig, points1, points2, color = (0, 255, 0), thick = 2, tip_
     return vis
 
 def draw_feature_tracks(img_left,kp1,img_right,kp2, matches, mask, display_invalid=False, color=(0, 255, 0), thick = 2):
-    '''
+    """
     This function extracts takes a 2 images, set of keypoints and a mask of valid
     (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
     The mask should be the same length as matches
-    '''
+
+    Parameters
+    ----------
+    img_left : NxM or NxMx3 Numpy array
+        Original image.
+    kp1 : list of OpenCV keypoint objects
+        All Keypoints in left image
+    img_right : NxM or NxMx3 Numpy array
+        Original image.
+    kp2 : list of OpenCV keypoint objects
+        All Keypoints in right image.
+    matches : list of OpenCV match objects
+        OpenCV match objects that pair matches from kp1 to kp2.
+    mask : Numpy array equal to length of matches
+        Numpy array equal in length to matches with 0 or false for invalid matches.
+    display_invalid : bool, optional
+        Flag to show invalid matches in different color. The default is False.
+    color : Tuple of ints len 3, optional
+        Color as BGR values between 0-255. The default is green (0,255,0).
+    thick : float, optional
+        Thickness of arrows. The default is 2.
+    Returns
+    -------
+    img_right_out : NxMx3 Numpy array
+        Image with arrows drawn between pairs from point1 to point2 for the features.
+
+    """
     bool_mask = mask.astype(bool)
     valid_right_matches = np.array([kp2[mat.trainIdx].pt for is_match, mat in zip(bool_mask, matches) if is_match])
     valid_left_matches = np.array([kp1[mat.queryIdx].pt for is_match, mat in zip(bool_mask, matches) if is_match])
@@ -160,12 +433,31 @@ def draw_feature_tracks(img_left,kp1,img_right,kp2, matches, mask, display_inval
     return img_right_out
 
 def draw_point_tracks(kp1,img_right,kp2, bool_mask=None, display_invalid=False, color=(0, 255, 0)):
-    '''
+    """
     This function extracts takes a 2 images, set of keypoints and a mask of valid
     (mask as a ndarray) keypoints and plots the valid ones in green and invalid in red.
     The mask should be the same length as matches
-    '''
-    #bool_mask = mask[:,0].astype(bool)
+
+    Parameters
+    ----------
+    kp1 : Lx2 Numpy array
+        Feature image coordinates from left image
+    img_right : NxM or NxMx3 Numpy array
+        Original image.
+    kp2 : Lx2 Numpy array
+        Feature image coordinates from right image
+    bool_mask : L long Numpy boolean array
+        Boolean mask for valid matches.
+    display_invalid : bool, optional
+        Flag to show invalid matches in different color. The default is False.
+    color : Tuple of ints len 3, optional
+        Color as BGR values between 0-255. The default is green (0,255,0).
+    Returns
+    -------
+    img_right_out : NxMx3 Numpy array
+        Image with arrows drawn between pairs from point1 to point2 for the features.
+
+    """
     if bool_mask is None:
         valid_left_matches = kp1
         valid_right_matches = kp2
@@ -200,7 +492,8 @@ def set_axes_radius(ax, origin, radius):
     ax.set_zlim3d([origin[2] - radius, origin[2] + radius])
 
 def set_axes_equal(ax, limits=None):
-    '''Make axes of 3D plot have equal scale so that spheres appear as spheres,
+    '''
+    Make axes of 3D plot have equal scale so that spheres appear as spheres,
     cubes as cubes, etc..  This is one possible solution to Matplotlib's
     ax.set_aspect('equal') and ax.axis('equal') not working for 3D.
 
@@ -237,11 +530,15 @@ def plot_pose2_on_axes(axes, pose, axis_length=0.1):
     axes.plot(line[:, 0], line[:, 1], 'g-')
 
 def plot_pose3_on_axes(axes, T, axis_length=0.1, center_plot=False, line_obj_list=None, zoom_to_fit=False):
-    """Plot a 3D pose 4x4 homogenous transform  on given axis 'axes' with given 'axis_length'."""
+    """
+    Plot a 3D pose 4x4 homogenous transform  on given axis 'axes' with given 'axis_length'.
+    """
     return plot_pose3RT_on_axes(axes, *decompose_T(T), axis_length, center_plot, line_obj_list, zoom_to_fit=zoom_to_fit)
 
 def plot_pose3RT_on_axes(axes, gRp, origin, axis_length=0.1, center_plot=False, line_obj_list=None, zoom_to_fit=False):
-    """Plot a 3D pose on given axis 'axes' with given 'axis_length'."""
+    """
+    Plot a 3D pose on given axis 'axes' with given 'axis_length'.
+    """
     # draw the camera axes
     x_axis = origin + gRp[:, 0] * axis_length
     linex = np.append(origin, x_axis, axis=0)
@@ -300,7 +597,8 @@ def plot_g2o_SE2(axes, g2o_obj,text=False):
 
 def bounding_box(points, min_x=-np.inf, max_x=np.inf, min_y=-np.inf,
                         max_y=np.inf):
-    """ Compute a bounding_box filter on the given points
+    """
+    Compute a bounding_box filter on the given points
 
     Parameters
     ----------
@@ -432,12 +730,6 @@ def tiled_features2(kp_list, img_shape, tiles_hor, tiles_ver, no_features = None
     #print("Size of Tiled Keypoints: ", len(tiled_keypoints), " Size of unsel keypoints: ", len(unsel_keypoints))
     #cv2.waitKey()
 '''
-
-def draw_keypoints(vis, keypoints, color = (0, 255, 255)):
-    for kp in keypoints:
-        x, y = kp.pt
-        cv2.circle(vis, (int(x), int(y)), 15, color)
-    return vis
 
 def knn_match_and_lowe_ratio_filter(matcher, des1, des2,threshold=0.9, dist_mask_12=None, draw_plot_dist=False):
     # First match 2 against 1
@@ -778,7 +1070,7 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask=None):
     T_2_1 = T_2_w @ T_w_1
     P_2_1 = T_2_1[:3]
     #print ("P_2_1: ", P_2_1)
-    
+
     t_2_1 = T_2_1[:3,-1]
     #print("pts_1: ",pts_1.shape)
     # Calculate points in 0,0,0 frame
@@ -786,15 +1078,15 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask=None):
         pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1, pts_2).T
         mask = np.ones((pts_1.shape[0],1),dtype='uint8')
     else:
-        pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1[mask==1], 
+        pts_3d_frame1_hom = cv2.triangulatePoints(P_origin, P_2_1, pts_1[mask==1],
                                               pts_2[mask==1]).T
     pts_3d_frame1_hom_norm = pts_3d_frame1_hom /  pts_3d_frame1_hom[:,-1][:,None]
-    
+
     pt_iter = 0
     rows_to_del = []
     #ANGLE_THRESHOLD = np.radians(.5)
-    
-    
+
+
     for i,v in enumerate(mask):
         if v==1:
             lm_cand = pts_3d_frame1_hom_norm[pt_iter,:3]
@@ -806,15 +1098,15 @@ def triangulate(T_w_1, T_w_2, pts_1, pts_2, mask=None):
             '''
             if pts_3d_frame1_hom_norm[pt_iter,2]<=0 or \
                pts_3d_frame1_hom_norm[pt_iter,2]>100: #or \
-               #pdist < .01: 
+               #pdist < .01:
                 #dist > 50.0:
                 #angle < ANGLE_THRESHOLD:
                 #print ("Point is negative")
-                mask[i,0]=0 
+                mask[i,0]=0
                 rows_to_del.append(pt_iter)
             '''
             pt_iter +=1
-    
+
     pts_3d_frame1_hom_norm = np.delete(pts_3d_frame1_hom_norm,rows_to_del,axis=0)
     # Move 3d points to world frame by transforming with T_w_1
     pts_3d_w_hom = pts_3d_frame1_hom_norm @ T_w_1.T
