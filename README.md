@@ -114,6 +114,9 @@ Depending on the system, make sure either osx_image_folder or linux_image_folder
 ./vslam.py -c config/kitti.conf
 ```
 
+## Tutorials and Examples
+All the ideas and algorithms used in this package are explained in [docs/tutorial.md](docs/tutorial.md), kudos to @arvindchelvan for putting it together.
+
 ## Algorithm
 ### Frame Dataflow
 ![Simple Vslam Frame Data Flow](./docs/frame_data_flow.svg)
