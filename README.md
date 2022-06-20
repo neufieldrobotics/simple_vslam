@@ -1,4 +1,4 @@
-# simple_vslam [![Build Status](https://travis-ci.com/neufieldrobotics/simple_vslam.svg?branch=master)](https://travis-ci.com/neufieldrobotics/simple_vslam)
+# simple_vslam [![Build Status](https://app.travis-ci.com/neufieldrobotics/zernike_py.svg?branch=master)](https://travis-ci.com/neufieldrobotics/simple_vslam)
 
 simple_vslam is a python based implementation of visual slam using opencv.
 ## Prerequisites
@@ -34,7 +34,7 @@ These are instructions for installing gtsam in a conda environment so that the r
 # Create an environment called simple_vslam_env as specified in conda_env.yml
 # We like python 3.5.6 since it works with OpenCV 3.3.1 which comes with SIFT out of the box
 # instead of having to compile it.
-conda env create --file conda_env_py36.yml
+conda env create --file conda_env_py39.yml
 # activate the environment
 conda activate simple_vslam_env
 ```
@@ -68,13 +68,13 @@ git clone https://github.com/borglab/gtsam.git
 
 cd gtsam
 # Check out the known commit that works with this repo
-# Checked with release candidate 4.1.0 on 05/26/2021
-git checkout release/4.1.0
+# Checked with release candidate 4.1.1 on 06/19/2022
+git checkout 4.1.1
 
 # Install gtsam python requirements with, these should already be in your environment
 pip install -r python/requirements.txt 
 
-# Edit the CMakeLists.txt file to the flags GTSAM_BUILD_PYTHON, GTSAM_INSTALL_MATLAB_TOOLBOX and GTSAM_INSTALL_CYTHON_TOOLBOX turn off GTSAM_ALLOW_DEPRECATED_SINCE_V4, 
+# Edit the cmake/HandleGeneralOptions.cmake file to the flags GTSAM_BUILD_PYTHON, GTSAM_INSTALL_MATLAB_TOOLBOX and GTSAM_INSTALL_CYTHON_TOOLBOX turn off GTSAM_ALLOW_DEPRECATED_SINCE_V4, 
 # the respective lines should look as follows:
   
 option(GTSAM_BUILD_PYTHON                "Enable/Disable building & installation of Python module with pybind11" ON)
@@ -84,7 +84,7 @@ option(GTSAM_ALLOW_DEPRECATED_SINCE_V41  "Allow use of methods/functions depreca
 # These instructions are for installing within a conda environment, for system wide installation, this would have to be adjusted accordingly:  
 mkdir build
 cd build
-cmake -D GTSAM_PYTHON_VERSION=3.6 -DCMAKE_INSTALL_PREFIX=/home/<username>/gtsam_bin ..
+cmake -D GTSAM_PYTHON_VERSION=3.9 -DCMAKE_INSTALL_PREFIX=/home/<username>/gtsam_bin ..
 make check -j4 # (check optional, runs unit tests)
 # Takes about 30 mins.
 make -j4
@@ -94,7 +94,7 @@ make python-install # this should install the binaries to /home/<username>/gtsam
 python ./python/gtsam/examples/ImuFactorISAM2Example.py 
 
 # If using conda environments, add the path '/home/<username>/gtsam_bin/cython' to a .pth file in 
-# '/home/<username>/anaconda/envs/simple_vslam_env/lib/python3.5/site-packages/gtsam.pth'
+# '/home/<username>/anaconda/envs/simple_vslam_env/lib/python3.9/site-packages/gtsam.pth'
 ```
 
 ## Get test data

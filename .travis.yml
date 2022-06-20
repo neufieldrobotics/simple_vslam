@@ -6,7 +6,7 @@ services:
 matrix:
   include:
    - arch: amd64
-     env : DOCKER_IMAGE=neufieldrobotics/conda_py3.6_gtsam:gtsam_latest
+     env : DOCKER_IMAGE=neufieldrobotics/conda_py3.9_gtsam_4_1_1:latest
 
 before_install:
 - docker pull $DOCKER_IMAGE
@@ -21,8 +21,8 @@ script:
   "
   echo $(pwd) &&
   echo "CONDA_PREFIX:" $CONDA_PREFIX &&
-  conda env update -n py36_env --file conda_env.yml &&
-  source activate py36_env &&
+  conda env update -n py39_env --file conda_env.yml &&
+  source activate py39_env &&
   echo "CONDA_PREFIX:" $CONDA_PREFIX &&
   python -m gtsam.examples.VisualISAM2Example &&
   cd simple_vslam &&
