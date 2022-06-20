@@ -115,10 +115,9 @@ points, rot_2R1, trans_2t1, mask_RP = cv2.recoverPose(E, kp1_match_ud, kp2_match
 print("points:",points,"\trecover pose mask:",np.sum(mask_RP!=0))
 print("R:",rot_2R1,"t:",trans_2t1.T)
 
-bool_mask = mask_RP.astype(bool)
 img_valid = cv2.drawMatches(gr1,kp1,gr2,kp2,matches, None, 
                             matchColor=(0, 255, 0), 
-                            matchesMask=bool_mask.ravel().tolist(), flags=2)
+                            matchesMask=mask_RP[:,0], flags=2)
 
 fig1 = plt.figure(1)
 ax1 = fig1.add_subplot(111)
