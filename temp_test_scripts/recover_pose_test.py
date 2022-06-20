@@ -36,7 +36,7 @@ gr2 = cv2.imread(img_path2, cv2.IMREAD_GRAYSCALE)
 chess_board_corners_file = os.path.join(data_path, img_folder, 'gopro_chess_board_800x600_corners.yaml')
 
 with open(chess_board_corners_file) as file:
-    corners_dict = yaml.load(file)
+    corners_dict = yaml.safe_load(file)
 
 '''
 K = np.array([[700.551256,   0.     ,  403.995336],
