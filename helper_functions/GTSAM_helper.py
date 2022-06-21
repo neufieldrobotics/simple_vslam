@@ -258,7 +258,7 @@ class iSAM2Wrapper():
             fkeys = factor.keys()
             if fkeys.size() == 2:
                 x = values.atPose3(fkeys.at(0)).translation()
-                if key_label(fkeys.at(1))[0] is 'x':
+                if key_label(fkeys.at(1))[0] == 'x':
                     l = values.atPose3(fkeys.at(1)).translation()
                 else:
                     l = values.atPoint3(fkeys.at(1))
