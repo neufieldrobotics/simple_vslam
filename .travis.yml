@@ -27,8 +27,8 @@ script:
   "
   echo $(pwd) &&
   echo "CONDA_PREFIX:" $CONDA_PREFIX &&
-  conda env update -n py39_env --file conda_env.yml &&
-  source activate py39_env &&
+  conda env update -n $CONDA_ENV --file conda_env.yml &&
+  source activate $CONDA_ENV &&
   echo "CONDA_PREFIX:" $CONDA_PREFIX &&
   python -m gtsam.examples.VisualISAM2Example &&
   cd simple_vslam &&
