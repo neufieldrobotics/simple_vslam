@@ -7,12 +7,16 @@ matrix:
   include:
    - arch: amd64
      env : DOCKER_IMAGE=neufieldrobotics/conda_py3.5_gtsam:latest
+     env : CONDA_ENV=py35_env
    - arch: amd64
      env : DOCKER_IMAGE=neufieldrobotics/conda_py3.6_gtsam:gtsam_latest
+     env : CONDA_ENV=py36_env
    - arch: amd64
      env : DOCKER_IMAGE=neufieldrobotics/conda_py3.9_gtsam_4_1_1:latest
+     env : CONDA_ENV=py39_env
    - arch: amd64
      env : DOCKER_IMAGE=neufieldrobotics/conda_py3.9_gtsam_head:latest
+     env : CONDA_ENV=py39_env
 
 before_install:
 - docker pull $DOCKER_IMAGE
