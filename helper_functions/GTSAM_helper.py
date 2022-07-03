@@ -46,7 +46,12 @@ class iSAM2Wrapper():
 
         iS2params = gtsam.ISAM2Params()
         iS2params.setRelinearizeThreshold(relinearizeThreshold)
-        iS2params.setRelinearizeSkip(relinearizeSkip)
+        try:
+            iS2params.setRelinearizeSkip(relinearizeSkip)
+        except AttributeError as exception:
+            Frame.frlog.warn(str(exception) + "\nUsing direct memeber access in recent versions of gtsam")
+            iS2params.relinearizeSkip = relinearizeSkip
+                        
         self.isam2 = gtsam.ISAM2(iS2params)
 
         self.projection_noise = gtsam.noiseModel.Isotropic.Sigma(2, proj_noise_val)
@@ -171,9 +176,11 @@ class iSAM2Wrapper():
         Author: Ellon Paiva
         Based on MATLAB version by: Duy Nguyen Ta and Frank Dellaert
         """
-
         fig = plt.figure(fignum)
-        axes = fig.gca(projection='3d')
+        if not fig.axes:
+            axes = fig.add_subplot(projection='3d')
+        else:
+            axes = fig.axes[0]
         plt.cla()
 
         # Plot points
@@ -258,7 +265,7 @@ class iSAM2Wrapper():
             fkeys = factor.keys()
             if fkeys.size() == 2:
                 x = values.atPose3(fkeys.at(0)).translation()
-                if key_label(fkeys.at(1))[0] is 'x':
+                if key_label(fkeys.at(1))[0] == 'x':
                     l = values.atPose3(fkeys.at(1)).translation()
                 else:
                     l = values.atPoint3(fkeys.at(1))

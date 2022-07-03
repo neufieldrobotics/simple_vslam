@@ -179,7 +179,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Inputs, images and camera info
-    config_dict = yaml.load(open(args.config))
+    config_dict = yaml.full_load(open(args.config))
     USE_MASKS = config_dict['use_masks']
     #RADIAL_NON_MAX_RADIUS = config_dict['radial_non_max_radius']
     image_ext = config_dict['image_ext']

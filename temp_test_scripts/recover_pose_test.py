@@ -9,6 +9,8 @@ import cv2
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import yaml
+from packaging import version
+OPENCV_NEWER_THAN_4_5_3 = version.parse(cv2.__version__) >= version.parse('4.5.3')
 
 # This allows adding correct path whether run from file, spyder or notebook
 try:
@@ -36,7 +38,7 @@ gr2 = cv2.imread(img_path2, cv2.IMREAD_GRAYSCALE)
 chess_board_corners_file = os.path.join(data_path, img_folder, 'gopro_chess_board_800x600_corners.yaml')
 
 with open(chess_board_corners_file) as file:
-    corners_dict = yaml.load(file)
+    corners_dict = yaml.safe_load(file)
 
 '''
 K = np.array([[700.551256,   0.     ,  403.995336],
@@ -115,10 +117,14 @@ points, rot_2R1, trans_2t1, mask_RP = cv2.recoverPose(E, kp1_match_ud, kp2_match
 print("points:",points,"\trecover pose mask:",np.sum(mask_RP!=0))
 print("R:",rot_2R1,"t:",trans_2t1.T)
 
-bool_mask = mask_RP.astype(bool)
+if OPENCV_NEWER_THAN_4_5_3:
+    bool_mask = mask_RP[:,0]
+else:
+    bool_mask = mask_RP.astype(bool).ravel().tolist()
+
 img_valid = cv2.drawMatches(gr1,kp1,gr2,kp2,matches, None, 
                             matchColor=(0, 255, 0), 
-                            matchesMask=bool_mask.ravel().tolist(), flags=2)
+                            matchesMask=bool_mask, flags=2)
 
 fig1 = plt.figure(1)
 ax1 = fig1.add_subplot(111)
