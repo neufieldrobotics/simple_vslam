@@ -14,7 +14,6 @@ import gtsam.utils.plot as gtsam_plot
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W0611
 from matplotlib import pyplot as plt
 import cv2
-import sys
 
 from frame import Frame
 
